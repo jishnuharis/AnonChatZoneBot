@@ -39,12 +39,17 @@ def save_user_data(data: dict):
 
         ensure_db()
 
+        cursor.execute("""
+                    ALTER TABLE user_details
+                    ALTER COLUMN partner_id SET DEFAULT NULL
+                    """)
+
         for user_id, details in data.items():
             cursor.execute("""
                     INSERT INTO user_details (
                         user_id, gender, age, country, reports, reporters, 
                         vote_up, vote_down, voters, feedback_track, partner_id
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %lld)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET
                         gender = EXCLUDED.gender,
                         age = EXCLUDED.age,
@@ -54,7 +59,7 @@ def save_user_data(data: dict):
                         vote_up = EXCLUDED.vote_up,
                         vote_down = EXCLUDED.vote_down,
                         voters = EXCLUDED.voters,
-                        feedback_track = EXCLUDED.feedback_track
+                        feedback_track = EXCLUDED.feedback_track,
                         partner_id = EXCLUDED.partner_id
             """, (
                 user_id,
@@ -67,7 +72,7 @@ def save_user_data(data: dict):
                 details.get("votes", {}).get("down", 0),
                 json.dumps(details.get("voters", [])),
                 json.dumps(details.get("feedback_track", {})),
-                details.get("partner_id")
+                details.get("partner_id", None)
             ))
         conn.commit()
         print("✅ User Data Saved to Drive Successfully.")
