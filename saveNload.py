@@ -41,8 +41,9 @@ def save_user_data(data: dict):
         cursor = conn.cursor()
 
         cursor.execute("""
-        ALTER TABLE user_details
-        ALTER COLUMN partner_id SET DEFAULT NULL""")
+        UPDATE user_details
+        SET partner_id = NULL
+        WHERE partner_id = -1""")
 
         for user_id, details in data.items():
             cursor.execute("""
