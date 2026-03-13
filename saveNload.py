@@ -44,7 +44,7 @@ def save_user_data(data: dict):
                     INSERT INTO user_details (
                         user_id, gender, age, country, reports, reporters, 
                         vote_up, vote_down, voters, feedback_track, partner_id
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %lld)
                     ON CONFLICT (user_id) DO UPDATE SET
                         gender = EXCLUDED.gender,
                         age = EXCLUDED.age,
