@@ -11,6 +11,6 @@ active_pairs = {}  # Holds the pairs of users' IDs where user's ID is the key an
 user_details = {int(k): v for k, v in load_user_data().items()}  # Holds the users' details and ratings
 for user_id, details in user_details:
     if details["partner_id"] > 0 and user_id not in active_pairs:
-        active_pairs = details["partner_id"]
+        active_pairs[user_id] = details["partner_id"]
 user_input_stage = {}  # Track the current input stage the user is in
 edit_stage = {}  # Track which field the user is editing
