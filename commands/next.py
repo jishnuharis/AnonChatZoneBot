@@ -17,8 +17,8 @@ async def next(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in init.active_pairs:  # Checks if the user is in an active conversation with their partner
         partner = init.active_pairs.pop(user_id)
-        init.user_details[partner]["partner_id"] = -1
-        init.user_details[user_id]["partner_id"] = -1
+        init.user_details[partner]["partner_id"] = None
+        init.user_details[user_id]["partner_id"] = None
         init.active_pairs.pop(partner, None)  # Pops the partner's ID from the active_pair
 
         # Notify the user and his partner that the conversation us ended

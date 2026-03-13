@@ -15,8 +15,8 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in init.active_pairs:  # Checks if the user is in a active conversation
         partner = init.active_pairs.pop(user_id)
-        init.user_details[partner]["partner_id"] = -1
-        init.user_details[user_id]["partner_id"] = -1
+        init.user_details[partner]["partner_id"] = None
+        init.user_details[user_id]["partner_id"] = None
         init.active_pairs.pop(partner, None)
 
         # Notifies the user and their partner thar the conversation is ended

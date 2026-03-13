@@ -26,7 +26,8 @@ def ensure_db():
                     vote_up INTEGER,
                     vote_down INTEGER,
                     voters TEXT,
-                    feedback_track JSONB
+                    feedback_track JSONB,
+                    partner_id BIGINT
             )
         """)
         conn.commit()
@@ -34,10 +35,14 @@ def ensure_db():
 
 # Function which stores the details of the users in the database
 def save_user_data(data: dict):
+    ensure_db()
+
     with get_connection() as conn:
         cursor = conn.cursor()
 
-        ensure_db()
+        cursor.execute("""
+        ALTER TABLE user_details
+        ALTER COLUMN partner_id SET DEFAULT NULL""")
 
         for user_id, details in data.items():
             cursor.execute("""
