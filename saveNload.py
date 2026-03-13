@@ -40,6 +40,8 @@ def save_user_data(data: dict):
     with get_connection() as conn:
         cursor = conn.cursor()
 
+        cursor.execute("ALTER DATABASE railway REFRESH COLLATION VERSION")
+
         for user_id, details in data.items():
             cursor.execute("""
                     INSERT INTO user_details (
