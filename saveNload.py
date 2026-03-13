@@ -3,8 +3,6 @@ import json
 import os
 import psycopg2
 
-import init
-
 DATABASE_URL = os.getenv("DATABASE_URL")  # Holds the database's URL
 
 
@@ -100,6 +98,4 @@ def load_user_data() -> dict:
                 "feedback_track": row[9],
                 "partner_id": row[10],
             }
-            if data[user_id]["partner_id"] > 0 and user_id not in init.active_pairs:
-                init.active_pairs[user_id] = data[user_id]["partner_id"]
         return data
