@@ -3,6 +3,8 @@ import json
 import os
 import psycopg2
 
+import init
+
 DATABASE_URL = os.getenv("DATABASE_URL")  # Holds the database's URL
 
 
@@ -43,7 +45,7 @@ def save_user_data(data: dict):
             cursor.execute("""
                     INSERT INTO user_details (
                         user_id, gender, age, country, reports, reporters, 
-                        vote_up, vote_down, voters, feedback_track
+                        vote_up, vote_down, voters, feedback_track, partner_id
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET
                         gender = EXCLUDED.gender,
@@ -55,6 +57,7 @@ def save_user_data(data: dict):
                         vote_down = EXCLUDED.vote_down,
                         voters = EXCLUDED.voters,
                         feedback_track = EXCLUDED.feedback_track
+                        partner_id = EXCLUDED.partner_id
             """, (
                 user_id,
                 details.get("gender"),
@@ -65,7 +68,8 @@ def save_user_data(data: dict):
                 details.get("votes", {}).get("up", 0),
                 details.get("votes", {}).get("down", 0),
                 json.dumps(details.get("voters", [])),
-                json.dumps(details.get("feedback_track", {}))
+                json.dumps(details.get("feedback_track", {})),
+                details.get("partner_id")
             ))
         conn.commit()
         print("✅ User Data Saved to Drive Successfully.")
@@ -94,5 +98,8 @@ def load_user_data() -> dict:
                 },
                 "voters": json.loads(row[8]),
                 "feedback_track": row[9],
+                "partner_id": row[10],
             }
+            if data[user_id]["partner_id"] > 0 and user_id not in init.active_pairs:
+                init.active_pairs[user_id] = data[user_id]["partner_id"]
         return data
