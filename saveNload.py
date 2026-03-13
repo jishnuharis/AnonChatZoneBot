@@ -46,6 +46,10 @@ def save_user_data(data: dict):
         WHERE partner_id = -1""")
 
         for user_id, details in data.items():
+            pid = details.get("partner_id")
+            if pid == -1:
+                pid = None
+
             cursor.execute("""
                     INSERT INTO user_details (
                         user_id, gender, age, country, reports, reporters, 
@@ -73,7 +77,7 @@ def save_user_data(data: dict):
                 details.get("votes", {}).get("down", 0),
                 json.dumps(details.get("voters", [])),
                 json.dumps(details.get("feedback_track", {})),
-                details.get("partner_id", None)
+                pid
             ))
         conn.commit()
         print("✅ User Data Saved to Drive Successfully.")
