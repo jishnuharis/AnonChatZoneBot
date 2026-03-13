@@ -40,11 +40,6 @@ def save_user_data(data: dict):
     with get_connection() as conn:
         cursor = conn.cursor()
 
-        cursor.execute("""
-        UPDATE user_details
-        SET partner_id = NULL
-        WHERE partner_id = -1""")
-
         for user_id, details in data.items():
             pid = details.get("partner_id")
             if pid == -1:
