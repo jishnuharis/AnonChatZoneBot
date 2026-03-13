@@ -39,11 +39,6 @@ def save_user_data(data: dict):
 
         ensure_db()
 
-        cursor.execute("""
-                    ALTER TABLE user_details
-                    ALTER COLUMN partner_id SET DEFAULT NULL
-                    """)
-
         for user_id, details in data.items():
             cursor.execute("""
                     INSERT INTO user_details (
