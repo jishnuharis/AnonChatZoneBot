@@ -42,21 +42,16 @@ async def set_commands(application):
 
 
 # Function to save the user data periodically every minute
-async def periodic_save():
-    while True:
-        save_user_data(init.user_details, init.dirty_users)
-        await asyncio.sleep(60)
+async def periodic_save(context):
+    save_user_data(init.user_details, init.dirty_users)
 
 
 # Function to free the feedback_track to handle clean voting system while minimising data overflow
-async def periodic_feedback_clear():
-    while True:
-        await asyncio.sleep(28800)
-
-        for user_id, details in init.user_details.items():
-            if details.get("feedback_track"):
-                details["feedback_track"] = {}
-                init.dirty_users.add(user_id)
+async def periodic_feedback_clear(context):
+    for user_id, details in init.user_details.items():
+        if details.get("feedback_track"):
+            details["feedback_track"] = {}
+            init.dirty_users.add(user_id)
 
 
 async def on_shutdown(application):
@@ -68,8 +63,8 @@ async def on_shutdown(application):
 
 
 async def on_startup(application):
-    application.create_task(periodic_save())  # Saves the user data
-    application.create_task(periodic_feedback_clear())  # Frees up the feedback_track
+    application.job_queue.run_repeating(periodic_save, interval=60, first=60)  # Saves the user data
+    application.job_queue.run_repeating(periodic_feedback_clear, interval=28800, first=28800)  # Frees up the feedback_track
 
 
 # Main function to keep the bot alive, handle user commands and user inputs, relaying messages between users
