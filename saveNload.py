@@ -80,12 +80,11 @@ def save_user_data(data: dict, dirty_user: set):
             ))
 
         if values:
+            print(f"✅ User Data Saved to Drive Successfully. Updated Data of {len(dirty_user)} User.")
             cursor.executemany(QUERY, values)
 
         conn.commit()
         dirty_user.clear()
-
-        print("✅ User Data Saved to Drive Successfully.")
 
 
 # Function which returns the users' details it read from the database
