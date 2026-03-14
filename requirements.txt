@@ -1,5 +1,5 @@
 python-telegram-bot
-python-telegram-bot[job-queue]==21.7
+python-telegram-bot[job-queue]
 Flask
 nest_asyncio
 aiofiles
