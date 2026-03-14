@@ -52,10 +52,12 @@ async def periodic_save():
 # Function to free the feedback_track to handle clean voting system while minimising data overflow
 async def periodic_feedback_clear():
     while True:
-        for u, v in init.user_details.items():
-            v["feedback_track"] = {}
-            init.dirty_users.add(u)
         await asyncio.sleep(28800)
+
+        for user_id, details in init.user_details.items():
+            if details.get("feedback_track"):
+                details["feedback_track"] = {}
+                init.dirty_users.add(user_id)
 
 
 # Main function to keep the bot alive, handle user commands and user inputs, relaying messages between users
