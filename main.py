@@ -46,8 +46,7 @@ async def set_commands(application):
 # Function to save the user data periodically every minute
 async def periodic_save():
     while True:
-        if init.dirty_users:
-            save_user_data(init.user_details, init.dirty_users)
+        save_user_data(init.user_details, init.dirty_users)
         await asyncio.sleep(60)
 
 
