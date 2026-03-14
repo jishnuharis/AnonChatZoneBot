@@ -71,10 +71,8 @@ async def on_shutdown(application):
 async def main():
     keep_alive()  # Keeps the bot alive
 
-    app = ApplicationBuilder().token(init.BOT_TOKEN).build()  # The app which makes the bot work
+    app = ApplicationBuilder().token(init.BOT_TOKEN).post_shutdown(on_shutdown).build()  # The app which makes the bot work
     await set_commands(app)
-
-    app.post_shutdown = on_shutdown
 
     app.add_handler(CommandHandler("start", start))  # Connects the 'start' command to its functionality
     app.add_handler(CommandHandler("find", find))  # Connects the 'find' command to its functionality
