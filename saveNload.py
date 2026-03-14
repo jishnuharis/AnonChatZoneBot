@@ -80,7 +80,7 @@ def save_user_data(data: dict, dirty_user: set):
             ))
 
         if values:
-            print(f"✅ User Data Saved to Drive Successfully. Updated Data of {len(dirty_user)} User.")
+            print(f"✅ User Data Saved to Drive Successfully. Updated Data of {len(dirty_user)} Users.")
             cursor.executemany(QUERY, values)
 
         conn.commit()
