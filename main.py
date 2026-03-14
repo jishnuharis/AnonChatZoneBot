@@ -61,9 +61,8 @@ async def periodic_feedback_clear():
                 init.dirty_users.add(user_id)
 
 
-def shutdown_handler(signum, frame):
+async def on_shutdown(application):
     print("⚠️ Bot shutting down. Saving user data...")
-
     try:
         save_user_data(init.user_details, init.dirty_users)
     except Exception as e:
@@ -74,11 +73,10 @@ def shutdown_handler(signum, frame):
 async def main():
     keep_alive()  # Keeps the bot alive
 
-    signal.signal(signal.SIGINT, shutdown_handler)
-    signal.signal(signal.SIGTERM, shutdown_handler)
-
     app = ApplicationBuilder().token(init.BOT_TOKEN).build()  # The app which makes the bot work
     await set_commands(app)
+
+    app.post_shutdown = on_shutdown
 
     app.add_handler(CommandHandler("start", start))  # Connects the 'start' command to its functionality
     app.add_handler(CommandHandler("find", find))  # Connects the 'find' command to its functionality
