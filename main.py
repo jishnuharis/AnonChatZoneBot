@@ -25,8 +25,6 @@ from security import global_error_handler
 
 # Imports for basic functionality of bot and its data credentials
 import asyncio
-import signal
-import sys
 import init
 
 
