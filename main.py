@@ -99,6 +99,4 @@ async def main():
 
 # Part which keeps the event loop running
 if __name__ == '__main__':
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
