@@ -67,12 +67,23 @@ async def on_shutdown(application):
         print("Failed to save during shutdown:", e)
 
 
+async def on_startup(application):
+    application.create_task(periodic_save())  # Saves the user data
+    application.create_task(periodic_feedback_clear())  # Frees up the feedback_track
+
+
 # Main function to keep the bot alive, handle user commands and user inputs, relaying messages between users
-async def main():
+def main():
     keep_alive()  # Keeps the bot alive
 
-    app = ApplicationBuilder().token(init.BOT_TOKEN).post_shutdown(on_shutdown).build()  # The app which makes the bot work
-    await set_commands(app)
+    app = (
+        ApplicationBuilder()
+        .token(init.BOT_TOKEN)
+        .post_init(set_commands)
+        .post_init(on_startup)
+        .post_shutdown(on_shutdown)
+        .build()
+    )  # The app which makes the bot work
 
     app.add_handler(CommandHandler("start", start))  # Connects the 'start' command to its functionality
     app.add_handler(CommandHandler("find", find))  # Connects the 'find' command to its functionality
@@ -93,12 +104,9 @@ async def main():
 
     app.add_error_handler(global_error_handler)
 
-    asyncio.create_task(periodic_save())  # Saves the user data
-    asyncio.create_task(periodic_feedback_clear())  # Frees up the feedback_track
-    await app.run_polling()  # Runs the app
+    app.run_polling()  # Runs the app
+
 
 # Part which keeps the event loop running
 if __name__ == '__main__':
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(main())
+    main()
