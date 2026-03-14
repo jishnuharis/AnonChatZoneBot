@@ -25,6 +25,8 @@ from security import global_error_handler
 
 # Imports for basic functionality of bot and its data credentials
 import asyncio
+import signal
+import sys
 import init
 
 
@@ -44,8 +46,8 @@ async def set_commands(application):
 # Function to save the user data periodically every minute
 async def periodic_save():
     while True:
-        save_user_data(init.user_details, init.dirty_users)
-        init.user_details = {int(k): v for k, v in load_user_data().items()}
+        if init.dirty_users:
+            save_user_data(init.user_details, init.dirty_users)
         await asyncio.sleep(60)
 
 
@@ -60,9 +62,22 @@ async def periodic_feedback_clear():
                 init.dirty_users.add(user_id)
 
 
+def shutdown_handler(signum, frame):
+    print("⚠️ Bot shutting down. Saving user data...")
+
+    try:
+        save_user_data(init.user_details, init.dirty_users)
+    except Exception as e:
+        print("Failed to save during shutdown:", e)
+
+
 # Main function to keep the bot alive, handle user commands and user inputs, relaying messages between users
 async def main():
     keep_alive()  # Keeps the bot alive
+
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
+
     app = ApplicationBuilder().token(init.BOT_TOKEN).build()  # The app which makes the bot work
     await set_commands(app)
 
