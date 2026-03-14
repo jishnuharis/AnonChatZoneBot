@@ -92,8 +92,8 @@ def main():
 
     app.add_error_handler(global_error_handler)
 
-    asyncio.create_task(periodic_save())  # Saves the user data
-    asyncio.create_task(periodic_feedback_clear())  # Frees up the feedback_track
+    app.create_task(periodic_save())  # Saves the user data
+    app.create_task(periodic_feedback_clear())  # Frees up the feedback_track
     app.run_polling()  # Runs the app
 
 
