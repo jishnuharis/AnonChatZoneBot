@@ -99,7 +99,7 @@ def main():
 
     app.add_error_handler(global_error_handler)
 
-    app.run_polling()  # Runs the app
+    app.run_polling(drop_pending_updates=True)  # Runs the app
 
 
 # Part which keeps the event loop running
