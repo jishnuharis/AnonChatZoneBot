@@ -44,7 +44,7 @@ async def set_commands(application):
 # Function to save the user data periodically every minute
 async def periodic_save():
     while True:
-        save_user_data(init.user_details)
+        save_user_data(init.user_details, init.dirty_users)
         init.user_details = {int(k): v for k, v in load_user_data().items()}
         await asyncio.sleep(60)
 
@@ -52,8 +52,9 @@ async def periodic_save():
 # Function to free the feedback_track to handle clean voting system while minimising data overflow
 async def periodic_feedback_clear():
     while True:
-        for v in init.user_details.values():
+        for u, v in init.user_details.items():
             v["feedback_track"] = {}
+            init.dirty_users.add(u)
         await asyncio.sleep(28800)
 
 

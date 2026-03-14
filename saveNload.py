@@ -11,7 +11,7 @@ def get_connection():
     return psycopg2.connect(DATABASE_URL)
 
 
-# Ensures the structure of the database is in the desired form and establishes it newly if it's missing
+# Ensures the structure of the database is in the desired form and establishes it newly if it's missing 1610390844
 def ensure_db():
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -34,30 +34,38 @@ def ensure_db():
 
 
 # Function which stores the details of the users in the database
-def save_user_data(data: dict):
+def save_user_data(data: dict, dirty_user: set):
     ensure_db()
+
+    QUERY = """
+            INSERT INTO user_details (
+                user_id, gender, age, country, reports, reporters, 
+                vote_up, vote_down, voters, feedback_track, partner_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+                gender = EXCLUDED.gender,
+                age = EXCLUDED.age,
+                country = EXCLUDED.country,
+                reports = EXCLUDED.reports,
+                reporters = EXCLUDED.reporters,
+                vote_up = EXCLUDED.vote_up,
+                vote_down = EXCLUDED.vote_down,
+                voters = EXCLUDED.voters,
+                feedback_track = EXCLUDED.feedback_track,
+                partner_id = EXCLUDED.partner_id
+    """
 
     with get_connection() as conn:
         cursor = conn.cursor()
 
-        for user_id, details in data.items():
-            cursor.execute("""
-                    INSERT INTO user_details (
-                        user_id, gender, age, country, reports, reporters, 
-                        vote_up, vote_down, voters, feedback_track, partner_id
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (user_id) DO UPDATE SET
-                        gender = EXCLUDED.gender,
-                        age = EXCLUDED.age,
-                        country = EXCLUDED.country,
-                        reports = EXCLUDED.reports,
-                        reporters = EXCLUDED.reporters,
-                        vote_up = EXCLUDED.vote_up,
-                        vote_down = EXCLUDED.vote_down,
-                        voters = EXCLUDED.voters,
-                        feedback_track = EXCLUDED.feedback_track,
-                        partner_id = EXCLUDED.partner_id
-            """, (
+        values = []
+
+        for user_id in list(dirty_user):
+            details = data.get(user_id)
+            if details is None:
+                continue
+
+            values.append((
                 user_id,
                 details.get("gender"),
                 details.get("age"),
@@ -70,7 +78,13 @@ def save_user_data(data: dict):
                 json.dumps(details.get("feedback_track", {})),
                 details.get("partner_id", None)
             ))
+
+        if values:
+            cursor.executemany(QUERY, values)
+
         conn.commit()
+        dirty_user.clear()
+
         print("✅ User Data Saved to Drive Successfully.")
 
 

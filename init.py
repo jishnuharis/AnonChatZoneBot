@@ -13,3 +13,4 @@ for user_id, details in user_details.items():
         active_pairs[user_id] = details["partner_id"]
 user_input_stage = {}  # Track the current input stage the user is in
 edit_stage = {}  # Track which field the user is editing
+dirty_users = set()

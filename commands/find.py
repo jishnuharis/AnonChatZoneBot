@@ -28,3 +28,5 @@ async def find(update: Update, context: ContextTypes.DEFAULT_TYPE):
         init.user_details[user2]["partner_id"] = user1
         await safe_tele_func_call(context.bot.send_message, chat_id=user1, text=f"🎯 *Found Someone.... Say Hi!!*\nRating: {uv2['up']} 👍 {uv2['down']} 👎\n/next - Next Chat\n/stop - Stop Chat", parse_mode="Markdown")
         await safe_tele_func_call(context.bot.send_message, chat_id=user2, text=f"🎯 *Found Someone.... Say Hi!!*\nRating: {uv1['up']} 👍 {uv1['down']} 👎\n/next - Next Chat\n/stop - Stop Chat", parse_mode="Markdown")
+
+        init.dirty_users.update([user1, user2])

@@ -78,3 +78,5 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not reported:
             buttons.append([InlineKeyboardButton("🚩 Report", callback_data=f"report|{target_id}")])
         await safe_tele_func_call(query.edit_message_text, text=f"*{rate_text}*", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+    
+    init.dirty_users.update([user_id, target_id])

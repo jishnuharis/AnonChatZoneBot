@@ -19,6 +19,8 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         init.user_details[user_id]["partner_id"] = None
         init.active_pairs.pop(partner, None)
 
+        init.dirty_users.update([user_id, partner])
+
         # Notifies the user and their partner thar the conversation is ended
         await safe_tele_func_call(context.bot.send_message, chat_id=partner, text="⛔ *Your partner left the chat.*", parse_mode="Markdown")
         await safe_tele_func_call(update.message.reply_text, text="👋 *Chat ended.*", parse_mode="Markdown")

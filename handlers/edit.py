@@ -27,3 +27,5 @@ async def handle_edit_selection(update: Update, context: ContextTypes.DEFAULT_TY
         await safe_tele_func_call(query.edit_message_text, text="🌍 *Select your new country:*", parse_mode="Markdown")
         init.edit_stage[user_id] = "country"
         await send_country_selection(user_id, context)
+
+    init.dirty_users.add(user_id)

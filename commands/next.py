@@ -21,6 +21,8 @@ async def next(update: Update, context: ContextTypes.DEFAULT_TYPE):
         init.user_details[user_id]["partner_id"] = None
         init.active_pairs.pop(partner, None)  # Pops the partner's ID from the active_pair
 
+        init.dirty_users.update([user_id, partner])
+
         # Notify the user and his partner that the conversation us ended
         await safe_tele_func_call(context.bot.send_message, chat_id=partner, text="⛔ *Your partner left the chat.*", parse_mode="Markdown")
         await safe_tele_func_call(update.message.reply_text, text="🔁 *Partner skipped...\nYou're added to the waiting queue...\nFinding new one...*", parse_mode="Markdown")

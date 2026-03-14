@@ -24,3 +24,5 @@ async def handle_gender_selection(update: Update, context: ContextTypes.DEFAULT_
     init.user_details[user_id]["gender"] = gender
     init.user_input_stage[user_id] = "age"
     await safe_tele_func_call(query.edit_message_text, text=f"*Gender is set to {'Male' if gender == 'M' else 'Female'}.*\n📅 Please enter your age:", parse_mode="Markdown")
+
+    init.dirty_users.add(user_id)

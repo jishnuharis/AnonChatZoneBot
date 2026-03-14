@@ -48,6 +48,9 @@ def check_user_profile(handler_func):
             elif stage == "age":  # If the stage is in age then it asks the user to enter the age
                 await safe_tele_func_call(update.message.reply_text, text="📅 *Please enter your age:*", parse_mode="Markdown")
             return
+
+        init.dirty_users.add(user_id)
+
         return await handler_func(update, context)
     return wrapper
 
@@ -81,3 +84,5 @@ async def handle_user_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_country_selection(user_id, context)
         except ValueError:  # If the user inputs something else it will notify them to do it again
             await safe_tele_func_call(update.message.reply_text, text="❌ *Please enter a valid number for age.*", parse_mode="Markdown")
+
+    init.dirty_users.add(user_id)
