@@ -93,7 +93,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_edit_selection, pattern="^edit\\|.+$"))  # Handles the selection of what to edit from the user
     app.add_handler(MessageHandler(
         (filters.TEXT | filters.Sticker.ALL | filters.PHOTO | filters.VIDEO |
-         filters.VIDEO_NOTE | filters.AUDIO | filters.Document.ALL | filters.VOICE) & ~filters.COMMAND,
+         filters.VIDEO_NOTE | filters.AUDIO | filters.Document.ALL | filters.VOICE | filters.ANIMATION) & ~filters.COMMAND,
         relay_message
     ))  # filters the commands from the messages sent by the user
 

@@ -28,17 +28,19 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif msg.sticker:
                 await safe_tele_func_call(context.bot.send_sticker, chat_id=partner_id, sticker=msg.sticker.file_id)  # Relaying the message as sticker if it's a sticker
             elif msg.photo:
-                await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=msg.photo[-1].file_id)  # Relaying the message as photo if it's a photo
+                await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=msg.photo[-1].file_id, caption=msg.caption)  # Relaying the message as photo if it's a photo
             elif msg.video:
-                await safe_tele_func_call(context.bot.send_video, chat_id=partner_id, video=msg.video.file_id)  # Relaying the message as video if it's a video
+                await safe_tele_func_call(context.bot.send_video, chat_id=partner_id, video=msg.video.file_id, caption=msg.caption)  # Relaying the message as video if it's a video
             elif msg.video_note:
                 await safe_tele_func_call(context.bot.send_video_note, chat_id=partner_id, video_note=msg.video_note.file_id)  # Relaying the message as voice note if it's a voice note
             elif msg.voice:
                 await safe_tele_func_call(context.bot.send_voice, chat_id=partner_id, voice=msg.voice.file_id)  # Relaying the message as voice if it's a voice
             elif msg.audio:
-                await safe_tele_func_call(context.bot.send_audio, chat_id=partner_id, audio=msg.audio.file_id)  # Relaying the message as audio if it's a audio
+                await safe_tele_func_call(context.bot.send_audio, chat_id=partner_id, audio=msg.audio.file_id, caption=msg.caption)  # Relaying the message as audio if it's a audio
             elif msg.document:
-                await safe_tele_func_call(context.bot.send_document, chat_id=partner_id, document=msg.document.file_id)  # Relaying the document as photo if it's a document
+                await safe_tele_func_call(context.bot.send_document, chat_id=partner_id, document=msg.document.file_id, caption=msg.caption)  # Relaying the message as document if it's a document
+            elif msg.animation:
+                await safe_tele_func_call(context.bot.send_animation, chat_id=partner_id, animation=msg.animation.file_id, caption=msg.caption)  # Relaying the message as animation if it's an animation
         except Exception as e:  # Notifying that there was an issue relaying the message
             await safe_tele_func_call(update.message.reply_text, text="❌ *Failed to send message.*", parse_mode="Markdown")
             print(e)
