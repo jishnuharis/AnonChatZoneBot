@@ -22,7 +22,7 @@ from handlers.gender import handle_gender_selection
 from handlers.country import handle_country_selection
 from handlers.edit import handle_edit_selection
 from handlers.coin_steal_game import send_request, handle_cs_request
-from games.coinsteal import handle_callback
+from games.coin_steal import handle_callback
 
 from security import global_error_handler
 
