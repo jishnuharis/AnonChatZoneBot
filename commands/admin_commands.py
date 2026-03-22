@@ -8,7 +8,7 @@ import init
 
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != init.OWNER:
+    if update.effective_user.id != int(init.OWNER):
         await update.message.reply_text("You can't use this command 💀")
         return
 
@@ -20,7 +20,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sent = 0
     for user_id in init.user_details.keys():
         try:
-            await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=message)
+            await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=message, parse_mode="Markdown")
             sent += 1
             await asyncio.sleep(0.1)  # tiny delay to avoid hitting rate limits
         except Exception as e:
