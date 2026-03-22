@@ -188,10 +188,12 @@ async def end_game(context: ContextTypes.DEFAULT_TYPE, session_id):
         m1 = "You really won by deceiving them 💔."
         m2 = "Maybe that's why they tell you not to trust anyone on the internet 🥀."
         init.user_details[u1]["points"] += 10
+        init.dirty_users.add(u1)
     elif s2 > s1:
         m1 = "Maybe that's why they tell you not to trust anyone on the internet 🥀."
         m2 = "You really won by deceiving them 💔."
         init.user_details[u2]["points"] += 10
+        init.dirty_users.add(u2)
     else:
         m1 = m2 = "You guys managed to make it a draw 👏.\nWell played for sure!"
 
@@ -222,6 +224,7 @@ async def force_end_game(context: ContextTypes.DEFAULT_TYPE, user_id):
 
     await safe_tele_func_call(context.bot.send_message, chat_id=other, text="Your partner left the game. Game ended...")
     init.user_details[other]["points"] += 5
+    init.dirty_users.add(other)
 
     remove_timeout_job(game)
 
