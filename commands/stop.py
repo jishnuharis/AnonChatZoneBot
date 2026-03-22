@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 from handlers.setup import check_user_profile  # Imports the handler which checks if the user's profile exists
 from handlers.rating import ask_for_rating  # Imports the handler which asks for the user to rate their partner after a conversation
 from security import safe_tele_func_call
-from games.coin_steal import force_end_game
+# from games.coin_steal import force_end_game
 
 import init  # Importing the bot credentials and users' details
 
@@ -21,7 +21,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         init.active_pairs.pop(partner, None)
 
         init.dirty_users.update([user_id, partner])
-        await force_end_game(context, user_id)
+        # await force_end_game(context, user_id)
 
         # Notifies the user and their partner thar the conversation is ended
         await safe_tele_func_call(context.bot.send_message, chat_id=partner, text="⛔ *Your partner left the chat.*", parse_mode="Markdown")
