@@ -62,7 +62,7 @@ async def handle_cs_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not requester_id:
         await safe_tele_func_call(query.edit_message_text, text="This request expired or doesn't exist.")
         return
-    # 5841585594 beautiful_yeah
+
     if action == "decline":
         await safe_tele_func_call(query.edit_message_text, "You declined the request.")
         await context.bot.send_message(chat_id=requester_id, text="Your partner declined the game.")

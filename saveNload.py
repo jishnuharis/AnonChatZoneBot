@@ -11,7 +11,7 @@ def get_connection():
     return psycopg2.connect(DATABASE_URL)
 
 
-# Ensures the structure of the database is in the desired form and establishes it newly if it's missing 1610390844
+# Ensures the structure of the database is in the desired form and establishes it newly if it's missing
 def ensure_db():
     with get_connection() as conn:
         cursor = conn.cursor()
