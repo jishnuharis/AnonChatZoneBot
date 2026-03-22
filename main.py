@@ -26,7 +26,6 @@ from handlers.coin_steal_game import send_request, handle_cs_request
 from security import global_error_handler
 
 # Imports for basic functionality of bot and its data credentials
-import asyncio
 import init
 
 
