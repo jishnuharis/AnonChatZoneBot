@@ -69,6 +69,11 @@ async def on_startup(application):
     application.job_queue.run_repeating(periodic_feedback_clear, interval=28800, first=28800)  # Frees up the feedback_track
 
 
+async def post_init_tasks(application):
+    await set_commands(application)
+    await on_startup(application)
+
+
 # Main function to keep the bot alive, handle user commands and user inputs, relaying messages between users
 def main():
     keep_alive()  # Keeps the bot alive
@@ -76,8 +81,7 @@ def main():
     app = (
         ApplicationBuilder()
         .token(init.BOT_TOKEN)
-        .post_init(set_commands)
-        .post_init(on_startup)
+        .post_init(post_init_tasks)
         .post_shutdown(on_shutdown)
         .build()
     )  # The app which makes the bot work
