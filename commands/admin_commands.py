@@ -12,7 +12,11 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("You can't use this command 💀")
         return
 
-    message = " ".join(context.args)
+    # get the full message text including line breaks
+    message = update.message.text
+    if message.lower().startswith("/broadcast"):
+        message = message[len("/broadcast"):].lstrip()  # preserve line breaks
+
     if not message:
         await update.message.reply_text("Give me a message to broadcast!")
         return
@@ -20,10 +24,15 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sent = 0
     for user_id in init.user_details.keys():
         try:
-            await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=message, parse_mode="Markdown")
+            await safe_tele_func_call(
+                context.bot.send_message,
+                chat_id=user_id,
+                text=message,
+                parse_mode="Markdown"  # preserves bold, italic, inline code
+            )
             sent += 1
-            await asyncio.sleep(0.1)  # tiny delay to avoid hitting rate limits
+            await asyncio.sleep(0.1)  # avoid rate limits
         except Exception as e:
-            await update.message.reply_text(f"An Unexpected error occurred: {e}")
+            print(f"Failed to send to {user_id}: {e}")
 
     await update.message.reply_text(f"Broadcast sent to {sent} users ✅")
