@@ -20,6 +20,7 @@ from handlers.rating import handle_vote
 from handlers.gender import handle_gender_selection
 from handlers.country import handle_country_selection
 from handlers.edit import handle_edit_selection
+from handlers.coin_steal_game import send_request, handle_cs_request
 
 from security import global_error_handler
 
@@ -37,6 +38,7 @@ async def set_commands(application):
         BotCommand("stop", "Stop the current chat"),  # stop
         BotCommand("help", "Show help"),  # help
         BotCommand("profile", "Show user profile"),  # profile
+        BotCommand("coinsteal", "Play a game of Coin Steal with your partner"),
     ]
     await application.bot.set_my_commands(commands)  # To set the commands to the bot menu
 
@@ -86,11 +88,13 @@ def main():
     app.add_handler(CommandHandler("stop", stop))  # Connects the 'stop' command to its functionality
     app.add_handler(CommandHandler("help", help_command))  # Connects the 'help' command to its functionality
     app.add_handler(CommandHandler("profile", show_profile))  # Connects the 'profile' command to its functionality
+    app.add_handler(CommandHandler("coinsteal", send_request))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern="rate\\|\\d+\\|(up|down)$"))  # Handles the voting mechanics
     app.add_handler(CallbackQueryHandler(handle_gender_selection, pattern="^gender\\|[MF]$"))  # Handles the selection of gender from the user
     app.add_handler(CallbackQueryHandler(handle_country_selection, pattern="^country\\|.+$"))  # Handles the selection of country from the user
     app.add_handler(CallbackQueryHandler(handle_vote, pattern="^report\\|\\d+$"))  # Handles the reporting mechanics
     app.add_handler(CallbackQueryHandler(handle_edit_selection, pattern="^edit\\|.+$"))  # Handles the selection of what to edit from the user
+    app.add_handler(CallbackQueryHandler(handle_cs_request, pattern="^cs_req\\|(accept|decline)$"))
     app.add_handler(MessageHandler(
         (filters.TEXT | filters.Sticker.ALL | filters.PHOTO | filters.VIDEO |
          filters.VIDEO_NOTE | filters.AUDIO | filters.Document.ALL | filters.VOICE | filters.ANIMATION) & ~filters.COMMAND,

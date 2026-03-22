@@ -27,7 +27,8 @@ def ensure_db():
                     vote_down INTEGER,
                     voters TEXT,
                     feedback_track JSONB,
-                    partner_id BIGINT
+                    partner_id BIGINT,
+                    points INTEGER
             )
         """)
         conn.commit()
@@ -40,8 +41,8 @@ def save_user_data(data: dict, dirty_user: set):
     QUERY = """
             INSERT INTO user_details (
                 user_id, gender, age, country, reports, reporters, 
-                vote_up, vote_down, voters, feedback_track, partner_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                vote_up, vote_down, voters, feedback_track, partner_id, points
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (user_id) DO UPDATE SET
                 gender = EXCLUDED.gender,
                 age = EXCLUDED.age,
@@ -52,7 +53,8 @@ def save_user_data(data: dict, dirty_user: set):
                 vote_down = EXCLUDED.vote_down,
                 voters = EXCLUDED.voters,
                 feedback_track = EXCLUDED.feedback_track,
-                partner_id = EXCLUDED.partner_id
+                partner_id = EXCLUDED.partner_id,
+                points = EXCLUDED.points
     """
 
     with get_connection() as conn:
@@ -76,7 +78,8 @@ def save_user_data(data: dict, dirty_user: set):
                 details.get("votes", {}).get("down", 0),
                 json.dumps(details.get("voters", [])),
                 json.dumps(details.get("feedback_track", {})),
-                details.get("partner_id", None)
+                details.get("partner_id", None),
+                details.get("points", None)
             ))
 
         if values:
@@ -111,5 +114,6 @@ def load_user_data() -> dict:
                 "voters": json.loads(row[8]),
                 "feedback_track": row[9],
                 "partner_id": row[10],
+                "points": row[11],
             }
         return data

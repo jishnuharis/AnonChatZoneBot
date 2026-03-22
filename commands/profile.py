@@ -23,6 +23,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 <b>Age:</b> {user["age"]}
 <b>Country:</b> {user["country"]}
 <b>Rating:</b> {votes["up"]} 👍 {votes["down"]} 👎
+<b>Points:</b> {user["points"]}
 """
     keyboard = [
         [InlineKeyboardButton("✏️ Edit Gender", callback_data="edit|gender"),
