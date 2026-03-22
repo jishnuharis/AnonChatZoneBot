@@ -14,6 +14,7 @@ from commands.next import next
 from commands.stop import stop
 from commands.help import help_command
 from commands.profile import show_profile
+from commands.admin_commands import *
 
 # Imports everything needed from the user-defined handler module to handle the command inputs of the users
 from handlers.rating import handle_vote
@@ -38,7 +39,7 @@ async def set_commands(application):
         BotCommand("stop", "Stop the current chat"),  # stop
         BotCommand("help", "Show help"),  # help
         BotCommand("profile", "Show user profile"),  # profile
-        BotCommand("coinsteal", "Play a game of Coin Steal with your partner"),  # coin steal game
+        BotCommand("coinsteal", "Play a game of Coin Steal"),  # coin steal game
     ]
     await application.bot.set_my_commands(commands)  # To set the commands to the bot menu
 
@@ -89,6 +90,7 @@ def main():
     app.add_handler(CommandHandler("help", help_command))  # Connects the 'help' command to its functionality
     app.add_handler(CommandHandler("profile", show_profile))  # Connects the 'profile' command to its functionality
     app.add_handler(CommandHandler("coinsteal", send_request))
+    app.add_handler((CommandHandler("broadcast", broadcast)))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern="rate\\|\\d+\\|(up|down)$"))  # Handles the voting mechanics
     app.add_handler(CallbackQueryHandler(handle_gender_selection, pattern="^gender\\|[MF]$"))  # Handles the selection of gender from the user
     app.add_handler(CallbackQueryHandler(handle_country_selection, pattern="^country\\|.+$"))  # Handles the selection of country from the user
