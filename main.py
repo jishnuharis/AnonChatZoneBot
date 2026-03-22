@@ -38,7 +38,7 @@ async def set_commands(application):
         BotCommand("stop", "Stop the current chat"),  # stop
         BotCommand("help", "Show help"),  # help
         BotCommand("profile", "Show user profile"),  # profile
-        BotCommand("coinsteal", "Play a game of Coin Steal with your partner"),
+        BotCommand("coinsteal", "Play a game of Coin Steal with your partner"),  # coin steal game
     ]
     await application.bot.set_my_commands(commands)  # To set the commands to the bot menu
 
