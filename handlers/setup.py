@@ -24,7 +24,9 @@ def check_user_profile(handler_func):
                 "reporters": [],
                 "votes": {"up": 0, "down": 0},
                 "voters": [],
-                "feedback_track": {}
+                "feedback_track": {},
+                "partner_id": None,
+                "points": 0,
             }
             init.user_input_stage[user_id] = "gender"  # Sets the input stage of the user to gender
             keyboard = [[
