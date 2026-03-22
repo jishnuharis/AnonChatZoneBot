@@ -18,7 +18,6 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if get_session(partner_id):
         await update.message.reply_text("Your partner is already in a game. Let them finish first.")
-        return
 
     if partner_id in init.game_requests:
         await update.message.reply_text("You can't just spam requests and expect your partner to accept it 💀.")
@@ -73,14 +72,14 @@ async def handle_cs_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_tele_func_call(query.edit_message_text, text="Request accepted!\nStarting Game...")
         await context.bot.send_message(chat_id=requester_id, text="Your request is accepted! Starting Game...")
 
-        from games.coin_steal import create_session, send_round, timeout_job
+        from games.coin_steal import create_session, send_round, timeout_job, TIMEOUT
 
         session_id = create_session(requester_id, user_id)
         await send_round(context, session_id)
 
         game = games.coin_steal.games[session_id]
 
-        job = context.job_queue.run_once(timeout_job, when=180, data={"session_id": session_id})
+        job = context.job_queue.run_once(timeout_job, when=TIMEOUT, data={"session_id": session_id})
 
         game["timeout_job"] = job
 
