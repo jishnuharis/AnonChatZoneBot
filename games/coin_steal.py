@@ -11,10 +11,12 @@ import init
 games = {}
 user_to_session = {}
 
+TIMEOUT = 300
+
 
 def create_session(user1, user2):
     session_id = str(uuid.uuid4())
-    
+
     games[session_id] = {
         "players": [user1, user2],
         "choices": {},
@@ -36,10 +38,13 @@ def get_session(user_id):
 
 
 async def send_round(context: ContextTypes.DEFAULT_TYPE, session_id):
-    game = games[session_id]
+    game = games.get(session_id)
+    if not game:
+        return
     r = game["round"]
 
-    txt = f"🎯 Round {r}:{"\n*x2 Multiplier*" if r == 3 else ""}\nChoose wisely..."
+    xtra = "\n*x2 Multiplier*" if r == 3 else ""
+    txt = f"🎯 Round {r}:{xtra}\nChoose wisely..."
 
     keyboard = InlineKeyboardMarkup([
         [
@@ -48,10 +53,9 @@ async def send_round(context: ContextTypes.DEFAULT_TYPE, session_id):
         ]
     ])
 
-    if game.get("timeout_job"):
-        game["timeout_job"].schedule_removal()
+    remove_timeout_job(game)
 
-    job = context.job_queue.run_once(timeout_job, when=180, data={"session_id": session_id})
+    job = context.job_queue.run_once(timeout_job, when=TIMEOUT, data={"session_id": session_id})
     game["timeout_job"] = job
 
     game["start_time"] = time.time()
@@ -79,19 +83,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text="You already chose. Chill 😭")
         return
 
-    msg_id = game["messages"].get(user_id)
+    msg_id = game["messages"].pop(user_id, None)
     if msg_id:
         await safe_tele_func_call(
             context.bot.edit_message_text,
             chat_id=user_id,
             message_id=msg_id,
             text="Choice locked in 🔒"
-        )
-        await safe_tele_func_call(
-            context.bot.edit_message_reply_markup,
-            chat_id=user_id,
-            message_id=msg_id,
-            reply_markup=None
         )
 
     await handle_choice(context, user_id, choice)
@@ -102,19 +100,19 @@ async def handle_choice(context: ContextTypes.DEFAULT_TYPE, user_id, choice):
     if not session_id:
         return
 
-    game = games[session_id]
+    game = games.get(session_id)
+    if not game:
+        return
 
     game["choices"][user_id] = choice
-
-    if game.get("timeout_job"):
-        game["timeout_job"].schedule_removal()
-
-    job = context.job_queue.run_once(timeout_job, when=180, data={"session_id": session_id})
-    game["timeout_job"] = job
 
     choice_text = "Steal 😈" if choice == "steal" else "Save 🤝"
     other_user = next(u for u in game["players"] if u != user_id)
     await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"You chose to {choice_text}.")
+
+    remove_timeout_job(game)
+    game["timeout_job"] = context.job_queue.run_once(timeout_job, when=TIMEOUT, data={"session_id": session_id})
+    game["start_time"] = time.time()
 
     if len(game["choices"]) == 1:
         await safe_tele_func_call(context.bot.send_message, chat_id=other_user, text="Your opponent made their move... do you trust them? 👀")
@@ -123,7 +121,9 @@ async def handle_choice(context: ContextTypes.DEFAULT_TYPE, user_id, choice):
 
 
 async def resolve_round(context: ContextTypes.DEFAULT_TYPE, session_id):
-    game = games[session_id]
+    game = games.get(session_id)
+    if not game:
+        return
     u1, u2 = game["players"]
     m1, m2 = "", ""
 
@@ -174,7 +174,9 @@ async def resolve_round(context: ContextTypes.DEFAULT_TYPE, session_id):
 
 
 async def end_game(context: ContextTypes.DEFAULT_TYPE, session_id):
-    game = games[session_id]
+    game = games.get(session_id)
+    if not game:
+        return
     u1, u2 = game["players"]
 
     s1 = game["score"][u1]
@@ -196,8 +198,7 @@ async def end_game(context: ContextTypes.DEFAULT_TYPE, session_id):
     await safe_tele_func_call(context.bot.send_message, chat_id=u1, text=m1)
     await safe_tele_func_call(context.bot.send_message, chat_id=u2, text=m2)
 
-    if game.get("timeout_job"):
-        game["timeout_job"].schedule_removal()
+    remove_timeout_job(game)
 
     for user in game["players"]:
         user_to_session.pop(user, None)
@@ -222,10 +223,23 @@ async def force_end_game(context: ContextTypes.DEFAULT_TYPE, user_id):
     await safe_tele_func_call(context.bot.send_message, chat_id=other, text="Your partner left the game. Game ended...")
     init.user_details[other]["points"] += 5
 
+    remove_timeout_job(game)
+
     for user in game["players"]:
         user_to_session.pop(user, None)
 
     games.pop(session_id, None)
+
+
+def remove_timeout_job(g):
+    job = g.get("timeout_job")
+
+    if job:
+        try:
+            job.schedule_removal()
+        except Exception:
+            pass
+        g["timeout_job"] = None
 
 
 async def timeout_job(context: ContextTypes.DEFAULT_TYPE):
@@ -235,21 +249,17 @@ async def timeout_job(context: ContextTypes.DEFAULT_TYPE):
     if not game:
         return
 
-    now = time.time()
+    u1, u2 = game["players"]
 
-    if now - game["start_time"] > 180:
-        u1, u2 = game["players"]
+    await safe_tele_func_call(context.bot.send_message, chat_id=u1, text="Game ended due to inactivity. Restart if you guys wanna play again.")
+    await safe_tele_func_call(context.bot.send_message, chat_id=u2, text="Game ended due to inactivity. Restart if you guys wanna play again.")
 
-        await safe_tele_func_call(context.bot.send_message, chat_id=u1, text="Game ended due to inactivity. Restart if you guys wanna play again.")
-        await safe_tele_func_call(context.bot.send_message, chat_id=u2, text="Game ended due to inactivity. Restart if you guys wanna play again.")
+    remove_timeout_job(game)
 
-        for user in game["players"]:
-            user_to_session.pop(user, None)
+    for user in game["players"]:
+        user_to_session.pop(user, None)
 
-        if game.get("timeout_job"):
-            game["timeout_job"].schedule_removal()
-
-        games.pop(session_id, None)
+    games.pop(session_id, None)
 
 
 
