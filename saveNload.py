@@ -79,7 +79,7 @@ def save_user_data(data: dict, dirty_user: set):
                 json.dumps(details.get("voters", [])),
                 json.dumps(details.get("feedback_track", {})),
                 details.get("partner_id", None),
-                details.get("points", None)
+                details.get("points", 0)
             ))
 
         if values:
