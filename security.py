@@ -1,4 +1,4 @@
-from telegram.error import Forbidden, Conflict  # Importing the 'Forbidden' exception
+from telegram.error import Forbidden, Conflict, BadRequest  # Importing the 'Forbidden' exception
 
 import init
 
@@ -16,6 +16,8 @@ async def global_error_handler(update, context):
         e = context.error
 
         if isinstance(e, Conflict):
+            return
+        if isinstance(e, BadRequest) and "message is not modified" in str(e).lower():
             return
 
         text = f" 🚨 YO THERE IS AN ERROR TWIN 🚨 \n\n{type(e).__name__}: {e}\n"
