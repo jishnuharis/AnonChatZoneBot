@@ -3,10 +3,12 @@ from telegram.ext import ContextTypes
 
 import games.coin_steal
 from security import safe_tele_func_call
+from setup import check_user_profile
 
 import init
 
 
+@check_user_profile
 async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     partner_id = init.user_details.get(user_id).get("partner_id")

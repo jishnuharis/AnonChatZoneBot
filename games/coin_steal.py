@@ -79,12 +79,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game = games.get(session_id)
     if not game:
         return
+    
+    if user_id not in game["messages"]:
+        return
+    
     if user_id in game["choices"]:
         await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text="You already chose. Chill 😭")
         return
 
-    msg_id = game["messages"].pop(user_id, None)
+    msg_id = game["messages"].get(user_id)
     if msg_id:
+        game["messages"].pop(user_id, None)
         await safe_tele_func_call(
             context.bot.edit_message_text,
             chat_id=user_id,
@@ -181,8 +186,6 @@ async def end_game(context: ContextTypes.DEFAULT_TYPE, session_id):
 
     s1 = game["score"][u1]
     s2 = game["score"][u2]
-    init.user_details.setdefault(u1, {}).setdefault("points", 0)
-    init.user_details.setdefault(u2, {}).setdefault("points", 0)
 
     if s1 > s2:
         m1 = "You really won by deceiving them 💔."
@@ -220,7 +223,6 @@ async def force_end_game(context: ContextTypes.DEFAULT_TYPE, user_id):
     u1, u2 = game["players"]
 
     other = u2 if user_id == u1 else u1
-    init.user_details.setdefault(other, {}).setdefault("points", 0)
 
     await safe_tele_func_call(context.bot.send_message, chat_id=other, text="Your partner left the game. Game ended...")
     init.user_details[other]["points"] += 5
