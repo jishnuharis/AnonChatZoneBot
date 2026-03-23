@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 
 import games.coin_steal
 from security import safe_tele_func_call
-from setup import check_user_profile
+from handlers.setup import check_user_profile
 
 import init
 
