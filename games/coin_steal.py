@@ -142,18 +142,18 @@ async def resolve_round(context: ContextTypes.DEFAULT_TYPE, session_id):
 
     if c1 == "save" and c2 == "save":
         s1, s2 = 1, 1
-        m1 = m2 = "You guys really trusted each other! 👀\nGood job saving the other for now 😏"
+        m1 = m2 = "You guys really trusted each other! 👀\nGood job saving your coins for now 😏"
     elif c1 == "steal" and c2 == "steal":
         s1, s2 = 0, 0
         m1 = m2 = "Both chose greed over the other and stole. Now no one wins 😏."
     elif c1 == "steal" and c2 == "save":
         s1, s2 = 2 * multiplier, 0
-        m1 = "You shouldn't have done that to them 💀.\nThey saved you..."
+        m1 = "You shouldn't have done that to them 💀.\nThey tried to save their coin and you just stole it..."
         m2 = "You sure trusted the wrong one this time 💀.\nYou just got stolen..."
     elif c1 == "save" and c2 == "steal":
         s1, s2 = 0, 2 * multiplier
         m1 = "You sure trusted the wrong one this time 💀.\nYou just got stolen..."
-        m2 = "You shouldn't have done that to them 💀.\nThey saved you..."
+        m2 = "You shouldn't have done that to them 💀.\nThey tried to save their coin and you just stole it..."
 
     game["score"][u1] += s1
     game["score"][u2] += s2
