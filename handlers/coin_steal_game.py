@@ -42,7 +42,7 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=partner_id,
-        text="🎮 Your partner wants to play *Coin Steal*\nDo you accept?",
+        text="🎮 Your partner wants to play a game of *Coin Steal*\nDo you accept?",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -66,13 +66,13 @@ async def handle_cs_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "decline":
         await safe_tele_func_call(query.edit_message_text, "You declined the request.")
-        await context.bot.send_message(chat_id=requester_id, text="Your partner declined the game.")
+        await context.bot.send_message(chat_id=requester_id, text="Your partner has declined the request.")
         init.game_requests.pop(user_id, None)
         return
 
     elif action == "accept":
         await safe_tele_func_call(query.edit_message_text, text="Request accepted!\nStarting Game...")
-        await context.bot.send_message(chat_id=requester_id, text="Your request is accepted! Starting Game...")
+        await context.bot.send_message(chat_id=requester_id, text="Your request has been accepted!\n Starting Game...")
 
         from games.coin_steal import create_session, send_round, timeout_job, TIMEOUT
 
