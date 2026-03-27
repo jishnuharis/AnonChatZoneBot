@@ -22,12 +22,13 @@ async def global_error_handler(update, context):
         if isinstance(e, BadRequest) and "message is not modified" in str(e).lower():
             return
 
-        tb = traceback.format_exc()
+        tb = "".join(traceback.format_exception(None, e, e.__traceback__))
 
-        text = f" 🚨 YO THERE IS AN ERROR TWIN 🚨 \n\n{type(e).__name__}: {e}\n\n"
+        text = f" 🚨 YO THERE IS AN ERROR TWIN 🚨 \n\n"
+        text += f"{type(e).__name__}: {e}\n\n"
 
         if update and update.effective_user:
-            text += f"\n👤 User ID: {update.effective_user.id}\n"
+            text += f"\n👤 User ID: {update.effective_user.id}\n\n"
 
         text += f"📍 Traceback:\n{tb}"
 
