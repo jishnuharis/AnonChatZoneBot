@@ -1,5 +1,7 @@
 from telegram.error import Forbidden, Conflict, BadRequest  # Importing the 'Forbidden' exception
 
+import traceback
+
 import init
 
 
@@ -20,11 +22,15 @@ async def global_error_handler(update, context):
         if isinstance(e, BadRequest) and "message is not modified" in str(e).lower():
             return
 
-        text = f" 🚨 YO THERE IS AN ERROR TWIN 🚨 \n\n{type(e).__name__}: {e}\n"
-        if update and update.effective_user:
-            text += f"\n👤 User ID: {update.effective_user.id}"
-        text += "\n\nngl something just exploded 😭 pls come check...!"
+        tb = traceback.format_exc()
 
-        await context.bot.send_message(chat_id=init.OWNER, text=text)
-    except:
-        pass
+        text = f" 🚨 YO THERE IS AN ERROR TWIN 🚨 \n\n{type(e).__name__}: {e}\n\n"
+
+        if update and update.effective_user:
+            text += f"\n👤 User ID: {update.effective_user.id}\n"
+
+        text += f"📍 Traceback:\n{tb}"
+
+        await context.bot.send_message(chat_id=init.OWNER, text=text[:4000])
+    except Exception as err:
+        print("Error inside the error handler: ", err)
