@@ -74,8 +74,7 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         init.active_pairs.pop(user_id)
         init.user_details[users_partner]["partner_id"] = None
 
-        await safe_tele_func_call(context.bot.send_message, chat_id=users_partner,
-                                  text="⛔ *Your partner left the chat.*", parse_mode="Markdown")
+        await safe_tele_func_call(context.bot.send_message, chat_id=users_partner, text="⛔ *Your partner left the chat.*", parse_mode="Markdown")
         await ask_for_rating(context.bot, users_partner, user_id)
 
     init.active_pairs[user_id] = target_id
