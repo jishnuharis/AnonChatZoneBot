@@ -67,10 +67,10 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if (voted and reported) or (not voted and not reported):
         del init.user_details[target_id]["feedback_track"][user_id]  # If both voted and reported are True or both are False
     if voted and reported:  # If the user is both voted and reported it thanks the user for doing it
-        await safe_tele_func_call(query.edit_message_text, text="*Thank You for your feedback.\nYour feedback helps other users to be safe and secure.*", parse_mode="Markdown")
+        await safe_tele_func_call(query.edit_message_text, text="*Thank You for your feedback.*\n_Your feedback helps other users to be safe and secure._", parse_mode="Markdown")
     else:  # Else it shows corresponding message and buttons to keep the menu active
         buttons = []
-        rate_text = "💡 If the interlocutor misbehaved or violated the rules, send a complaint against them."
+        rate_text = "💡 _If the interlocutor misbehaved or violated the rules, send a complaint against them._"
         if not voted:
             buttons.append([InlineKeyboardButton("👍", callback_data=f"rate|{target_id}|up"),
                             InlineKeyboardButton("👎", callback_data=f"rate|{target_id}|down")])

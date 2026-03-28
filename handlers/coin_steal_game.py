@@ -42,7 +42,7 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=partner_id,
-        text="🎮 Your partner wants to play a game of *Coin Steal*\nDo you accept?",
+        text="🎮 _Your partner wants to play a game of *Coin Steal*\nDo you accept?_",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )

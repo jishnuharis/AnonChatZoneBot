@@ -82,7 +82,7 @@ async def handle_user_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             age = int(text)
             init.user_details[user_id]["age"] = age
             init.user_input_stage[user_id] = "country"
-            await safe_tele_func_call(update.message.reply_text, text=f"✅ _Age set to *{age}*.\n🌍 Great! Now, please select your country:_", parse_mode="Markdown")
+            await safe_tele_func_call(update.message.reply_text, text=f"✅ _Age set to *{age}*._\n🌍 *Great! Now, please select your country:*", parse_mode="Markdown")
             await send_country_selection(user_id, context)
         except ValueError:  # If the user inputs something else it will notify them to do it again
             await safe_tele_func_call(update.message.reply_text, text="❌ *Please enter a valid number for age.*", parse_mode="Markdown")

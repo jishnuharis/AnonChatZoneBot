@@ -13,7 +13,7 @@ import init  # Importing the bot credentials and users' details
 async def find(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in init.active_pairs:  # Checks if the user is already in a chat and notifies if they are in a chat already
-        await safe_tele_func_call(update.message.reply_text, text="⚠️ *You're already in a chat.*\n_Use /stop or /next first._", parse_mode="Markdown")
+        await safe_tele_func_call(update.message.reply_text, text="⚠️ *You're already in a chat.*\n_Use_ /stop _or_ /next _first._", parse_mode="Markdown")
         return
     if user_id not in init.waiting_users:  # Pushes the user's ID into the waiting_users list if it's not already in the list
         init.waiting_users.append(user_id)
@@ -26,7 +26,7 @@ async def find(update: Update, context: ContextTypes.DEFAULT_TYPE):
         uv1, uv2 = init.user_details[user1]["votes"], init.user_details[user2]["votes"]
         init.user_details[user1]["partner_id"] = user2
         init.user_details[user2]["partner_id"] = user1
-        await safe_tele_func_call(context.bot.send_message, chat_id=user1, text=f"🎯 *Found Someone.... Say Hi!!*\n_Rating:_ {uv2['up']} 👍 {uv2['down']} 👎\n/next _- Next Chat_\n/stop _- Stop Chat_", parse_mode="Markdown")
-        await safe_tele_func_call(context.bot.send_message, chat_id=user2, text=f"🎯 *Found Someone.... Say Hi!!*\n_Rating:_ {uv1['up']} 👍 {uv1['down']} 👎\n/next _- Next Chat_\n/stop _- Stop Chat_", parse_mode="Markdown")
+        await safe_tele_func_call(context.bot.send_message, chat_id=user1, text=f"🎯 *Found Someone.... Say Hi!!*\n_Rating: {uv2['up']}_ 👍 _{uv2['down']}_ 👎\n/next _- Next Chat_\n/stop _- Stop Chat_", parse_mode="Markdown")
+        await safe_tele_func_call(context.bot.send_message, chat_id=user2, text=f"🎯 *Found Someone.... Say Hi!!*\n_Rating: {uv1['up']}_ 👍 _{uv1['down']}_ 👎\n/next _- Next Chat_\n/stop _- Stop Chat_", parse_mode="Markdown")
 
         init.dirty_users.update([user1, user2])

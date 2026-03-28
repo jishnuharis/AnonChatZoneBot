@@ -35,4 +35,4 @@ async def next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await find(update, context)  # Finds a new partner for the user
     else:  # Notifies the user that they are not in an active conversation
-        await safe_tele_func_call(update.message.reply_text, text="❗*You're not in a chat.*\n_Use /find to connect._", parse_mode="Markdown")
+        await safe_tele_func_call(update.message.reply_text, text="❗*You're not in a chat.*\n_Use_ /find _to connect._", parse_mode="Markdown")

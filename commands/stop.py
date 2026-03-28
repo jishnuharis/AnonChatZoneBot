@@ -32,6 +32,6 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await ask_for_rating(context.bot, partner, user_id)
     elif user_id in init.waiting_users:  # If the user is waiting they are popped out of the waiting_users list
         init.waiting_users.remove(user_id)
-        await safe_tele_func_call(update.message.reply_text, text="❗ *You've been popped out of the Waiting Queue.*\n_Use /find to search for a partner._", parse_mode="Markdown")
+        await safe_tele_func_call(update.message.reply_text, text="❗ *You've been popped out of the Waiting Queue.*\n_Use_ /find _to search for a partner._", parse_mode="Markdown")
     else:  # Notifies that the user is neither in an active conversation nor in waiting_users list
         await safe_tele_func_call(update.message.reply_text, text="❗*You're not in a chat.*", parse_mode="Markdown")
