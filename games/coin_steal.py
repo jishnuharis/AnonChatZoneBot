@@ -43,8 +43,8 @@ async def send_round(context: ContextTypes.DEFAULT_TYPE, session_id):
         return
     r = game["round"]
 
-    xtra = "\n*x2 Multiplier* has been added for this round" if r == 3 else ""
-    txt = f"🎯 Round {r}:\nChoose wisely...{xtra}"
+    xtra = "\n*x2 Multiplier* _has been added for this round_" if r == 3 else ""
+    txt = f"_🎯 Round {r}:\nChoose wisely..._{xtra}"
 
     keyboard = InlineKeyboardMarkup([
         [
@@ -84,7 +84,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if user_id in game["choices"]:
-        await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text="You already chose. Chill 😭")
+        await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text="_You already chose. Chill 😭_", parse_mode="Markdown")
         return
 
     msg_id = game["messages"].get(user_id)
@@ -113,14 +113,14 @@ async def handle_choice(context: ContextTypes.DEFAULT_TYPE, user_id, choice):
 
     choice_text = "Steal 😈" if choice == "steal" else "Save 🤝"
     other_user = next(u for u in game["players"] if u != user_id)
-    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"You chose to {choice_text}.")
+    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"_You chose to {choice_text}._", parse_mode="Markdown")
 
     remove_timeout_job(game)
     game["timeout_job"] = context.job_queue.run_once(timeout_job, when=TIMEOUT, data={"session_id": session_id})
     game["start_time"] = time.time()
 
     if len(game["choices"]) == 1:
-        await safe_tele_func_call(context.bot.send_message, chat_id=other_user, text="Your opponent made their move... do you trust them? 👀")
+        await safe_tele_func_call(context.bot.send_message, chat_id=other_user, text="_Your opponent made their move... do you trust them? 👀_", parse_mode="Markdown")
     if len(game["choices"]) == 2:
         await resolve_round(context, session_id)
 
@@ -142,18 +142,18 @@ async def resolve_round(context: ContextTypes.DEFAULT_TYPE, session_id):
 
     if c1 == "save" and c2 == "save":
         s1, s2 = 1, 1
-        m1 = m2 = "You guys really trusted each other! 👀\nGood job saving your coins for now 😏"
+        m1 = m2 = "_You guys really trusted each other! 👀\nGood job saving your coins for now 😏_"
     elif c1 == "steal" and c2 == "steal":
         s1, s2 = 0, 0
-        m1 = m2 = "Both chose greed over the other and stole. Now no one wins 😏."
+        m1 = m2 = "_Both chose greed over the other and stole. Now no one wins 😏._"
     elif c1 == "steal" and c2 == "save":
         s1, s2 = 2 * multiplier, 0
-        m1 = "You shouldn't have done that to them 💀.\nThey tried to save their coin and you just stole it..."
-        m2 = "You sure trusted the wrong one this time 💀.\nYou just got stolen..."
+        m1 = "_You shouldn't have done that to them 💀.\nThey tried to save their coin and you just stole it..._"
+        m2 = "_You sure trusted the wrong one this time 💀.\nYou just got stolen..._"
     elif c1 == "save" and c2 == "steal":
         s1, s2 = 0, 2 * multiplier
-        m1 = "You sure trusted the wrong one this time 💀.\nYou just got stolen..."
-        m2 = "You shouldn't have done that to them 💀.\nThey tried to save their coin and you just stole it..."
+        m1 = "_You sure trusted the wrong one this time 💀.\nYou just got stolen..._"
+        m2 = "_You shouldn't have done that to them 💀.\nThey tried to save their coin and you just stole it..._"
 
     game["score"][u1] += s1
     game["score"][u2] += s2
@@ -161,12 +161,14 @@ async def resolve_round(context: ContextTypes.DEFAULT_TYPE, session_id):
     await safe_tele_func_call(
         context.bot.send_message,
         chat_id=u1,
-        text=f"{m1}\n\nYou: {game['score'][u1]}\nOpponent: {game['score'][u2]}"
+        text=f"{m1}\n\nYou: {game['score'][u1]}\nOpponent: {game['score'][u2]}",
+        parse_mode="Markdown"
     )
     await safe_tele_func_call(
         context.bot.send_message,
         chat_id=u2,
-        text=f"{m2}\n\nYou: {game['score'][u2]}\nOpponent: {game['score'][u1]}"
+        text=f"{m2}\n\nYou: {game['score'][u2]}\nOpponent: {game['score'][u1]}",
+        parse_mode="Markdown"
     )
 
     game["choices"] = {}
@@ -188,24 +190,24 @@ async def end_game(context: ContextTypes.DEFAULT_TYPE, session_id):
     s1 = game["score"][u1]
     s2 = game["score"][u2]
 
-    m1 += "The game has come to an end. Well played both of you.\n\n"
+    m1 += "_The game has come to an end. Well played both of you.\n\n"
 
     if s1 > s2:
-        m1 += "You really won by deceiving them 💔."
-        m2 += "Maybe that's why they tell us not to trust anyone on the internet 🥀."
+        m1 += "You really won by deceiving them 💔._"
+        m2 += "Maybe that's why they tell us not to trust anyone on the internet 🥀._"
         init.user_details[u1]["points"] += 10
         init.dirty_users.add(u1)
     elif s2 > s1:
-        m1 += "Maybe that's why they tell us not to trust anyone on the internet 🥀."
-        m2 += "You really won by deceiving them 💔."
+        m1 += "Maybe that's why they tell us not to trust anyone on the internet 🥀._"
+        m2 += "You really won by deceiving them 💔._"
         init.user_details[u2]["points"] += 10
         init.dirty_users.add(u2)
     else:
-        m1 += "You guys managed to make it a draw 👏.\nWell played for sure!"
-        m2 += "You guys managed to make it a draw 👏.\nWell played for sure!"
+        m1 += "You guys managed to make it a draw 👏.\nWell played for sure!_"
+        m2 += "You guys managed to make it a draw 👏.\nWell played for sure!_"
 
-    await safe_tele_func_call(context.bot.send_message, chat_id=u1, text=m1)
-    await safe_tele_func_call(context.bot.send_message, chat_id=u2, text=m2)
+    await safe_tele_func_call(context.bot.send_message, chat_id=u1, text=m1, parse_mode="Markdown")
+    await safe_tele_func_call(context.bot.send_message, chat_id=u2, text=m2, parse_mode="Markdown")
 
     remove_timeout_job(game)
 
@@ -228,7 +230,7 @@ async def force_end_game(context: ContextTypes.DEFAULT_TYPE, user_id):
 
     other = u2 if user_id == u1 else u1
 
-    await safe_tele_func_call(context.bot.send_message, chat_id=other, text="Your partner left the game. Game ended...")
+    await safe_tele_func_call(context.bot.send_message, chat_id=other, text="_Your partner left the game. Game ended..._", parse_mode="Markdown")
     init.user_details[other]["points"] += 5
     init.dirty_users.add(other)
 
@@ -260,8 +262,8 @@ async def timeout_job(context: ContextTypes.DEFAULT_TYPE):
 
     u1, u2 = game["players"]
 
-    await safe_tele_func_call(context.bot.send_message, chat_id=u1, text="Game ended due to inactivity.\nRestart if you guys wanna play again.")
-    await safe_tele_func_call(context.bot.send_message, chat_id=u2, text="Game ended due to inactivity.\nRestart if you guys wanna play again.")
+    await safe_tele_func_call(context.bot.send_message, chat_id=u1, text="_Game ended due to inactivity.\nRestart if you guys wanna play again._", parse_mode="Markdown")
+    await safe_tele_func_call(context.bot.send_message, chat_id=u2, text="_Game ended due to inactivity.\nRestart if you guys wanna play again._", parse_mode="Markdown")
     init.user_details[u1]["points"] += 1
     init.user_details[u2]["points"] += 1
 

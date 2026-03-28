@@ -17,11 +17,11 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = message[len("/broadcast"):].lstrip()
 
     if not message:
-        await update.message.reply_text("Give me a message to broadcast!")
+        await update.message.reply_text("_Give me a message to broadcast!_", parse_mode="Markdown")
         return
 
     sent = 0
-    for user_id in init.user_details.keys():
+    for user_id in init.user_details:
         try:
             await safe_tele_func_call(
                 context.bot.send_message,
@@ -34,7 +34,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Failed to send to {user_id}: {e}")
 
-    await update.message.reply_text(f"Broadcast sent to {sent} users ✅.")
+    await update.message.reply_text(f"_Broadcast sent to {sent} users ✅._", parse_mode="Markdown")
 
 
 async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,16 +48,16 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         target_id = int(message)
     except ValueError:
-        await update.message.reply_text("Give me a valid user id to connect.")
+        await update.message.reply_text("_Give me a valid user id to connect._", parse_mode="Markdown")
         return
 
     if target_id not in init.user_details:
-        await update.message.reply_text("The target user isn't in our database.")
+        await update.message.reply_text("_The target user isn't in our database._", parse_mode="Markdown")
         return
 
-    # if target_id == init.user_details[user_id]["partner_id"]:
-    #     await update.message.reply_text("You are already connected to the target.")
-    #     return
+    if target_id == init.user_details[user_id]["partner_id"]:
+        await update.message.reply_text("_You are already connected to the target._", parse_mode="Markdown")
+        return
 
     targets_partner = init.user_details[target_id]["partner_id"]
     if targets_partner:
@@ -82,7 +82,7 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uv1, uv2 = init.user_details[user_id]["votes"], init.user_details[target_id]["votes"]
     init.user_details[user_id]["partner_id"] = target_id
     init.user_details[target_id]["partner_id"] = user_id
-    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"🎯 *Found User.... Say Hi!!*\nRating: {uv2['up']} 👍 {uv2['down']} 👎\n/next - Next Chat\n/stop - Stop Chat", parse_mode="Markdown")
-    await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=f"🎯 *Someone Found You.... Say Hi!!*\nRating: {uv1['up']} 👍 {uv1['down']} 👎\n/next - Next Chat\n/stop - Stop Chat", parse_mode="Markdown")
+    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"🎯 *Found User.... Say Hi!!*\n_Rating:_ {uv2['up']} 👍 {uv2['down']} 👎\n/next _- Next Chat_\n/stop _- Stop Chat_", parse_mode="Markdown")
+    await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=f"🎯 *Someone Found You.... Say Hi!!*\n_Rating:_ {uv1['up']} 👍 {uv1['down']} 👎\n/next _- Next Chat_\n/stop _- Stop Chat_", parse_mode="Markdown")
 
     init.dirty_users.update([user_id, target_id])

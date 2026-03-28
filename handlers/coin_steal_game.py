@@ -16,21 +16,21 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from games.coin_steal import get_session
 
     if get_session(user_id):
-        await update.message.reply_text("You are already in a game. Finish that first.")
+        await update.message.reply_text("_You are already in a game. Finish that first._", parse_mode="Markdown")
         return
     if get_session(partner_id):
-        await update.message.reply_text("Your partner is already in a game. Let them finish first.")
+        await update.message.reply_text("_Your partner is already in a game. Let them finish first._", parse_mode="Markdown")
 
     if partner_id in init.game_requests:
-        await update.message.reply_text("You can't just spam requests and expect your partner to accept it 💀.")
+        await update.message.reply_text("_You can't just spam requests and expect your partner to accept it 💀._", parse_mode="Markdown")
         return
 
     if not partner_id:
-        await update.message.reply_text("No partner found. Go get one soon to play 💀.")
+        await update.message.reply_text("_No partner found. Go get one soon to play 💀._", parse_mode="Markdown")
         return
 
     if partner_id == user_id:
-        await update.message.reply_text("Are you really trying to play with yourself 💀.")
+        await update.message.reply_text("_Are you really trying to play with yourself 💀._", parse_mode="Markdown")
         return
 
     keyboard = [
@@ -47,7 +47,7 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-    await update.message.reply_text("⏳ Waiting for your partner to accept...")
+    await update.message.reply_text("⏳ *Waiting for your partner to accept...*", parse_mode="Markdown")
     init.game_requests[partner_id] = user_id
 
 
@@ -61,18 +61,18 @@ async def handle_cs_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     requester_id = init.game_requests.get(user_id)
 
     if not requester_id:
-        await safe_tele_func_call(query.edit_message_text, text="This request expired or doesn't exist.")
+        await safe_tele_func_call(query.edit_message_text, text="_This request expired or doesn't exist._", parse_mode="Markdown")
         return
 
     if action == "decline":
-        await safe_tele_func_call(query.edit_message_text, "You declined the request.")
-        await context.bot.send_message(chat_id=requester_id, text="Your partner has declined the request.")
+        await safe_tele_func_call(query.edit_message_text, "_You declined the request._", parse_mode="Markdown")
+        await context.bot.send_message(chat_id=requester_id, text="_Your partner has declined the request._", parse_mode="Markdown")
         init.game_requests.pop(user_id, None)
         return
 
     elif action == "accept":
-        await safe_tele_func_call(query.edit_message_text, text="Request accepted!\nStarting Game...")
-        await context.bot.send_message(chat_id=requester_id, text="Your request has been accepted!\n Starting Game...")
+        await safe_tele_func_call(query.edit_message_text, text="*Request accepted!\nStarting Game...*", parse_mode="Markdown")
+        await context.bot.send_message(chat_id=requester_id, text="*Your request has been accepted!\n Starting Game...*", parse_mode="Markdown")
 
         from games.coin_steal import create_session, send_round, timeout_job, TIMEOUT
 
