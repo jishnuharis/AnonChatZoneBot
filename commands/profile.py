@@ -18,12 +18,12 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 <b>User Profile</b>
 
 <b>Name:</b> <i>{update.effective_user.full_name}</i> | @{(update.effective_user.username)}
-<b>ID:</b> {user_id}
-<b>Gender:</b> {"Male" if user["gender"] == "M" else "Female"}
-<b>Age:</b> {user["age"]}
-<b>Country:</b> {user["country"]}
-<b>Rating:</b> {votes["up"]} 👍 {votes["down"]} 👎
-<b>Points:</b> {user["points"]}
+<b>ID:</b> <i>{user_id}</i>
+<b>Gender:</b> <i>{"Male" if user["gender"] == "M" else "Female"}</i>
+<b>Age:</b> <i>{user["age"]}</i>
+<b>Country:</b> <i>{user["country"]}</i>
+<b>Rating:</b> <i>{votes["up"]}</i> 👍 <i>{votes["down"]}</i> 👎
+<b>Points:</b> <i>{user["points"]}</i>
 """
     keyboard = [
         [InlineKeyboardButton("✏️ Edit Gender", callback_data="edit|gender"),
