@@ -11,11 +11,11 @@ from security import safe_tele_func_call
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_tele_func_call(update.message.reply_text, text="""
 🤖 *Anonymous Chat Bot*
-Commands:
+_Commands:
 /start - Show welcome message
 /find - Find a new partner
 /next - Skip current chat
 /stop - Stop current chat
 /help - Show this message
-/profile - Show user profile
+/profile - Show user profile_
 """, parse_mode="Markdown")

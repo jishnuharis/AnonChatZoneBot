@@ -34,8 +34,8 @@ def check_user_profile(handler_func):
                 InlineKeyboardButton("♀️ Female", callback_data="gender|F")
             ]]
             markup = InlineKeyboardMarkup(keyboard)
-            await safe_tele_func_call(update.message.reply_text, text="👋 Welcome to *Chat Zone - Anonymous Chat Bot!*", parse_mode="Markdown")
-            await safe_tele_func_call(update.message.reply_text, text="*Let's set up your profile.*\nWhat's your gender?", reply_markup=markup, parse_mode="Markdown")
+            await safe_tele_func_call(update.message.reply_text, text="👋 _Welcome to *Chat Zone - Anonymous Chat Bot!*_", parse_mode="Markdown")
+            await safe_tele_func_call(update.message.reply_text, text="*Let's set up your profile.*\n_What's your gender?_", reply_markup=markup, parse_mode="Markdown")
             return
 
         if not all([init.user_details[user_id].get("gender"), init.user_details[user_id].get("age"), init.user_details[user_id].get("country")]):  # Checks if every user detail is saved or not
@@ -67,7 +67,7 @@ async def handle_user_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             age = int(text)
             init.user_details[user_id]["age"] = age
             del init.edit_stage[user_id]
-            await safe_tele_func_call(update.message.reply_text, text=f"✅ *Age updated to {age}.*", parse_mode="Markdown")
+            await safe_tele_func_call(update.message.reply_text, text=f"✅ _Age updated to *{age}*._", parse_mode="Markdown")
         except ValueError:  # If the user inputs something else it will notify them to do it again
             await safe_tele_func_call(update.message.reply_text, text="❌ *Please enter a valid number for age.*", parse_mode="Markdown")
         return
@@ -82,7 +82,7 @@ async def handle_user_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             age = int(text)
             init.user_details[user_id]["age"] = age
             init.user_input_stage[user_id] = "country"
-            await safe_tele_func_call(update.message.reply_text, text=f"✅ *Age set to {age}.*\n🌍 Great! Now, please select your country:", parse_mode="Markdown")
+            await safe_tele_func_call(update.message.reply_text, text=f"✅ _Age set to *{age}*.\n🌍 Great! Now, please select your country:_", parse_mode="Markdown")
             await send_country_selection(user_id, context)
         except ValueError:  # If the user inputs something else it will notify them to do it again
             await safe_tele_func_call(update.message.reply_text, text="❌ *Please enter a valid number for age.*", parse_mode="Markdown")

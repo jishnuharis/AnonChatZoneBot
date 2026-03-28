@@ -22,8 +22,7 @@ async def ask_for_rating(bot, from_id, to_id):
     init.user_details[to_id].setdefault("feedback_track", {})  # Sets up the feedback_track to the partner's ID to track the users feedback
     init.user_details[to_id]["feedback_track"][from_id] = {"voted": False, "reported": False}  # Sets both voted and reported state to False initially
     await safe_tele_func_call(bot.send_message, chat_id=from_id,
-                              text="""💡 *If the interlocutor misbehaved or violated the rules, send a complaint against them.*
-Give a rating to the interlocutor which will affect their ratings.""",
+                              text="💡 *If the interlocutor misbehaved or violated the rules, send a complaint against them.*\n_Give a rating to the interlocutor which will affect their ratings._",
                               reply_markup=markup, parse_mode="Markdown")  # Asks the user if they wanna rate their partner and shows them the menu
 
 

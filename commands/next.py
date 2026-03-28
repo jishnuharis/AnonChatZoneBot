@@ -27,7 +27,7 @@ async def next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Notify the user and his partner that the conversation us ended
         await safe_tele_func_call(context.bot.send_message, chat_id=partner, text="⛔ *Your partner left the chat.*", parse_mode="Markdown")
-        await safe_tele_func_call(update.message.reply_text, text="🔁 *Partner skipped...\nYou're added to the waiting queue...\nFinding new one...*", parse_mode="Markdown")
+        await safe_tele_func_call(update.message.reply_text, text="🔁 *Partner skipped...*\n_You're added to the waiting queue...\nFinding new one..._", parse_mode="Markdown")
 
         # Ask both users to rate each other
         await ask_for_rating(context.bot, user_id, partner)
@@ -35,4 +35,4 @@ async def next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await find(update, context)  # Finds a new partner for the user
     else:  # Notifies the user that they are not in an active conversation
-        await safe_tele_func_call(update.message.reply_text, text="❗*You're not in a chat.*\nUse /find to connect.", parse_mode="Markdown")
+        await safe_tele_func_call(update.message.reply_text, text="❗*You're not in a chat.*\n_Use /find to connect._", parse_mode="Markdown")

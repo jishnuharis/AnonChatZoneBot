@@ -14,4 +14,4 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not all([init.user_details[user_id].get("gender"), init.user_details[user_id].get("age"), init.user_details[user_id].get("country")]):
         return
-    await safe_tele_func_call(update.message.reply_text, text="👋 Welcome back to *Chat Zone - Anonymous Chat Bot!*\nUse /find to look for a partner.", parse_mode="Markdown")
+    await safe_tele_func_call(update.message.reply_text, text="👋 _Welcome back to_ *Chat Zone - Anonymous Chat Bot!*\n_Use /find to look for a partner._", parse_mode="Markdown")

@@ -94,7 +94,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.bot.edit_message_text,
             chat_id=user_id,
             message_id=msg_id,
-            text="Your choice has been locked in 🔒."
+            text="_Your choice has been locked in 🔒_."
         )
 
     await handle_choice(context, user_id, choice)
@@ -113,7 +113,7 @@ async def handle_choice(context: ContextTypes.DEFAULT_TYPE, user_id, choice):
 
     choice_text = "Steal 😈" if choice == "steal" else "Save 🤝"
     other_user = next(u for u in game["players"] if u != user_id)
-    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"_You chose to {choice_text}._", parse_mode="Markdown")
+    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"_You chose to *{choice_text}*._", parse_mode="Markdown")
 
     remove_timeout_job(game)
     game["timeout_job"] = context.job_queue.run_once(timeout_job, when=TIMEOUT, data={"session_id": session_id})
