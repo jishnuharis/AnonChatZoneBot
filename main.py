@@ -95,6 +95,7 @@ def main():
     app.add_handler(CommandHandler("profile", show_profile))  # Connects the 'profile' command to its functionality
     app.add_handler(CommandHandler("coinsteal", send_request))
     app.add_handler((CommandHandler("broadcast", broadcast)))
+    app.add_handler((CommandHandler("connect", connect)))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern="rate\\|\\d+\\|(up|down)$"))  # Handles the voting mechanics
     app.add_handler(CallbackQueryHandler(handle_gender_selection, pattern="^gender\\|[MF]$"))  # Handles the selection of gender from the user
     app.add_handler(CallbackQueryHandler(handle_country_selection, pattern="^country\\|.+$"))  # Handles the selection of country from the user
