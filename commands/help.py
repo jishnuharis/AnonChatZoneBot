@@ -10,12 +10,20 @@ from security import safe_tele_func_call
 @check_user_profile
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_tele_func_call(update.message.reply_text, text="""
-🤖 *Anonymous Chat Bot*
+🤖 *Chat Zone - Anonymous Chat Bot*
+
+    _You can connect with people and chat anonymously in Telegram_
+    
+    _This bot can send texts, stickers, photos, videos, gifs, voice and videos notes_
+
 _Commands:_
 /start _- Show welcome message_
 /find _- Find a new partner_
-/next _- Skip current chat_
-/stop _- Stop current chat_
-/help _- Show this message_
+/next _- Skip the current chat_
+/stop _- Stop the current chat_
+/help _- Show help_
 /profile _- Show user profile_
+/coinsteal _-Play a game of Coin Steal_
+
+_If you have any feature suggestions or ideas feel free to join our group t.me/groupchatzone and let us know_
 """, parse_mode="Markdown")
