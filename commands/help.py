@@ -14,7 +14,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 _You can connect with people and chat anonymously in Telegram_
     
-_This bot can send texts, stickers, photos, videos, gifs, voice and videos notes_
+_This bot can send texts, stickers, photos, videos, gifs, voice and video notes_
 
 *Commands:*
 /start _- Show welcome message_
