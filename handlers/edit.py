@@ -24,7 +24,7 @@ async def handle_edit_selection(update: Update, context: ContextTypes.DEFAULT_TY
         await safe_tele_func_call(query.edit_message_text, text="📅 *Please enter your new age:*", parse_mode="Markdown")
         init.edit_stage[user_id] = "age"
     elif action == "country":  # Checks if the user wants to edit the country and sends a selection menu for them to select
-        await safe_tele_func_call(query.edit_message_text, text="🌍 *Select your new country:*", parse_mode="Markdown")
+        await context.bot.delete_message(chat_id=query.message.chat.id, message_id=query.message.message_id)
         init.edit_stage[user_id] = "country"
         await send_country_selection(user_id, context)
 
