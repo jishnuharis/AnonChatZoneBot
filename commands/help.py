@@ -23,7 +23,7 @@ _This bot can send texts, stickers, photos, videos, gifs, voice and video notes_
 /stop _- Stop the current chat_
 /help _- Show help_
 /profile _- Show user profile_
-/coinsteal _-Play a game of Coin Steal_
+/coinsteal _- Play a game of Coin Steal_
 
 _If you have any feature suggestions or ideas feel free to join our group_ t.me/groupchatzone _and let us know_
 """, parse_mode="Markdown")

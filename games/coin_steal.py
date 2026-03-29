@@ -24,6 +24,7 @@ def create_session(user1, user2):
         "round": 1,
         "messages": {},
         "start_time": time.time(),
+        "active": True,
         "timeout_job": None,
     }
 
@@ -94,7 +95,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.bot.edit_message_text,
             chat_id=user_id,
             message_id=msg_id,
-            text="_Your choice has been locked in 🔒_."
+            text="_Your choice has been locked in 🔒._",
+            parse_mode="Markdown"
         )
 
     await handle_choice(context, user_id, choice)
@@ -113,14 +115,14 @@ async def handle_choice(context: ContextTypes.DEFAULT_TYPE, user_id, choice):
 
     choice_text = "Steal 😈" if choice == "steal" else "Save 🤝"
     other_user = next(u for u in game["players"] if u != user_id)
-    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"_You chose to *{choice_text}*._", parse_mode="Markdown")
+    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"_You chose to_ *{choice_text}*.", parse_mode="Markdown")
 
     remove_timeout_job(game)
     game["timeout_job"] = context.job_queue.run_once(timeout_job, when=TIMEOUT, data={"session_id": session_id})
     game["start_time"] = time.time()
 
     if len(game["choices"]) == 1:
-        await safe_tele_func_call(context.bot.send_message, chat_id=other_user, text="_Your opponent made their move... do you trust them? 👀_", parse_mode="Markdown")
+        await safe_tele_func_call(context.bot.send_message, chat_id=other_user, text="_Your opponent made their move...\n Do you trust them? 👀_", parse_mode="Markdown")
     if len(game["choices"]) == 2:
         await resolve_round(context, session_id)
 
@@ -161,13 +163,13 @@ async def resolve_round(context: ContextTypes.DEFAULT_TYPE, session_id):
     await safe_tele_func_call(
         context.bot.send_message,
         chat_id=u1,
-        text=f"{m1}\n\nYou: {game['score'][u1]}\nOpponent: {game['score'][u2]}",
+        text=f"{m1}\n\n*You:* {game['score'][u1]}\n*Opponent:* {game['score'][u2]}",
         parse_mode="Markdown"
     )
     await safe_tele_func_call(
         context.bot.send_message,
         chat_id=u2,
-        text=f"{m2}\n\nYou: {game['score'][u2]}\nOpponent: {game['score'][u1]}",
+        text=f"{m2}\n\n*You:* {game['score'][u2]}\n*Opponent:* {game['score'][u1]}",
         parse_mode="Markdown"
     )
 
@@ -210,6 +212,7 @@ async def end_game(context: ContextTypes.DEFAULT_TYPE, session_id):
     await safe_tele_func_call(context.bot.send_message, chat_id=u2, text=m2, parse_mode="Markdown")
 
     remove_timeout_job(game)
+    game["active"] = False
 
     for user in game["players"]:
         user_to_session.pop(user, None)
@@ -235,6 +238,7 @@ async def force_end_game(context: ContextTypes.DEFAULT_TYPE, user_id):
     init.dirty_users.add(other)
 
     remove_timeout_job(game)
+    game["active"] = False
 
     for user in game["players"]:
         user_to_session.pop(user, None)
@@ -250,14 +254,14 @@ def remove_timeout_job(g):
             job.schedule_removal()
         except Exception:
             pass
-        g["timeout_job"] = None
+    g["timeout_job"] = None
 
 
 async def timeout_job(context: ContextTypes.DEFAULT_TYPE):
     session_id = context.job.data["session_id"]
 
     game = games.get(session_id)
-    if not game:
+    if not game or not game["active"]:
         return
 
     u1, u2 = game["players"]
@@ -268,6 +272,7 @@ async def timeout_job(context: ContextTypes.DEFAULT_TYPE):
     init.user_details[u2]["points"] += 1
 
     remove_timeout_job(game)
+    game["active"] = False
 
     for user in game["players"]:
         user_to_session.pop(user, None)
