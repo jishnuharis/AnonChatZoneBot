@@ -22,7 +22,7 @@ async def global_error_handler(update, context):
         if isinstance(e, BadRequest) and "message is not modified" in str(e).lower():
             return
 
-        tb = "".join(traceback.format_exception(None, e, e.__traceback__))
+        tb = "".join(traceback.format_tb(e.__traceback__)[-8:])
 
         text = f" _🚨 YO THERE IS AN ERROR TWIN 🚨_ \n\n"
         text += f"_{type(e).__name__}:_ {e}\n\n"

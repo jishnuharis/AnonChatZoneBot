@@ -34,7 +34,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Failed to send to {user_id}: {e}")
 
-    await update.message.reply_text(f"_Broadcast sent to {sent} users ✅._", parse_mode="Markdown")
+    await update.message.reply_text(f"_Broadcast sent to_ *{sent}* _users ✅._", parse_mode="Markdown")
 
 
 async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
