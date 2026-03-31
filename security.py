@@ -24,14 +24,14 @@ async def global_error_handler(update, context):
 
         tb = "".join(traceback.format_tb(e.__traceback__)[-4:])
 
-        text = f" _🚨 YO THERE IS AN ERROR TWIN 🚨_ \n\n"
+        text = f" _🚨 YO THERE IS AN ERROR TWIN 🚨_\n\n"
         text += f"_{type(e).__name__}:_ {e}\n\n"
 
         if update and update.effective_user:
             text += f"\n_👤 User ID:_ {update.effective_user.id}\n\n"
 
-        text += f"_📍 Traceback:_\n{tb}"
+        text += f"_📍 Traceback:_\n```{tb}```"
 
-        await context.bot.send_message(chat_id=init.OWNER, text=text[:4000], parse_mode="Markdown")
+        await context.bot.send_message(chat_id=init.OWNER, text=text, parse_mode="Markdown")
     except Exception as err:
         print("Error inside the error handler: ", err)
