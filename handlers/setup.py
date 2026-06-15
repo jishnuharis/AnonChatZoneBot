@@ -34,7 +34,7 @@ def check_user_profile(handler_func):
                 InlineKeyboardButton("♀️ Female", callback_data="gender|F")
             ]]
             markup = InlineKeyboardMarkup(keyboard)
-            await safe_tele_func_call(update.message.reply_text, text="👋 _Welcome to *Chat Zone - Anonymous Chat Bot!*_", parse_mode="Markdown")
+            await safe_tele_func_call(update.message.reply_text, text="👋 _Welcome to _*Chat Zone - Anonymous Chat Bot!*", parse_mode="Markdown")
             await safe_tele_func_call(update.message.reply_text, text="*Let's set up your profile.*\n_What's your gender?_", reply_markup=markup, parse_mode="Markdown")
             return
 

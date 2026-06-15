@@ -45,6 +45,6 @@ async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT
     init.user_details[user_id]["country"] = country
     if user_id in init.user_input_stage:
         del init.user_input_stage[user_id]
-    await safe_tele_func_call(query.edit_message_text, text=f"✅ _Country set to *{country}*.\nYou're all set! Use_ /find _to start chatting._", parse_mode="Markdown")
+    await safe_tele_func_call(query.edit_message_text, text=f"✅ _Country set to _*{country}*_.\nYou're all set! Use_ /find _to start chatting._", parse_mode="Markdown")
 
     init.dirty_users.add(user_id)
