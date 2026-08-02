@@ -65,7 +65,7 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # /next skips (see subscription.py). Subscribers send photos free & unlimited.
         # Only pre-checked here (not consumed yet) - the actual charge happens after
         # a successful send below, so a failed delivery never costs a phantom credit.
-        if kind == "photo" and not is_subscribed(user_id) and not has_daily_credit(user_id):
+        if kind in ("photo", "video", "voice", "video_note") and not is_subscribed(user_id) and not has_daily_credit(user_id):
             await safe_tele_func_call(
                 update.message.reply_text,
                 text=PHOTO_DAILY_LIMIT_REACHED_TEXT.format(limit=daily_credit_limit(user_id)),
@@ -84,13 +84,19 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif kind == "photo":
                 sent = await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)  # Relaying the message as a photo
                 if sent and not is_subscribed(user_id):
-                    consume_daily_credit(user_id)  # Free-tier photo cost - see the pre-check above
+                    consume_daily_credit(user_id)
             elif kind == "video":
                 sent = await safe_tele_func_call(context.bot.send_video, chat_id=partner_id, video=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)  # Relaying the message as a video
+                if sent and not is_subscribed(user_id):
+                    consume_daily_credit(user_id)
             elif kind == "voice":
                 sent = await safe_tele_func_call(context.bot.send_voice, chat_id=partner_id, voice=file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True)  # Relaying the message as a voice note
+                if sent and not is_subscribed(user_id):
+                    consume_daily_credit(user_id)
             elif kind == "video_note":
                 sent = await safe_tele_func_call(context.bot.send_video_note, chat_id=partner_id, video_note=file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True)  # Relaying the message as a video note
+                if sent and not is_subscribed(user_id):
+                    consume_daily_credit(user_id)
             elif msg.sticker:
                 sent = await safe_tele_func_call(context.bot.send_sticker, chat_id=partner_id, sticker=msg.sticker.file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True)  # Relaying the message as sticker if it's a sticker
             elif msg.audio:
