@@ -14,7 +14,9 @@ from message import (
     SEVERITY_RANGE_TEXT, CANT_RESTRICT_SELF_TEXT, ADMINS_CANT_BE_RESTRICTED_TEXT,
     SEVERITY_ZERO_NOOP_TEXT, UNBAN_USAGE_TEXT, GIVE_VALID_USER_ID_TEXT, RESTRICTION_LIFTED_TEXT,
     CHECKUSER_USAGE_TEXT, NO_RECORD_OF_USER_TEXT, NOT_RESTRICTED_TEXT, NO_REPORTS_TEXT,
+    GIVEAWAY_USAGE_TEXT, GIVEAWAY_UNKNOWN_TIER_TEXT,
 )
+import subscription
 
 import init
 
@@ -38,7 +40,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.bot.send_message,
                 chat_id=user_id,
                 text=message,
-                parse_mode="HTML",
             )
             sent += 1
             await asyncio.sleep(0.1)
@@ -211,3 +212,51 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Recent reports:\n{reports_text}"
     )
     await update.message.reply_text(text, parse_mode="HTML")
+
+
+async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/giveaway <user_id> <tier> - manually grants a subscription tier, same
+    perks and bonus points a paid purchase of that tier would give. Stacks
+    with (extends from) any existing active subscription rather than
+    overwriting it."""
+    if not is_admin(update.effective_user.id):
+        return
+
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text(GIVEAWAY_USAGE_TEXT, parse_mode="HTML")
+        return
+
+    try:
+        target_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text(GIVE_VALID_USER_ID_TEXT, parse_mode="HTML")
+        return
+
+    tier_key = args[1].lower()
+    if tier_key not in subscription.TIERS:
+        await update.message.reply_text(GIVEAWAY_UNKNOWN_TIER_TEXT, parse_mode="HTML")
+        return
+
+    if target_id not in init.user_details:
+        await update.message.reply_text(TARGET_NOT_IN_DB_TEXT, parse_mode="HTML")
+        return
+
+    tier = subscription.TIERS[tier_key]
+    new_expiry = subscription.grant_subscription(target_id, tier_key, source="admin_grant")
+    expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(new_expiry))
+
+    await update.message.reply_text(
+        f"✅ <i>Granted</i> <b>{tier['label']}</b> <i>to</i> <code>{target_id}</code> "
+        f"<i>(+{tier['bonus_points']} points). Active until</i> <code>{expires_str}</code>.",
+        parse_mode="HTML",
+    )
+    await safe_tele_func_call(
+        context.bot.send_message, chat_id=target_id,
+        text=(
+            f"🎁 <b>An admin gifted you a {tier['label']} subscription!</b>\n"
+            f"<i>Active until:</i> <code>{expires_str}</code>\n"
+            f"<i>+{tier['bonus_points']} points added 🎉</i>"
+        ),
+        parse_mode="HTML",
+    )

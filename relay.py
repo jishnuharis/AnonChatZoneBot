@@ -4,8 +4,9 @@ from telegram.ext import ContextTypes
 
 from handlers.setup import handle_user_setup  # Importing the handler which handles the user setup
 from security import safe_tele_func_call
-from media_privacy import extract_media, maybe_send_private, SUPPORTED_KINDS
-from message import FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT
+from media_privacy import extract_media, maybe_send_private, split_private_caption, SUPPORTED_KINDS
+from message import FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, PHOTO_DAILY_LIMIT_REACHED_TEXT
+from subscription import is_subscribed, has_daily_credit, consume_daily_credit, daily_credit_limit
 
 import init  # Importing the bot credentials and users' details
 
@@ -48,13 +49,29 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = update.message
 
         # Photos/videos/voice/video notes can be sent in Privacy Mode by captioning them
-        # "/private" (or sending a bare /private beforehand) - otherwise they relay normally
-        # just like everything else, no interruption.
+        # "/private" (or sending a bare /private beforehand) - Privacy Mode itself is a
+        # subscriber perk (see media_privacy.py); everyone else just relays normally.
         kind, file_id, caption, duration = extract_media(msg)
         if kind in SUPPORTED_KINDS:
             handled = await maybe_send_private(update, context, partner_id, kind, file_id, caption, duration)
             if handled:
                 return
+            # Not sent privately (either it wasn't a /private send, or it was but the
+            # sender isn't subscribed) - strip any leftover "/private" prefix so it
+            # doesn't show up literally in the normally-relayed caption.
+            _, caption = split_private_caption(caption)
+
+        # Free-tier photo cost: each photo relayed costs 1 daily credit, shared with
+        # /next skips (see subscription.py). Subscribers send photos free & unlimited.
+        # Only pre-checked here (not consumed yet) - the actual charge happens after
+        # a successful send below, so a failed delivery never costs a phantom credit.
+        if kind == "photo" and not is_subscribed(user_id) and not has_daily_credit(user_id):
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=PHOTO_DAILY_LIMIT_REACHED_TEXT.format(limit=daily_credit_limit(user_id)),
+                parse_mode="HTML",
+            )
+            return
 
         # If this message is a reply to something already relayed, mirror it as a reply
         # on the partner's side too. Falls back to a normal send if the target vanished.
@@ -66,6 +83,8 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sent = await safe_tele_func_call(context.bot.send_message, chat_id=partner_id, text=msg.text, reply_to_message_id=reply_to, allow_sending_without_reply=True)  # Relaying the message as plain text if it's just a message
             elif kind == "photo":
                 sent = await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)  # Relaying the message as a photo
+                if sent and not is_subscribed(user_id):
+                    consume_daily_credit(user_id)  # Free-tier photo cost - see the pre-check above
             elif kind == "video":
                 sent = await safe_tele_func_call(context.bot.send_video, chat_id=partner_id, video=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)  # Relaying the message as a video
             elif kind == "voice":

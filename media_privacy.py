@@ -10,8 +10,9 @@ from message import (
     NOT_IN_CHAT_TEXT, SENT_PRIVACY_MODE_TEXT, PRIVACY_MODE_PLACEHOLDER_TEXT,
     PRIVACY_MEDIA_NO_LONGER_AVAILABLE_ALERT, PRIVACY_MEDIA_NO_LONGER_AVAILABLE_TEXT,
     NOT_FOR_YOU_ALERT, ALREADY_VIEWED_ALERT, ALREADY_VIEWED_TEXT, YOUR_MEDIA_VIEWED_TEXT,
-    PRIVACY_MEDIA_EXPIRED_EDIT_TEXT, PRIVACY_MEDIA_EXPIRED_DM_TEXT,
+    PRIVACY_MEDIA_EXPIRED_EDIT_TEXT, PRIVACY_MEDIA_EXPIRED_DM_TEXT, PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT,
 )
+from subscription import is_subscribed
 
 import init
 
@@ -45,7 +46,7 @@ def extract_media(msg):
     return None, None, None, None
 
 
-def _split_private_caption(caption):
+def split_private_caption(caption):
     """If caption is (or starts with) '/private', returns (True, remaining_caption_or_None).
     Otherwise returns (False, original_caption)."""
     if not caption:
@@ -74,10 +75,15 @@ def _consume_private_flag(user_id: int) -> bool:
 async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE, partner_id, kind, file_id, caption, duration) -> bool:
     """Checks whether this piece of media should go out in Privacy Mode (via a '/private'
     caption or a previously armed /private command) and sends it that way if so.
-    Returns True if it handled the send, False if the caller should relay normally."""
+    Returns True if it handled the send, False if the caller should relay normally.
+
+    Privacy Mode is a subscriber-only perk. A free-tier user's '/private' caption or
+    armed flag is intentionally *not* honoured - we pop any armed flag (so it doesn't
+    linger and surprise them later if they do subscribe) and let them know, then fall
+    through to a normal relay."""
     user_id = update.effective_user.id
 
-    is_private, remaining_caption = _split_private_caption(caption)
+    is_private, remaining_caption = split_private_caption(caption)
     if not is_private:
         is_private = _consume_private_flag(user_id)
         remaining_caption = caption
@@ -87,6 +93,10 @@ async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE,
         _armed_until.pop(user_id, None)
 
     if not is_private:
+        return False
+
+    if not is_subscribed(user_id):
+        await safe_tele_func_call(update.message.reply_text, text=PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT, parse_mode="HTML")
         return False
 
     token = str(uuid.uuid4())
@@ -120,8 +130,11 @@ async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE,
 @check_user_profile
 async def handle_private_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Standalone /private command with no media attached - arms Privacy Mode for
-    whatever media the user sends next."""
+    whatever media the user sends next. Subscriber-only."""
     user_id = update.effective_user.id
+    if not is_subscribed(user_id):
+        await safe_tele_func_call(update.message.reply_text, text=PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT, parse_mode="HTML")
+        return
     if user_id not in init.active_pairs:
         await safe_tele_func_call(update.message.reply_text, text=NOT_IN_CHAT_TEXT, parse_mode="HTML")
         return

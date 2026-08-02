@@ -7,6 +7,7 @@ from html import escape as esc
 from handlers.setup import check_user_profile  # Imports the handler which checks if the user's profile exists
 from handlers.preferences import describe_preferences
 from security import safe_tele_func_call
+import subscription
 
 import init  # Importing the bot credentials and users' details
 
@@ -46,7 +47,8 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
         f"<b>Country:</b> {esc(str(user['country']))}\n"
         f"<b>Interests:</b> {prefs_text}\n"
         f"<b>Rating:</b> {votes['up']} 👍 {votes['down']} 👎\n"
-        f"<b>Points:</b> {user['points']}"
+        f"<b>Points:</b> {user['points']}\n\n"
+        f"{subscription.status_text(user_id)}"
     )
 
 

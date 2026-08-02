@@ -39,6 +39,10 @@ def ensure_db():
         cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS severity_score INTEGER DEFAULT 0")
         cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS report_log JSONB DEFAULT '[]'")
         cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS last_severity_decay DOUBLE PRECISION")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS subscription_expires DOUBLE PRECISION")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(10)")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS next_used_today INTEGER DEFAULT 0")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS next_used_day VARCHAR(10)")
         conn.commit()
 
 
@@ -51,8 +55,9 @@ def save_user_data(data: dict, dirty_user: set):
                 user_id, gender, age, country, reports, reporters,
                 vote_up, vote_down, voters, feedback_track, partner_id, points,
                 preferences, restricted_until, restriction_reason, severity_score,
-                report_log, last_severity_decay
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                report_log, last_severity_decay, subscription_expires, subscription_tier,
+                next_used_today, next_used_day
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (user_id) DO UPDATE SET
                 gender = EXCLUDED.gender,
                 age = EXCLUDED.age,
@@ -70,7 +75,11 @@ def save_user_data(data: dict, dirty_user: set):
                 restriction_reason = EXCLUDED.restriction_reason,
                 severity_score = EXCLUDED.severity_score,
                 report_log = EXCLUDED.report_log,
-                last_severity_decay = EXCLUDED.last_severity_decay
+                last_severity_decay = EXCLUDED.last_severity_decay,
+                subscription_expires = EXCLUDED.subscription_expires,
+                subscription_tier = EXCLUDED.subscription_tier,
+                next_used_today = EXCLUDED.next_used_today,
+                next_used_day = EXCLUDED.next_used_day
     """
 
     with get_connection() as conn:
@@ -102,6 +111,10 @@ def save_user_data(data: dict, dirty_user: set):
                 details.get("severity_score", 0),
                 json.dumps(details.get("report_log", [])),
                 details.get("last_severity_decay"),
+                details.get("subscription_expires"),
+                details.get("subscription_tier"),
+                details.get("next_used_today", 0),
+                details.get("next_used_day"),
             ))
 
         if values:
@@ -120,7 +133,8 @@ def load_user_data() -> dict:
         cursor.execute("""
             SELECT user_id, gender, age, country, reports, reporters, vote_up, vote_down,
                    voters, feedback_track, partner_id, points, preferences, restricted_until,
-                   restriction_reason, severity_score, report_log, last_severity_decay
+                   restriction_reason, severity_score, report_log, last_severity_decay,
+                   subscription_expires, subscription_tier, next_used_today, next_used_day
             FROM user_details
         """)
         rows = cursor.fetchall()
@@ -148,5 +162,9 @@ def load_user_data() -> dict:
                 "severity_score": row[15] or 0,
                 "report_log": row[16] if row[16] else [],
                 "last_severity_decay": row[17],
+                "subscription_expires": row[18],
+                "subscription_tier": row[19],
+                "next_used_today": row[20] or 0,
+                "next_used_day": row[21],
             }
         return data

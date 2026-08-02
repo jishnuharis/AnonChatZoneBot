@@ -3,6 +3,7 @@ import time
 from telegram.ext import ContextTypes
 
 from security import safe_tele_func_call
+from subscription import is_subscribed
 
 import init
 
@@ -31,6 +32,19 @@ def _best_match_for(user_id: int):
     return best_id, best_score
 
 
+def _partner_details_line(viewer_id: int, partner_id: int) -> str:
+    """Subscriber-only perk: reveal the partner's age/gender/country. Gated on the
+    *viewer's* own subscription, not the partner's - each side sees extra info
+    about the other only if they themselves paid for it."""
+    if not is_subscribed(viewer_id):
+        return ""
+    partner = init.user_details.get(partner_id, {})
+    gender = "Male" if partner.get("gender") == "M" else "Female" if partner.get("gender") == "F" else "Unknown"
+    age = partner.get("age") or "Unknown"
+    country = partner.get("country") or "Unknown"
+    return f"\n<i>👤 {gender}, {age} — {country}</i>"
+
+
 async def _pair_users(context: ContextTypes.DEFAULT_TYPE, user1: int, user2: int):
     init.active_pairs[user1] = user2
     init.active_pairs[user2] = user1
@@ -43,14 +57,17 @@ async def _pair_users(context: ContextTypes.DEFAULT_TYPE, user1: int, user2: int
     shared = _overlap_score(user1, user2)
     shared_note = f"\n<i>You have {shared} shared interest{'s' if shared != 1 else ''}!</i> 🏷️" if shared else ""
 
+    details1 = _partner_details_line(user1, user2)
+    details2 = _partner_details_line(user2, user1)
+
     await safe_tele_func_call(
         context.bot.send_message, chat_id=user1,
-        text=f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv2['up']} 👍 {uv2['down']} 👎{shared_note}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>",
+        text=f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv2['up']} 👍 {uv2['down']} 👎{shared_note}{details1}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>",
         parse_mode="HTML",
     )
     await safe_tele_func_call(
         context.bot.send_message, chat_id=user2,
-        text=f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv1['up']} 👍 {uv1['down']} 👎{shared_note}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>",
+        text=f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv1['up']} 👍 {uv1['down']} 👎{shared_note}{details2}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>",
         parse_mode="HTML",
     )
 

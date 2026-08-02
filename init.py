@@ -51,6 +51,15 @@ def _default_user():
         "severity_score": 0,
         "report_log": [],
         "last_severity_decay": time.time(),
+        # Subscription: None = never subscribed / lapsed. A timestamp means the
+        # subscription is valid until that time - subscription.is_subscribed()
+        # is the single source of truth, nothing else should be checked directly.
+        "subscription_expires": None,
+        "subscription_tier": None,
+        # Daily /next usage tracking - reset whenever next_used_day no longer
+        # matches today's date (see subscription.py).
+        "next_used_today": 0,
+        "next_used_day": None,
     }
 
 

@@ -19,6 +19,57 @@ LOOKING_FOR_PARTNER_TEXT = "🔍 <b>Looking for a partner...</b>\n<i>Matching yo
 PARTNER_LEFT_CHAT_TEXT = "⛔ <b>Your partner left the chat.</b>"
 PARTNER_SKIPPED_TEXT = "🔁 <b>Partner skipped...</b>\n<i>You're added to the waiting queue, finding a new one...</i>"
 NOT_IN_CHAT_USE_FIND_TEXT = "❗ <b>You're not in a chat.</b>\n<i>Use</i> /find <i>to connect.</i>"
+DAILY_NEXT_LIMIT_REACHED_TEXT = (
+    "⏳ <b>You've used all {limit} of your daily credits.</b>\n"
+    "<i>Credits are spent on /next skips and (for free-tier users) photo sends.</i>\n"
+    "<i>Your count resets at midnight UTC, or</i> /subscribe <i>for more credits + unlimited photos.</i>"
+)
+
+# ---------------------------------------------------------------------------
+# commands/subscribe.py
+# ---------------------------------------------------------------------------
+SUBSCRIBE_INTRO_TEXT = (
+    "⭐ <b>Chat Zone Subscription</b>\n\n"
+    "{status}\n\n"
+    "<b>Perks on any active plan:</b>\n"
+    "• Higher daily credit limit (more skips)\n"
+    "• Send unlimited photos — free-tier photo sends cost 1 daily credit each\n"
+    "• Unlock /private (Privacy Mode) for photos/videos/voice notes\n"
+    "• Get a peek at your partner's details when matched\n\n"
+    "<b>Pick a plan:</b>"
+)
+SUBSCRIBE_INVOICE_TITLE = "Chat Zone — {label} Plan"
+SUBSCRIBE_INVOICE_DESCRIPTION = (
+    "{label} subscription: daily credit limit of {limit}, unlimited photos, "
+    "Privacy Mode access, partner details on match, and {points} bonus points."
+)
+SUBSCRIBE_PAYMENT_SUCCESS_TEXT = (
+    "✅ <b>{label} plan activated!</b>\n"
+    "<i>Active until:</i> <code>{expires}</code>\n"
+    "<i>+{points} points added to your account 🎉</i>\n"
+    "<i>Daily credit limit is now</i> <b>{limit}</b> — <i>and your photos are unlimited & free.</i>"
+)
+
+# ---------------------------------------------------------------------------
+# commands/admin_commands.py - /giveaway
+# ---------------------------------------------------------------------------
+GIVEAWAY_USAGE_TEXT = (
+    "<i>Usage:</i> <code>/giveaway &lt;user_id&gt; &lt;tier&gt;</code>\n"
+    "<i>Tier is one of:</i> <code>daily</code>, <code>weekly</code>, <code>monthly</code>, <code>yearly</code>"
+)
+GIVEAWAY_UNKNOWN_TIER_TEXT = "<i>Unknown tier. Use one of:</i> <code>daily</code>, <code>weekly</code>, <code>monthly</code>, <code>yearly</code>"
+
+# ---------------------------------------------------------------------------
+# media_privacy.py / relay.py
+# ---------------------------------------------------------------------------
+PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT = (
+    "🔒 <b>Privacy Mode is a subscriber perk.</b>\n"
+    "<i>Your media was sent as a normal message instead. Use</i> /subscribe <i>to unlock Privacy Mode.</i>"
+)
+PHOTO_DAILY_LIMIT_REACHED_TEXT = (
+    "📷 <b>You've used all {limit} of your daily credits, so this photo wasn't sent.</b>\n"
+    "<i>Your count resets at midnight UTC, or</i> /subscribe <i>for unlimited photos.</i>"
+)
 
 # ---------------------------------------------------------------------------
 # commands/games.py
