@@ -46,11 +46,6 @@ from moderation import decay_severity_scores
 import init
 
 
-# Quick-start shortcut for the Coin Steal game (kept as its own command, on top of /games)
-async def coinsteal_shortcut(update, context):
-    await send_request(update, context, "coinsteal")
-
-
 # Function to preset the commands available in the bot
 async def set_commands(application):
     commands = [
@@ -143,7 +138,6 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("profile", show_profile))
     app.add_handler(CommandHandler("games", games_menu))
-    app.add_handler(CommandHandler("coinsteal", coinsteal_shortcut))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("connect", connect))
     app.add_handler(CommandHandler("ban", ban_user))

@@ -31,18 +31,6 @@ def ensure_db():
                     points INTEGER
             )
         """)
-        # Newer columns get bolted on with ALTER TABLE so existing databases upgrade cleanly
-        # instead of needing a manual migration.
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS preferences INTEGER DEFAULT 0")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS restricted_until DOUBLE PRECISION")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS restriction_reason TEXT")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS severity_score INTEGER DEFAULT 0")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS report_log JSONB DEFAULT '[]'")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS last_severity_decay DOUBLE PRECISION")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS subscription_expires DOUBLE PRECISION")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(10)")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS next_used_today INTEGER DEFAULT 0")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS next_used_day VARCHAR(10)")
         conn.commit()
 
 
