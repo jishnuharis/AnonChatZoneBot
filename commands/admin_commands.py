@@ -38,6 +38,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.bot.send_message,
                 chat_id=user_id,
                 text=message,
+                parse_mode="HTML",
             )
             sent += 1
             await asyncio.sleep(0.1)
