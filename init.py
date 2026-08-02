@@ -2,9 +2,7 @@ from saveNload import load_user_data  # Importing to load the user data into the
 
 import os  # Importing to help us get the desired constants from a separate file
 import time
-from dotenv import load_dotenv
 
-load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Holds the Bot Token
 OWNER = os.getenv("OWNER")  # Holds the owner's ID
 
