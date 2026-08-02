@@ -21,8 +21,8 @@ PARTNER_SKIPPED_TEXT = "🔁 <b>Partner skipped...</b>\n<i>You're added to the w
 NOT_IN_CHAT_USE_FIND_TEXT = "❗ <b>You're not in a chat.</b>\n<i>Use</i> /find <i>to connect.</i>"
 DAILY_NEXT_LIMIT_REACHED_TEXT = (
     "⏳ <b>You've used all {limit} of your daily credits.</b>\n"
-    "<i>Credits are spent on /next skips and (for free-tier users) photo sends.</i>\n"
-    "<i>Your count resets at midnight UTC, or</i> /subscribe <i>for more credits + unlimited photos.</i>"
+    "<i>Credits are spent on /next skips and (for free-tier users) media files sends.</i>\n"
+    "<i>Your count resets at midnight UTC, or</i> /subscribe <i>for more credits + unlimited media files.</i>"
 )
 
 # ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ SUBSCRIBE_INTRO_TEXT = (
     "{status}\n\n"
     "<b>Perks on any active plan:</b>\n"
     "• Higher daily credit limit (more skips)\n"
-    "• Send unlimited photos — free-tier photo sends cost 1 daily credit each\n"
+    "• Send unlimited photos — free-tier media files sends cost 1 daily credit each\n"
     "• Unlock /private (Privacy Mode) for photos/videos/voice notes\n"
     "• Get a peek at your partner's details when matched\n\n"
     "<b>Pick a plan:</b>"
@@ -100,7 +100,7 @@ HELP_TEXT = (
     "/subscribe - <i>View plans for higher daily credits, unlimited photos & Privacy Mode access</i>\n"
     "/help - <i>Show this message</i>\n\n"
     "<b>Daily credits:</b>\n"
-    "\t\tFree accounts share a daily credit pool between /find, /next skips and photo sends, resetting at midnight UTC. "
+    "\t\tFree accounts share a daily credit pool between /find, /next skips and media files sends, resetting at midnight UTC. "
     "Subscribers get a bigger pool, unlimited free photos, and unlock Privacy Mode — see /subscribe for plans.\n\n"
     "<b>Staying safe:</b>\n"
     "\t\tEvery chat ends with the option to rate or report your partner. Reports are reviewed and repeated "
