@@ -31,6 +31,14 @@ def ensure_db():
                     points INTEGER
             )
         """)
+        # Newer columns get bolted on with ALTER TABLE so existing databases upgrade cleanly
+        # instead of needing a manual migration.
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS preferences INTEGER DEFAULT 0")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS restricted_until DOUBLE PRECISION")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS restriction_reason TEXT")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS severity_score INTEGER DEFAULT 0")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS report_log JSONB DEFAULT '[]'")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS last_severity_decay DOUBLE PRECISION")
         conn.commit()
 
 
@@ -40,9 +48,11 @@ def save_user_data(data: dict, dirty_user: set):
 
     QUERY = """
             INSERT INTO user_details (
-                user_id, gender, age, country, reports, reporters, 
-                vote_up, vote_down, voters, feedback_track, partner_id, points
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                user_id, gender, age, country, reports, reporters,
+                vote_up, vote_down, voters, feedback_track, partner_id, points,
+                preferences, restricted_until, restriction_reason, severity_score,
+                report_log, last_severity_decay
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (user_id) DO UPDATE SET
                 gender = EXCLUDED.gender,
                 age = EXCLUDED.age,
@@ -54,7 +64,13 @@ def save_user_data(data: dict, dirty_user: set):
                 voters = EXCLUDED.voters,
                 feedback_track = EXCLUDED.feedback_track,
                 partner_id = EXCLUDED.partner_id,
-                points = EXCLUDED.points
+                points = EXCLUDED.points,
+                preferences = EXCLUDED.preferences,
+                restricted_until = EXCLUDED.restricted_until,
+                restriction_reason = EXCLUDED.restriction_reason,
+                severity_score = EXCLUDED.severity_score,
+                report_log = EXCLUDED.report_log,
+                last_severity_decay = EXCLUDED.last_severity_decay
     """
 
     with get_connection() as conn:
@@ -79,7 +95,13 @@ def save_user_data(data: dict, dirty_user: set):
                 json.dumps(details.get("voters", [])),
                 json.dumps(details.get("feedback_track", {})),
                 details.get("partner_id", None),
-                details.get("points", 0)
+                details.get("points", 0),
+                details.get("preferences", 0),
+                details.get("restricted_until"),
+                details.get("restriction_reason"),
+                details.get("severity_score", 0),
+                json.dumps(details.get("report_log", [])),
+                details.get("last_severity_decay"),
             ))
 
         if values:
@@ -95,7 +117,12 @@ def load_user_data() -> dict:
     ensure_db()
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM user_details")
+        cursor.execute("""
+            SELECT user_id, gender, age, country, reports, reporters, vote_up, vote_down,
+                   voters, feedback_track, partner_id, points, preferences, restricted_until,
+                   restriction_reason, severity_score, report_log, last_severity_decay
+            FROM user_details
+        """)
         rows = cursor.fetchall()
 
         data = {}
@@ -105,15 +132,21 @@ def load_user_data() -> dict:
                 "gender": row[1],
                 "age": row[2],
                 "country": row[3],
-                "reports": row[4],
-                "reporters": json.loads(row[5]),
+                "reports": row[4] or 0,
+                "reporters": json.loads(row[5]) if row[5] else [],
                 "votes": {
-                    "up": row[6],
-                    "down": row[7],
+                    "up": row[6] or 0,
+                    "down": row[7] or 0,
                 },
-                "voters": json.loads(row[8]),
-                "feedback_track": row[9],
+                "voters": json.loads(row[8]) if row[8] else [],
+                "feedback_track": row[9] or {},
                 "partner_id": row[10],
-                "points": row[11],
+                "points": row[11] or 0,
+                "preferences": row[12] or 0,
+                "restricted_until": row[13],
+                "restriction_reason": row[14],
+                "severity_score": row[15] or 0,
+                "report_log": row[16] if row[16] else [],
+                "last_severity_decay": row[17],
             }
         return data

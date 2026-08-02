@@ -17,12 +17,16 @@ async def handle_gender_selection(update: Update, context: ContextTypes.DEFAULT_
     if user_id in init.edit_stage and init.edit_stage[user_id] == "gender":  # Checks if the user is in editing stage and wants to edit their gender
         init.user_details[user_id]["gender"] = gender
         del init.edit_stage[user_id]
-        await safe_tele_func_call(query.edit_message_text, text=f"_Gender updated to_ *{'Male' if gender == 'M' else 'Female'}*.", parse_mode="Markdown")  # Notifies the user that their gender is updated
+        await safe_tele_func_call(query.edit_message_text, text=f"✅ <i>Gender updated to</i> <b>{'Male' if gender == 'M' else 'Female'}</b>.", parse_mode="HTML")  # Notifies the user that their gender is updated
+        init.dirty_users.add(user_id)
+
+        from commands.profile import send_profile_menu  # Lazy import to dodge a circular import
+        await send_profile_menu(context, user_id)
         return
 
     # This part works if the user is setting up their profile for the first time
     init.user_details[user_id]["gender"] = gender
     init.user_input_stage[user_id] = "age"
-    await safe_tele_func_call(query.edit_message_text, text=f"_Gender is set to_ *{'Male' if gender == 'M' else 'Female'}*.\n📅 *Please enter your age:*", parse_mode="Markdown")
+    await safe_tele_func_call(query.edit_message_text, text=f"<i>Gender set to</i> <b>{'Male' if gender == 'M' else 'Female'}</b>.\n📅 <b>Please enter your age:</b>", parse_mode="HTML")
 
     init.dirty_users.add(user_id)

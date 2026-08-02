@@ -1,33 +1,49 @@
 # Imports everything needed from telegram module
-from telegram import BotCommand
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from telegram import BotCommand, Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler, TypeHandler, MessageReactionHandler
 
 # Imports everything needed from user-defined modules responsible for basic working of the bot
-from saveNload import save_user_data, load_user_data
-from app import home, run, keep_alive
-from relay import relay_message
+from saveNload import save_user_data
+from app import keep_alive
+from relay import relay_message, relay_reaction
 
 # Imports everything needed from the user-defined command module
 from commands.start import start
 from commands.find import find
-from commands.next import next
+from commands.next import skip_partner
 from commands.stop import stop
+from commands.cancel import cancel
 from commands.help import help_command
 from commands.profile import show_profile
-from commands.admin_commands import *
+from commands.games import games_menu, handle_games_menu_selection
+from commands.admin_commands import broadcast, connect, ban_user, unban_user, check_user
 
 # Imports everything needed from the user-defined handler module to handle the command inputs of the users
-from handlers.rating import handle_vote
+from handlers.rating import handle_vote, handle_report_reason, handle_report_back
 from handlers.gender import handle_gender_selection
 from handlers.country import handle_country_selection
 from handlers.edit import handle_edit_selection
-from handlers.coin_steal_game import send_request, handle_cs_request
-from games.coin_steal import handle_callback
+from handlers.preferences import handle_preferences_selection
 
-from security import global_error_handler
+from games.game_requests import send_request, handle_game_request_response
+import games.coin_steal as coin_steal
+import games.tictactoe as tictactoe
+import games.rps as rps
+import games.guess_it as guess_it
+import games.would_you_rather as would_you_rather
+
+from media_privacy import handle_private_command, handle_view_once, sweep_expired_media
+
+from security import global_error_handler, restriction_gate
+from moderation import decay_severity_scores
 
 # Imports for basic functionality of bot and its data credentials
 import init
+
+
+# Quick-start shortcut for the Coin Steal game (kept as its own command, on top of /games)
+async def coinsteal_shortcut(update, context):
+    await send_request(update, context, "coinsteal")
 
 
 # Function to preset the commands available in the bot
@@ -37,9 +53,11 @@ async def set_commands(application):
         BotCommand("find", "Find a new chat partner"),  # find
         BotCommand("next", "Skip your current partner"),  # next
         BotCommand("stop", "Stop the current chat"),  # stop
+        BotCommand("cancel", "Cancel your ongoing game"),  # cancel game
         BotCommand("help", "Show help"),  # help
         BotCommand("profile", "Show user profile"),  # profile
-        BotCommand("coinsteal", "Play a game of Coin Steal"),  # coin steal game
+        BotCommand("games", "Play a mini-game with your partner"),  # games menu
+        BotCommand("private", "Arm Privacy Mode for your next media"),  # privacy mode arm
     ]
     await application.bot.set_my_commands(commands)  # To set the commands to the bot menu
 
@@ -57,6 +75,23 @@ async def periodic_feedback_clear(context):
             init.dirty_users.add(user_id)
 
 
+# Function to slowly forgive old severity points so a few minor reports don't
+# permanently follow someone around
+async def periodic_severity_decay(context):
+    decay_severity_scores()
+
+
+# Function to sweep the matchmaking queue and pair up anyone who's waited past
+# the grace period, ignoring interest overlap at that point
+async def periodic_queue_sweep(context):
+    from matchmaking import queue_sweep
+    await queue_sweep(context)
+
+
+async def periodic_media_sweep(context):
+    await sweep_expired_media(context)
+
+
 async def on_shutdown(application):
     print("⚠️ Bot shutting down. Saving user data...")
     try:
@@ -68,6 +103,9 @@ async def on_shutdown(application):
 async def on_startup(application):
     application.job_queue.run_repeating(periodic_save, interval=60, first=60)  # Saves the user data
     application.job_queue.run_repeating(periodic_feedback_clear, interval=28800, first=28800)  # Frees up the feedback_track
+    application.job_queue.run_repeating(periodic_severity_decay, interval=86400, first=3600)  # Slowly forgives old reports
+    application.job_queue.run_repeating(periodic_queue_sweep, interval=5, first=5)  # Fallback FIFO pairing once the grace period passes
+    application.job_queue.run_repeating(periodic_media_sweep, interval=3600, first=3600)  # Expires unopened Privacy Mode media
 
 
 async def post_init_tasks(application):
@@ -87,31 +125,61 @@ def main():
         .build()
     )  # The app which makes the bot work
 
-    app.add_handler(CommandHandler("start", start))  # Connects the 'start' command to its functionality
-    app.add_handler(CommandHandler("find", find))  # Connects the 'find' command to its functionality
-    app.add_handler(CommandHandler("next", next))  # Connects the 'next' command to its functionality
-    app.add_handler(CommandHandler("stop", stop))  # Connects the 'stop' command to its functionality
-    app.add_handler(CommandHandler("help", help_command))  # Connects the 'help' command to its functionality
-    app.add_handler(CommandHandler("profile", show_profile))  # Connects the 'profile' command to its functionality
-    app.add_handler(CommandHandler("coinsteal", send_request))
-    app.add_handler((CommandHandler("broadcast", broadcast)))
-    app.add_handler((CommandHandler("connect", connect)))
-    app.add_handler(CallbackQueryHandler(handle_vote, pattern="rate\\|\\d+\\|(up|down)$"))  # Handles the voting mechanics
-    app.add_handler(CallbackQueryHandler(handle_gender_selection, pattern="^gender\\|[MF]$"))  # Handles the selection of gender from the user
-    app.add_handler(CallbackQueryHandler(handle_country_selection, pattern="^country\\|.+$"))  # Handles the selection of country from the user
-    app.add_handler(CallbackQueryHandler(handle_vote, pattern="^report\\|\\d+$"))  # Handles the reporting mechanics
-    app.add_handler(CallbackQueryHandler(handle_edit_selection, pattern="^edit\\|.+$"))  # Handles the selection of what to edit from the user
-    app.add_handler(CallbackQueryHandler(handle_cs_request, pattern="^cs_req\\|(accept|decline)$"))
-    app.add_handler(CallbackQueryHandler(handle_callback, pattern="^cs\\|(save|steal)$"))
+    # Runs before every single other handler: blocks restricted users dead in
+    # their tracks (commands, buttons, media, everything) via ApplicationHandlerStop.
+    app.add_handler(TypeHandler(Update, restriction_gate), group=-2)
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("find", find))
+    app.add_handler(CommandHandler("next", skip_partner))
+    app.add_handler(CommandHandler("stop", stop))
+    app.add_handler(CommandHandler("cancel", cancel))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("profile", show_profile))
+    app.add_handler(CommandHandler("games", games_menu))
+    app.add_handler(CommandHandler("coinsteal", coinsteal_shortcut))
+    app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("connect", connect))
+    app.add_handler(CommandHandler("ban", ban_user))
+    app.add_handler(CommandHandler("unban", unban_user))
+    app.add_handler(CommandHandler("checkuser", check_user))
+    app.add_handler(CommandHandler("private", handle_private_command))
+
+    # Profile / rating / reports
+    app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^rate\|\d+\|(up|down)$"))
+    app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^report\|\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_report_reason, pattern=r"^reportreason\|\d+\|\w+$"))
+    app.add_handler(CallbackQueryHandler(handle_report_back, pattern=r"^reportback\|\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_gender_selection, pattern=r"^gender\|[MF]$"))
+    app.add_handler(CallbackQueryHandler(handle_country_selection, pattern=r"^country\|.+$"))
+    app.add_handler(CallbackQueryHandler(handle_edit_selection, pattern=r"^edit\|.+$"))
+    app.add_handler(CallbackQueryHandler(handle_preferences_selection, pattern=r"^pref\|.+$"))
+
+    # Games
+    app.add_handler(CallbackQueryHandler(handle_games_menu_selection, pattern=r"^gamemenu\|\w+$"))
+    app.add_handler(CallbackQueryHandler(handle_game_request_response, pattern=r"^gamereq\|(accept|decline)$"))
+    app.add_handler(CallbackQueryHandler(coin_steal.handle_callback, pattern=r"^cs\|(save|steal)$"))
+    app.add_handler(CallbackQueryHandler(tictactoe.handle_callback, pattern=r"^ttt\|.+$"))
+    app.add_handler(CallbackQueryHandler(rps.handle_callback, pattern=r"^rps\|(rock|paper|scissors)$"))
+    app.add_handler(CallbackQueryHandler(guess_it.handle_callback, pattern=r"^gi\|.+$"))
+    app.add_handler(CallbackQueryHandler(would_you_rather.handle_callback, pattern=r"^wyr\|[AB]$"))
+
+    # Privacy Mode media
+    app.add_handler(CallbackQueryHandler(handle_view_once, pattern=r"^viewonce\|.+$"))
+
     app.add_handler(MessageHandler(
         (filters.TEXT | filters.Sticker.ALL | filters.PHOTO | filters.VIDEO |
          filters.VIDEO_NOTE | filters.AUDIO | filters.Document.ALL | filters.VOICE | filters.ANIMATION) & ~filters.COMMAND,
         relay_message
     ))  # filters the commands from the messages sent by the user
 
+    app.add_handler(MessageReactionHandler(relay_reaction))  # Mirrors emoji reactions across the relay
+
     app.add_error_handler(global_error_handler)
 
-    app.run_polling(drop_pending_updates=True)  # Runs the app
+    # allowed_updates must explicitly list message_reaction, since Telegram omits it
+    # from the default update set unless it's requested.
+    app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)  # Runs the app
 
 
 # Part which keeps the event loop running

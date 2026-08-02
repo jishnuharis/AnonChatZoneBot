@@ -2,6 +2,8 @@
 from flask import Flask
 from threading import Thread
 
+from message import BOT_RUNNING_STATUS_TEXT
+
 web_app = Flask('')  # Creates a web app object
 
 
@@ -13,7 +15,7 @@ def run():
 # Acts as a entry point and ensures the bot is active
 @web_app.route('/')
 def home():
-    return "✅ Anonymous Chat Bot is running!"
+    return BOT_RUNNING_STATUS_TEXT
 
 
 # Function which keeps the bot alive

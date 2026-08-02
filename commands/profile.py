@@ -2,32 +2,71 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
+from html import escape as esc
+
 from handlers.setup import check_user_profile  # Imports the handler which checks if the user's profile exists
+from handlers.preferences import describe_preferences
 from security import safe_tele_func_call
 
 import init  # Importing the bot credentials and users' details
+
+
+def _profile_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✏️ Edit Gender", callback_data="edit|gender"),
+         InlineKeyboardButton("✏️ Edit Age", callback_data="edit|age")],
+        [InlineKeyboardButton("✏️ Edit Country", callback_data="edit|country"),
+         InlineKeyboardButton("🏷️ Edit Interests", callback_data="edit|preferences")],
+    ])
+
+
+async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallback_name=None, fallback_username=None):
+    user = init.user_details.get(user_id)
+    if not user:
+        return None
+
+    full_name, username = fallback_name, fallback_username
+    if full_name is None:
+        chat = await safe_tele_func_call(context.bot.get_chat, user_id)
+        full_name = esc(chat.full_name) if chat and chat.full_name else "Unknown"
+        username = chat.username if chat else None
+    else:
+        full_name = esc(full_name)
+
+    username_line = f" | @{esc(username)}" if username else ""
+    votes = user.get("votes", {"up": 0, "down": 0})
+    prefs_text = esc(describe_preferences(user.get("preferences", 0)))
+
+    return (
+        "<b>👤 Your Profile</b>\n\n"
+        f"<b>Name:</b> {full_name}{username_line}\n"
+        f"<b>ID:</b> <code>{user_id}</code>\n"
+        f"<b>Gender:</b> {'Male' if user['gender'] == 'M' else 'Female'}\n"
+        f"<b>Age:</b> {user['age']}\n"
+        f"<b>Country:</b> {esc(str(user['country']))}\n"
+        f"<b>Interests:</b> {prefs_text}\n"
+        f"<b>Rating:</b> {votes['up']} 👍 {votes['down']} 👎\n"
+        f"<b>Points:</b> {user['points']}"
+    )
 
 
 # Function shows the user their profile and asks if they wanna edit them and what to edit
 @check_user_profile
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user = init.user_details[user_id]
-    votes = user.get("votes", {"up": 0, "down": 0})
-    profile_text = f"""
-<b>User Profile</b>
+    text = await _build_profile_text(
+        user_id, context,
+        fallback_name=update.effective_user.full_name,
+        fallback_username=update.effective_user.username,
+    )
+    await safe_tele_func_call(update.message.reply_text, text=text, reply_markup=_profile_keyboard(), parse_mode="HTML")
 
-<b>Name:</b> <i>{update.effective_user.full_name}</i> | @{(update.effective_user.username)}
-<b>ID:</b> <i>{user_id}</i>
-<b>Gender:</b> <i>{"Male" if user["gender"] == "M" else "Female"}</i>
-<b>Age:</b> <i>{user["age"]}</i>
-<b>Country:</b> <i>{user["country"]}</i>
-<b>Rating:</b> <i>{votes["up"]}</i> 👍 <i>{votes["down"]}</i> 👎
-<b>Points:</b> <i>{user["points"]}</i>
-"""
-    keyboard = [
-        [InlineKeyboardButton("✏️ Edit Gender", callback_data="edit|gender"),
-         InlineKeyboardButton("✏️ Edit Age", callback_data="edit|age")],
-        [InlineKeyboardButton("✏️ Edit Country", callback_data="edit|country")]
-    ]
-    await safe_tele_func_call(update.message.reply_text, text=profile_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
+async def send_profile_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """Sends a fresh profile menu message. Used to bring the user right back to
+    /profile after they finish editing any single field, so editing never just
+    dead-ends - it always flows back into the same menu, consistently."""
+    text = await _build_profile_text(user_id, context)
+    if not text:
+        return
+    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=text, reply_markup=_profile_keyboard(), parse_mode="HTML")

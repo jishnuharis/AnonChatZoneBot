@@ -3,30 +3,33 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, Callbac
 from telegram.ext import ContextTypes
 
 from security import safe_tele_func_call
+from moderation import REPORT_REASONS, file_report
+from message import RATE_PROMPT_TEXT, REPORT_REASON_PROMPT_TEXT, REPORT_LOGGED_TEXT, FEEDBACK_THANKS_TEXT
 
 import init  # Importing the bot credentials and users' details
 
 
+def _feedback_keyboard(to_id, voted, reported):
+    buttons = []
+    if not voted:
+        buttons.append([InlineKeyboardButton("👍", callback_data=f"rate|{to_id}|up"),
+                         InlineKeyboardButton("👎", callback_data=f"rate|{to_id}|down")])
+    if not reported:
+        buttons.append([InlineKeyboardButton("🚩 Report", callback_data=f"report|{to_id}")])
+    return InlineKeyboardMarkup(buttons)
+
+
+
 # Function asks for rating from the user for their partner
 async def ask_for_rating(bot, from_id, to_id):
-    keyboard = [
-        [
-            InlineKeyboardButton("👍", callback_data=f"rate|{to_id}|up"),
-            InlineKeyboardButton("👎", callback_data=f"rate|{to_id}|down")
-        ],
-        [
-            InlineKeyboardButton("🚩 Report", callback_data=f"report|{to_id}")
-        ]
-    ]  # Initialises the keyboard with the voting up and voting down button and a report button
-    markup = InlineKeyboardMarkup(keyboard)
+    markup = _feedback_keyboard(to_id, voted=False, reported=False)
     init.user_details[to_id].setdefault("feedback_track", {})  # Sets up the feedback_track to the partner's ID to track the users feedback
     init.user_details[to_id]["feedback_track"][from_id] = {"voted": False, "reported": False}  # Sets both voted and reported state to False initially
-    await safe_tele_func_call(bot.send_message, chat_id=from_id,
-                              text="💡 *If the interlocutor misbehaved or violated the rules, send a complaint against them.*\n_Give a rating to the interlocutor which will affect their ratings._",
-                              reply_markup=markup, parse_mode="Markdown")  # Asks the user if they wanna rate their partner and shows them the menu
+    await safe_tele_func_call(bot.send_message, chat_id=from_id, text=RATE_PROMPT_TEXT,
+                               reply_markup=markup, parse_mode="HTML")  # Asks the user if they wanna rate their partner and shows them the menu
 
 
-# Handles the vote and report done by the user
+# Handles the vote (up/down) done by the user, and kicks off the report-reason menu
 async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     query: CallbackQuery = update.callback_query
@@ -38,11 +41,8 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = data[0]
     target_id = int(data[1])
     if target_id not in init.user_details:  # Checks if the target's ID is in the user database and if not present it initialises the row for the target's ID
-        init.user_details[target_id] = {
-            "gender": None, "age": None, "country": None,
-            "reports": 0, "reporters": [], "votes": {"up": 0, "down": 0},
-            "voters": [], "feedback_track": {}
-        }
+        from init import _default_user
+        init.user_details[target_id] = _default_user()
 
     track = init.user_details[target_id].setdefault("feedback_track", {})  # Initialises the tracker
     track.setdefault(user_id, {"voted": False, "reported": False})  # Initialises both voted and reported to False
@@ -54,28 +54,66 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 init.user_details[target_id]["votes"][vote_type] += 1  # Increments the vote up or vote down by 1
                 init.user_details[target_id]["voters"].append(user_id)  # Adds the user's ID to the voters list of the target
             track[user_id]["voted"] = True  # Sets the 'voted' value of the user to True in the feedback_track of the target
-    elif action == "report":  # Checks if the user did 'vote'
-        if not track[user_id]["reported"]:  # Checks if the user's ID doesn't have value of 'reported' as True in the feedback_track of the target
-            if user_id not in init.user_details[target_id]["reporters"]:  # Checks if the user's ID is not in the reporters list of the target
-                init.user_details[target_id]["reports"] += 1  # Increments the reports by 1
-                init.user_details[target_id]["reporters"].append(user_id)  # Adds the user's ID to the reporters list of the target
-            track[user_id]["reported"] = True  # Sets the 'reported' value of the user to True in the feedback_track of the target
+        init.dirty_users.update([user_id, target_id])
+        await _refresh_feedback_message(query, target_id, track[user_id])
+        return
 
-    voted = track[user_id]["voted"]
-    reported = track[user_id]["reported"]
+    if action == "report":  # Checks if the user wants to report, opens the reason picker
+        if track[user_id]["reported"]:
+            return
+        buttons = [[InlineKeyboardButton(label, callback_data=f"reportreason|{target_id}|{code}")]
+                   for code, (label, _weight) in REPORT_REASONS.items()]
+        buttons.append([InlineKeyboardButton("« Back", callback_data=f"reportback|{target_id}")])
+        await safe_tele_func_call(query.edit_message_text, text=REPORT_REASON_PROMPT_TEXT, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="HTML")
+        return
 
-    if (voted and reported) or (not voted and not reported):
-        del init.user_details[target_id]["feedback_track"][user_id]  # If both voted and reported are True or both are False
-    if voted and reported:  # If the user is both voted and reported it thanks the user for doing it
-        await safe_tele_func_call(query.edit_message_text, text="*Thank You for your feedback.*\n_Your feedback helps other users to be safe and secure._", parse_mode="Markdown")
-    else:  # Else it shows corresponding message and buttons to keep the menu active
-        buttons = []
-        rate_text = "💡 _If the interlocutor misbehaved or violated the rules, send a complaint against them._"
-        if not voted:
-            buttons.append([InlineKeyboardButton("👍", callback_data=f"rate|{target_id}|up"),
-                            InlineKeyboardButton("👎", callback_data=f"rate|{target_id}|down")])
-        if not reported:
-            buttons.append([InlineKeyboardButton("🚩 Report", callback_data=f"report|{target_id}")])
-        await safe_tele_func_call(query.edit_message_text, text=f"*{rate_text}*", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
-    
+
+async def handle_report_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    target_id = int(query.data.split("|")[1])
+    track = init.user_details.get(target_id, {}).get("feedback_track", {}).get(user_id, {"voted": False, "reported": False})
+    await _refresh_feedback_message(query, target_id, track)
+
+
+async def handle_report_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    _, target_id, code = query.data.split("|")
+    target_id = int(target_id)
+
+    if target_id not in init.user_details:
+        from init import _default_user
+        init.user_details[target_id] = _default_user()
+
+    track = init.user_details[target_id].setdefault("feedback_track", {})
+    track.setdefault(user_id, {"voted": False, "reported": False})
+
+    if not track[user_id]["reported"]:
+        if user_id not in init.user_details[target_id]["reporters"]:
+            init.user_details[target_id]["reporters"].append(user_id)
+            # file_report logs the report and auto-restricts the target once their
+            # severity score crosses a threshold - it does this quietly, with no DM
+            # to the owner. A single report (even an "underage concern" one) never
+            # restricts anyone on its own; it takes a real pattern of reports.
+            # If a restricted user thinks it's a mistake, they can reach out to an
+            # admin themselves to get it reviewed - the owner doesn't need to be
+            # paged for every report that comes in.
+            file_report(user_id, target_id, code)
+        track[user_id]["reported"] = True
+
     init.dirty_users.update([user_id, target_id])
+    await safe_tele_func_call(query.edit_message_text, text=REPORT_LOGGED_TEXT, parse_mode="HTML")
+
+
+async def _refresh_feedback_message(query, target_id, track_for_user):
+    voted = track_for_user["voted"]
+    reported = track_for_user["reported"]
+    user_id = query.from_user.id
+    if voted and reported:  # If the user is both voted and reported it thanks the user for doing it
+        del init.user_details[target_id]["feedback_track"][user_id]
+        await safe_tele_func_call(query.edit_message_text, text=FEEDBACK_THANKS_TEXT, parse_mode="HTML")
+    else:  # Else it shows corresponding message and buttons to keep the menu active
+        await safe_tele_func_call(query.edit_message_text, text=RATE_PROMPT_TEXT, reply_markup=_feedback_keyboard(target_id, voted, reported), parse_mode="HTML")

@@ -1,85 +1,27 @@
 # 💬 AnonChatZoneBot
 
-An anonymous chat bot for Telegram that randomly pairs strangers for real-time private conversations — built entirely for the love of the game. No third-party storage, no accounts, just two people matched together through Telegram.
+An anonymous chat bot for Telegram that pairs strangers — by shared interests when possible — for real-time private conversations, with a moderation system, Privacy Mode media, and a handful of mini-games to play with your partner.
 
 ---
 
-## Table of Contents
+## What's new in this rework
 
-- [How It Works](#how-it-works)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Tech Stack](#tech-stack)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Running the Bot](#running-the-bot)
-- [Commands](#commands)
-- [User Profile & Setup](#user-profile--setup)
-- [Rating & Reporting System](#rating--reporting-system)
-- [Coin Steal Game](#coin-steal-game)
-- [Admin Controls](#admin-controls)
-- [Database](#database)
-- [Error Handling](#error-handling)
+- **Interest-based matching** — pick tags (Gaming, Anime, Flirting, Music, Movies, Sports, Memes, Relationships, Study, Politics) and `/find` tries to pair you with someone who shares them, falling back to FIFO after a short grace period so nobody waits forever.
+- **Severity-based moderation** — reports now ask *why*, each reason carries a weight, and crossing a threshold auto-restricts the offender for a duration scaled to severity (0–10), quietly and automatically — no admin has to be paged for every report that comes in. Thresholds are scaled deliberately high so a single report (even a serious one) never restricts someone on its own; it takes a real, sustained pattern of reports. Admins can also manually `/ban`, `/unban`, and `/checkuser`.
+- **Admins can't be restricted, ever** — not manually, not automatically, not even by themselves. `/ban`-ing yourself (or another admin) is explicitly blocked, and the automatic report-threshold system skips admin accounts entirely.
+- **Full lockout while restricted** — a restricted user can't run any command, tap any button, or send any message until their restriction expires (or an admin lifts it). If someone thinks a restriction is a mistake, they reach out to an admin themselves to get it reviewed.
+- **Privacy Mode media, now opt-in** — sending a photo/video/voice/video note relays instantly like anything else *unless* you caption it `/private` (or send a bare `/private` first, then the media right after within 5 minutes). Either way it's then held server-side, delivered with forward/save protection, and deleted from the chat shortly after your partner opens it — photos after a flat 45s, videos/voice/video notes after their own duration plus that same 45s so playback never gets cut off. See [Privacy note on Privacy Mode media](#privacy-note-on-privacy-mode-media) for what this can and can't guarantee.
+- **Consistent profile editing** — editing your gender, age, country, or interests from `/profile` now always drops you back into the profile menu afterward, instead of just ending. Same flow everywhere, no dead ends.
+- **HTML formatting everywhere** — every message the bot sends uses Telegram's HTML parse mode instead of Markdown, and anything derived from user input (report reasons, ban reasons, etc.) is escaped before being sent. This was the main source of "can't parse entities" failures in the old version and should no longer happen.
+- **More mini-games** — Coin Steal (reworked with trust streaks and a wildcard round), Tic Tac Toe, Rock Paper Scissors, Guess It, and Would You Rather — all available via `/games`.
+
+Spam detection (a lightweight in-memory rate limiter) has been removed — it added a small delay to every single update for very little practical benefit. The restriction system (via reports and manual admin action) remains as the actual moderation layer.
 
 ---
 
 ## How It Works
 
-Users start the bot, set up a quick profile (gender, age, country), then use `/find` to enter a waiting queue. Once two users are queued, the bot pairs them and relays all messages between them in real time — neither user ever sees the other's Telegram ID or username. When done, they rate each other and move on.
-
-All message relay happens server-side. The bot forwards text, photos, videos, audio, voice notes, video notes, stickers, GIFs, and documents between partners transparently.
-
----
-
-## Features
-
-### Anonymous Matching
-- Random partner matching from a shared waiting queue
-- Partner's rating (👍/👎) is shown when a match is made
-- `/next` skips the current partner and immediately queues for a new one
-
-### Message Relay
-Supports relaying all major Telegram message types between partners:
-- Text messages
-- Photos (with caption)
-- Videos (with caption)
-- Video notes (round videos)
-- Voice messages
-- Audio files (with caption)
-- Documents (with caption)
-- Stickers
-- Animations / GIFs (with caption)
-
-### User Profiles
-- Each user sets up gender, age, and country on first use
-- Profile fields are editable at any time via `/profile`
-- Profile data persists across bot restarts via PostgreSQL
-
-### Rating & Reporting
-- After every conversation ends, both users are prompted to rate their partner (👍 or 👎)
-- Users can also report a partner for misconduct (🚩)
-- A `feedback_track` system prevents double-voting and double-reporting within the same session
-- Feedback tracks are cleared every 8 hours to prevent data bloat
-
-### Points System
-- Users earn points by playing the Coin Steal game
-- Points are stored per user in the database
-
-### Coin Steal Game
-- A 3-round psychological game playable with your current chat partner
-- Each round: both players simultaneously choose to **Save** or **Steal**
-- Round 3 applies a x2 multiplier if one player saves and the other steals
-- Winner earns 10 points; draws and timeouts earn 1 point each
-- Games time out after 5 minutes of inactivity
-
-### Data Persistence
-- User data is saved to PostgreSQL every 60 seconds (dirty-write pattern — only changed users are written)
-- Data is also flushed on clean shutdown
-
-### Admin Controls
-- `/broadcast` — sends a message to every registered user
-- `/connect <user_id>` — forcibly pairs the admin with a specific user (disconnects their existing partners gracefully and is used to investigate users with abnormal amount of reports)
+Users start the bot, set up a quick profile (gender, age, country, and optional interest tags), then use `/find` to enter a waiting queue. The bot pairs them up — preferring someone who shares interests — and relays messages between them in real time. Neither user ever sees the other's Telegram ID or username.
 
 ---
 
@@ -89,111 +31,44 @@ Supports relaying all major Telegram message types between partners:
 AnonChatZoneBot/
 ├── main.py                     # App entry point, handler wiring, periodic jobs
 ├── app.py                      # Flask keep-alive server (for cloud deployment)
-├── init.py                     # Global state: waiting queue, active pairs, user details
-├── relay.py                    # Message relay logic between paired users
+├── init.py                     # Global state: queue, active pairs, user details, preference tags
+├── relay.py                    # Message relay + Privacy Mode media interception
+├── matchmaking.py              # Interest-aware pairing + FIFO fallback sweep
+├── moderation.py                # Report reasons, severity scoring, ban/restrict logic
+├── media_privacy.py             # Privacy Mode media flow
 ├── saveNload.py                # PostgreSQL save/load layer
-├── security.py                 # Safe Telegram API wrapper, global error handler
+├── security.py                 # Safe Telegram API wrapper, restriction gate, error handler
 │
 ├── commands/
-│   ├── start.py                # /start — welcome message
-│   ├── find.py                 # /find — queue and match users
-│   ├── next.py                 # /next — skip partner, re-queue
-│   ├── stop.py                 # /stop — end current chat
-│   ├── help.py                 # /help — command reference
-│   ├── profile.py              # /profile — show and edit user profile
-│   └── admin_commands.py       # /broadcast, /connect (owner only)
+│   ├── start.py / find.py / next.py / stop.py / help.py / profile.py / games.py
+│   └── admin_commands.py       # /broadcast, /connect, /ban, /unban, /checkuser
 │
 ├── handlers/
 │   ├── setup.py                # New user onboarding flow (decorator + handler)
-│   ├── gender.py               # Gender selection callback handler
-│   ├── country.py              # Country selection menu + callback handler
-│   ├── edit.py                 # Profile edit callback handler
-│   ├── rating.py               # Post-chat rating and report handler
-│   └── coin_steal_game.py      # Coin Steal game request/accept/decline handler
+│   ├── gender.py / country.py / edit.py
+│   ├── preferences.py          # Interest tag toggle menu (bitmask storage)
+│   └── rating.py               # Post-chat rating + reason-based reporting
 │
 ├── games/
-│   └── coin_steal.py           # Coin Steal game logic, session management, timeout
+│   ├── registry.py             # Tracks which game each user is in, for cleanup on disconnect
+│   ├── game_requests.py        # Generic request/accept/decline flow for all games
+│   ├── coin_steal.py / tictactoe.py / rps.py / guess_it.py / would_you_rather.py
 │
+├── tests/                      # Lightweight import + logic sanity checks (no live bot/DB needed)
 ├── requirements.txt
 └── Procfile
 ```
 
 ---
 
-## Tech Stack
-
-- **Python 3** — core language
-- **python-telegram-bot v20+** — async Telegram Bot API wrapper (with job-queue)
-- **Flask** — lightweight web server for keep-alive pings on cloud platforms
-- **PostgreSQL** — persistent user data storage via `psycopg2`
-- **Procfile** — Railway / Heroku compatible deployment config
-
----
-
-## Requirements
-
-- Python 3.10+
-- A PostgreSQL database (local or hosted, e.g. Railway, Supabase, Neon)
-- A Telegram bot token from [@BotFather](https://t.me/BotFather)
-
-### Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-`requirements.txt` includes:
-```
-python-telegram-bot
-python-telegram-bot[job-queue]
-Flask
-nest_asyncio
-aiofiles
-psycopg2-binary
-```
-
----
-
 ## Configuration
-
-All configuration is done via **environment variables**.
 
 | Variable | Required | Description |
 |---|---|---|
 | `BOT_TOKEN` | ✅ | Telegram bot token from BotFather |
-| `OWNER` | ✅ | Your Telegram user ID (for admin commands and error reports) |
-| `DATABASE_URL` | ✅ | PostgreSQL connection string (e.g. `postgresql://user:pass@host/db`) |
-
-### Example `.env`
-
-```env
-BOT_TOKEN=123456:ABC-DEF...
-OWNER=987654321
-DATABASE_URL=postgresql://user:password@localhost:5432/anonchat
-```
-
----
-
-## Running the Bot
-
-```bash
-python main.py
-```
-
-On startup the bot will:
-1. Connect to PostgreSQL and create the `user_details` table if it doesn't exist
-2. Load all existing user data into memory
-3. Restore any previously active partner pairings
-4. Start the Flask keep-alive server on port `8080`
-5. Begin polling for Telegram updates
-
-### Deploying to Railway
-
-1. Push the project to a GitHub repository
-2. Create a new Railway project and connect the repository
-3. Add a PostgreSQL plugin (Railway auto-sets `DATABASE_URL`)
-4. Add `BOT_TOKEN` and `OWNER` as environment variables
-5. Railway uses the `Procfile` (`web: python3 main.py`) to start the bot automatically
+| `OWNER` | ✅ | Your Telegram user ID (full admin, error reports) |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `ADMIN_IDS` | optional | Comma-separated extra admin user IDs (e.g. `111,222`) |
 
 ---
 
@@ -202,127 +77,63 @@ On startup the bot will:
 | Command | Description |
 |---|---|
 | `/start` | Welcome message; triggers profile setup for new users |
-| `/find` | Join the waiting queue and get matched with a partner |
-| `/next` | Skip current partner, rate them, and immediately search for a new one |
+| `/find` | Join the waiting queue, matched by shared interests when possible |
+| `/next` | Skip current partner, rate them, and search for a new one |
 | `/stop` | End the current chat and rate your partner |
 | `/help` | Show all available commands |
-| `/profile` | View your profile and edit gender, age, or country |
-| `/coinsteal` | Challenge your current chat partner to a game of Coin Steal |
+| `/profile` | View/edit your profile and interests |
+| `/games` | Pick a mini-game to challenge your partner to |
+| `/coinsteal` | Quick-start a Coin Steal game request |
+| `/private` | Arm Privacy Mode, then send your media right after (or just caption the media `/private` directly) |
+
+**Admin only (not shown in `/help` or the bot's command menu):** `/broadcast <message>`, `/connect <user_id>`, `/ban <user_id> <severity 0-10> [reason]`, `/unban <user_id>`, `/checkuser <user_id>`
 
 ---
 
-## User Profile & Setup
+## Moderation system
 
-New users are automatically walked through a setup flow on their first interaction:
+Reports go through a reason picker (spam, rude/toxic, unwanted NSFW, harassment, scam, leaked private media, underage concern), each adding weighted points to the target's `severity_score`. Crossing a threshold auto-computes a ban severity (0–10) and restricts the user for a duration scaled to that severity — from a few minutes up to long-term. This all happens silently: no message is sent to the owner when a report comes in or a restriction triggers. Restricted users are told why they're restricted and can reach out to an admin themselves if they think it's a mistake — admins can look up the full report history with `/checkuser`. `severity_score` decays slowly over time so a couple of old minor reports don't follow someone around forever.
 
-1. **Gender** — inline button selection (Male / Female)
-2. **Age** — free text input (validated as integer)
-3. **Country** — inline button selection from a menu of 10 countries + "Other"
+`restricted_until` is `NULL` when a user isn't restricted, and a timestamp otherwise. A restricted user is blocked at the very first stage of update processing, before any command or button handler runs, so *everything* is locked, not just chat.
 
-All three fields must be completed before a user can use `/find`. The setup flow is enforced via the `@check_user_profile` decorator applied to every command handler.
-
-After setup, users can edit any field at any time via `/profile`:
-- Editing gender and country shows the same inline button menus
-- Editing age prompts for a new text input
+Admin accounts (the owner and anyone in `ADMIN_IDS`) can never be restricted — not through `/ban` (including on yourself), and not automatically through reports, no matter how many pile up.
 
 ---
 
-## Rating & Reporting System
+## Privacy note on Privacy Mode media
 
-After every chat ends (via `/stop` or `/next`), both users receive a feedback prompt:
-
-- 👍 **Upvote** — increases the partner's positive rating
-- 👎 **Downvote** — increases the partner's negative rating
-- 🚩 **Report** — logs a report against the partner
-
-A `feedback_track` dictionary prevents any user from voting or reporting the same partner more than once per session. The feedback track for all users is automatically cleared every **8 hours** to keep memory usage in check.
-
-When a new partner is found, their current rating (total upvotes and downvotes) is shown to both users immediately upon matching.
+Sending a photo/video/voice/video note while paired relays normally by default. Caption it `/private` (or send a bare `/private` command first, then the media within 5 minutes) and it goes out in Privacy Mode instead. Once opened, the bot sends it with `protect_content` (blocks forward/save in stock Telegram clients) and deletes its own copy shortly after — 45s for photos, or the media's own duration plus 45s for video/voice/video notes, so playback never gets cut off mid-way. What this **can't** guarantee: once media is delivered to a device, that device has it — a modified client can still retain a file it already downloaded, and Telegram gives bots no visibility into screenshots. That's true of every bot on the platform, not something fixable in code. The report system's "leaked my private media" reason (high severity) is the real backstop for misuse, not a technical promise.
 
 ---
 
-## Coin Steal Game
+## Mini-games
 
-A 3-round game of trust and betrayal playable between two currently paired users.
+All playable via `/games` (or `/coinsteal` directly for that one) between two currently paired users. Whoever leaves the chat mid-game auto-forfeits and their partner is notified — no orphaned sessions.
 
-### How to play
-1. Either partner sends `/coinsteal` — a game request is sent to the other partner
-2. The partner accepts or declines via inline buttons
-3. Each round, both players simultaneously and independently choose:
-   - **Save 🤝** — cooperate with your partner
-   - **Steal 😈** — take their coin
-
-### Scoring
-
-| Player 1 | Player 2 | P1 Score | P2 Score |
-|---|---|---|---|
-| Save | Save | +1 | +1 |
-| Steal | Steal | +0 | +0 |
-| Steal | Save | +2 | +0 |
-| Save | Steal | +0 | +2 |
-
-**Round 3 only:** If one player saves and the other steals, the stealer earns **+4** instead of +2 (x2 multiplier).
-
-### End of game
-- **Winner** (higher score after 3 rounds): +10 points
-- **Draw**: no points awarded
-- **Timeout** (5 minutes of inactivity): both players get +1 point and the game ends
-
-Games are session-based (UUID) and fully cleaned up after completion or timeout.
-
----
-
-## Admin Controls
-
-Available only to the user whose Telegram ID matches the `OWNER` environment variable.
-
-### `/broadcast <message>`
-Sends the given message to every registered user in the database. Rate-limited to one message per user per 0.1 seconds to avoid hitting Telegram's flood limits.
-
-### `/connect <user_id>`
-Forcibly pairs the admin with the specified user. Handles all edge cases:
-- Disconnects the target user from their current partner (if any)
-- Disconnects the admin from their current partner (if any)
-- Sends disconnection notices and rating prompts to all displaced partners
-- Establishes the new pair and notifies both users
-- `Important` : This command is only for the owner of the bot and is used to investigate questionable activities the bot
+- **Coin Steal 🪙** — 3-round trust game, Save or Steal each round, streak bonuses for repeated mutual trust, wildcard round 3.
+- **Tic Tac Toe ⭕❌** — classic, first to three in a row.
+- **Rock Paper Scissors 🪨📄✂️** — best of 5.
+- **Guess It 🔢** — alternating number-guessing duel with hot/cold hints, best of 3.
+- **Would You Rather 🤔** — 5-round compatibility duel, prompts pulled from your shared interest tags when possible, ends with a match percentage.
 
 ---
 
 ## Database
 
-User data is stored in a single PostgreSQL table:
-
-```sql
-CREATE TABLE user_details (
-    user_id        BIGINT PRIMARY KEY,
-    gender         VARCHAR(1),
-    age            INTEGER,
-    country        VARCHAR(25),
-    reports        INTEGER,
-    reporters      TEXT,           -- JSON array of reporter user IDs
-    vote_up        INTEGER,
-    vote_down      INTEGER,
-    voters         TEXT,           -- JSON array of voter user IDs
-    feedback_track JSONB,          -- per-session vote/report tracking
-    partner_id     BIGINT,         -- current partner (NULL if not in chat)
-    points         INTEGER
-);
-```
-
-### Write strategy
-
-The bot uses a **dirty-write pattern** to minimise database load. When a user's data changes, their ID is added to the `dirty_users` set. The periodic save job (every 60 seconds) only writes users in that set, then clears it. Data is also flushed on clean shutdown via the `post_shutdown` hook.
+Same `user_details` table as before, extended with: `preferences` (bitmask int), `restricted_until`, `restriction_reason`, `severity_score`, `report_log` (JSONB), `last_severity_decay`. New columns are added automatically on startup via `ALTER TABLE ... IF NOT EXISTS`, so upgrading an existing deployment doesn't need a manual migration.
 
 ---
 
-## Error Handling
+## Running the Bot
 
-All Telegram API calls go through `safe_tele_func_call`, which silently catches `Forbidden` errors (the user blocked the bot) and returns `None` instead of raising an exception.
+```bash
+pip install -r requirements.txt
+python main.py
+```
 
-A global error handler (`global_error_handler`) catches all unhandled exceptions during update processing and sends a formatted error report directly to the owner's DM, including:
-- Exception type and message
-- User ID that triggered the error
-- The file, line number, function name, and source line of the innermost non-library stack frame
+### Running the sanity tests (no live bot/DB required)
 
-`Conflict` errors (multiple bot instances running) and "message is not modified" `BadRequest` errors are silently ignored.
+```bash
+python tests/test_imports.py
+python tests/test_logic.py
+```
