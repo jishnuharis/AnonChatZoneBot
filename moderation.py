@@ -21,7 +21,7 @@ REPORT_REASONS = {
 # including a single "underage concern" flag - can't auto-restrict someone on
 # their own. It takes a real, sustained pattern of reports to trip this.
 SEVERITY_SCORE_THRESHOLDS = [
-    (200, 10), (170, 9), (140, 8), (115, 7), (90, 6), (65, 5), (45, 4), (28, 3), (15, 2), (6, 1),
+    (200, 10), (181, 9), (162, 8), (143, 7), (124, 6), (105, 5), (86, 4), (67, 3), (48, 2), (32, 1),
 ]
 
 # Ban severity (0-10) -> restriction duration in seconds
