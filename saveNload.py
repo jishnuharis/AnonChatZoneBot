@@ -29,23 +29,6 @@ def ensure_db():
             )
         """)
 
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS preferences INTEGER")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS restricted_until DOUBLE PRECISION")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS restriction_reason TEXT")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS severity_score INTEGER")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS report_log JSONB")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS last_severity_decay DOUBLE PRECISION")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS subscription_expires DOUBLE PRECISION")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(16)")
-
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS daily_credits_used INTEGER")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS daily_credits_reset_day VARCHAR(10)")
-
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referred_by BIGINT")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_count INTEGER")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_rewarded_count INTEGER")
-        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_credited BOOLEAN")
-
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS bot_config (
                     key VARCHAR(64) PRIMARY KEY,
