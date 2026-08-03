@@ -9,14 +9,9 @@ import time
 
 import init
 
-# ---------------------------------------------------------------------------
-# Basic safe-call helpers
-# ---------------------------------------------------------------------------
 
-
-# Function which checks if the bot is blocked by the given user
 async def safe_tele_func_call(caller, *args, **kwargs):
-    try:  # Tries to send a typing action to the user to check if it is blocked by the user
+    try:
         return await caller(*args, **kwargs)
     except Forbidden:
         return None
@@ -27,7 +22,6 @@ async def safe_tele_func_call(caller, *args, **kwargs):
 
 
 async def safe_reply(update: Update, text: str, **kwargs):
-    """Replies to either a plain message update or a callback query update, whichever fired."""
     kwargs.setdefault("parse_mode", "HTML")
     if update.callback_query:
         await safe_tele_func_call(update.callback_query.answer)
@@ -50,13 +44,6 @@ def format_duration(seconds: float) -> str:
         parts.append(f"{minutes}m")
     return " ".join(parts)
 
-
-# ---------------------------------------------------------------------------
-# Restriction gate - runs before every single handler (group=-2 in main.py).
-# Spam detection used to run right after this (group=-1) but it added a
-# noticeable delay to every single update for very little benefit, so it's
-# been removed entirely - this gate is now the only pre-handler check.
-# ---------------------------------------------------------------------------
 
 async def restriction_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user

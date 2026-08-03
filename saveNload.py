@@ -1,17 +1,14 @@
-# Imports modules which handles the database
 import json
 import os
 import psycopg2
 
-DATABASE_URL = os.getenv("DATABASE_URL")  # Holds the database's URL
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 
-# Establishes connection between the program and the database
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
 
 
-# Ensures the structure of the database is in the desired form and establishes it newly if it's missing
 def ensure_db():
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -31,19 +28,24 @@ def ensure_db():
                     points INTEGER
             )
         """)
-        # Referral columns, added on top of whatever's already there so existing
-        # deployments don't need a manual migration - see the note above
-        # save_user_data on why older columns above (preferences, subscription_*,
-        # etc.) aren't listed in the CREATE TABLE itself.
+
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS preferences INTEGER")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS restricted_until DOUBLE PRECISION")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS restriction_reason TEXT")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS severity_score INTEGER")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS report_log JSONB")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS last_severity_decay DOUBLE PRECISION")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS subscription_expires DOUBLE PRECISION")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(16)")
+
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS daily_credits_used INTEGER")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS daily_credits_reset_day VARCHAR(10)")
+
         cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referred_by BIGINT")
         cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_count INTEGER")
         cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_rewarded_count INTEGER")
         cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_credited BOOLEAN")
 
-        # Tiny global key/value store - currently just holds the admin-configured
-        # referral scheme (see referral.py). Unlike user_details, this is written
-        # immediately on change rather than batched through dirty_users, since
-        # admin config changes are rare and should apply instantly.
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS bot_config (
                     key VARCHAR(64) PRIMARY KEY,
@@ -53,7 +55,6 @@ def ensure_db():
         conn.commit()
 
 
-# Reads a single bot_config row, or None if it's never been set
 def load_config(key: str):
     ensure_db()
     with get_connection() as conn:
@@ -63,7 +64,6 @@ def load_config(key: str):
         return row[0] if row else None
 
 
-# Writes a single bot_config row immediately (not batched - see ensure_db note)
 def save_config(key: str, value: dict):
     ensure_db()
     with get_connection() as conn:
@@ -78,7 +78,6 @@ def save_config(key: str, value: dict):
         conn.commit()
 
 
-# Function which stores the details of the users in the database
 def save_user_data(data: dict, dirty_user: set):
     ensure_db()
 
@@ -88,7 +87,7 @@ def save_user_data(data: dict, dirty_user: set):
                 vote_up, vote_down, voters, feedback_track, partner_id, points,
                 preferences, restricted_until, restriction_reason, severity_score,
                 report_log, last_severity_decay, subscription_expires, subscription_tier,
-                next_used_today, next_used_day, referred_by, referral_count,
+                daily_credits_used, daily_credits_reset_day, referred_by, referral_count,
                 referral_rewarded_count, referral_credited
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (user_id) DO UPDATE SET
@@ -111,8 +110,8 @@ def save_user_data(data: dict, dirty_user: set):
                 last_severity_decay = EXCLUDED.last_severity_decay,
                 subscription_expires = EXCLUDED.subscription_expires,
                 subscription_tier = EXCLUDED.subscription_tier,
-                next_used_today = EXCLUDED.next_used_today,
-                next_used_day = EXCLUDED.next_used_day,
+                daily_credits_used = EXCLUDED.daily_credits_used,
+                daily_credits_reset_day = EXCLUDED.daily_credits_reset_day,
                 referred_by = EXCLUDED.referred_by,
                 referral_count = EXCLUDED.referral_count,
                 referral_rewarded_count = EXCLUDED.referral_rewarded_count,
@@ -150,8 +149,8 @@ def save_user_data(data: dict, dirty_user: set):
                 details.get("last_severity_decay"),
                 details.get("subscription_expires"),
                 details.get("subscription_tier"),
-                details.get("next_used_today", 0),
-                details.get("next_used_day"),
+                details.get("daily_credits_used", 0),
+                details.get("daily_credits_reset_day"),
                 details.get("referred_by"),
                 details.get("referral_count", 0),
                 details.get("referral_rewarded_count", 0),
@@ -166,7 +165,6 @@ def save_user_data(data: dict, dirty_user: set):
         dirty_user.clear()
 
 
-# Function which returns the users' details it read from the database
 def load_user_data() -> dict:
     ensure_db()
     with get_connection() as conn:
@@ -175,7 +173,7 @@ def load_user_data() -> dict:
             SELECT user_id, gender, age, country, reports, reporters, vote_up, vote_down,
                    voters, feedback_track, partner_id, points, preferences, restricted_until,
                    restriction_reason, severity_score, report_log, last_severity_decay,
-                   subscription_expires, subscription_tier, next_used_today, next_used_day,
+                   subscription_expires, subscription_tier, daily_credits_used, daily_credits_reset_day,
                    referred_by, referral_count, referral_rewarded_count, referral_credited
             FROM user_details
         """)
@@ -206,8 +204,8 @@ def load_user_data() -> dict:
                 "last_severity_decay": row[17],
                 "subscription_expires": row[18],
                 "subscription_tier": row[19],
-                "next_used_today": row[20] or 0,
-                "next_used_day": row[21],
+                "daily_credits_used": row[20] or 0,
+                "daily_credits_reset_day": row[21],
                 "referred_by": row[22],
                 "referral_count": row[23] or 0,
                 "referral_rewarded_count": row[24] or 0,

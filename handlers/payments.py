@@ -11,11 +11,6 @@ import init
 
 
 async def handle_pre_checkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Telegram requires this to be answered within 10 seconds of the user hitting
-    Pay, or the payment is cancelled client-side. We only ever sell known tiers
-    via our own invoices, so the payload is always trusted here - just validate
-    it still maps to a real tier in case pricing/tiers changed after the invoice
-    was sent."""
     query = update.pre_checkout_query
     tier_key = query.invoice_payload.split("|")[-1] if query.invoice_payload.startswith("sub|") else None
     if tier_key in subscription.TIERS:
@@ -27,7 +22,7 @@ async def handle_pre_checkout(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     payment = update.message.successful_payment
     user_id = update.effective_user.id
-    payload = payment.invoice_payload  # "sub|<tier_key>"
+    payload = payment.invoice_payload
 
     if not payload.startswith("sub|"):
         return

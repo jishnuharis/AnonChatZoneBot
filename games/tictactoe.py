@@ -79,11 +79,6 @@ async def send_board(context: ContextTypes.DEFAULT_TYPE, session_id, extra_note=
             if msg:
                 game["messages"][user] = msg.message_id
 
-
-# game_requests.py starts every game generically via `await module.send_round(context, session_id)`.
-# Every other game module names its "kick off a round" function send_round; tictactoe named its
-# equivalent send_board. Alias it so tictactoe fits the same interface instead of throwing
-# AttributeError: module 'games.tictactoe' has no attribute 'send_round' the moment a match starts.
 send_round = send_board
 
 

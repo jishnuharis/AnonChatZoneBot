@@ -17,7 +17,6 @@ from message import (
 
 import init
 
-# game_type -> (label, module)
 GAME_MODULES = {
     "coinsteal": ("Coin Steal 🪙", coin_steal),
     "tictactoe": ("Tic Tac Toe ⭕❌", tictactoe),
@@ -26,19 +25,11 @@ GAME_MODULES = {
     "wyr": ("Would You Rather 🤔", would_you_rather),
 }
 
-# Wire up force-end handlers with the registry once, on import
 for _game_type, (_label, _module) in GAME_MODULES.items():
     registry.set_force_end_handler(_game_type, _module.force_end_game)
 
 
 def clear_pending_requests(user_id: int):
-    """Removes any game request that involves user_id, whether they're the
-    target (waiting on them to accept/decline) or the requester (waiting on
-    someone else). Call this whenever a chat ends (/stop, /next) or a game
-    request is manually cancelled (/cancel) - otherwise a stale request can
-    sit around and later be accepted against a partner who's since moved on,
-    which corrupts game state (mismatched sessions/registry entries) and is
-    the root cause behind the "coroutine raised StopIteration" crashes."""
     init.game_requests.pop(user_id, None)
     for target_id, req in list(init.game_requests.items()):
         if req["from"] == user_id:
@@ -106,10 +97,6 @@ async def handle_game_request_response(update: Update, context: ContextTypes.DEF
         init.game_requests.pop(user_id, None)
         return
 
-    # accept - but first make sure this request is still valid. It can go stale if either side
-    # left the chat (/stop, /next) or started/joined another game while it was pending; blindly
-    # creating a session in that case corrupts both players' game state (mismatched sessions and
-    # registry entries) and is what used to cause "coroutine raised StopIteration" crashes.
     still_partnered = init.user_details.get(requester_id, {}).get("partner_id") == user_id
     either_already_in_game = registry.get_active(requester_id) or registry.get_active(user_id)
 

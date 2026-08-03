@@ -1,4 +1,3 @@
-# Handles the interest/preference tags (Gaming, Anime, Flirting, etc.) used for matchmaking
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -27,8 +26,6 @@ def build_preferences_keyboard(bitmask: int, done_label=DONE_BUTTON_LABEL) -> In
 
 
 def describe_preferences(bitmask: int) -> str:
-    """Returns a plain-text (no markup) summary of the tags set in bitmask, so
-    callers can safely drop it straight into an HTML-parsed message."""
     tags = [f"{emoji} {label}" for i, (label, emoji) in enumerate(init.PREFERENCE_TAGS) if bitmask & (1 << i)]
     return ", ".join(tags) if tags else NONE_PICKED_YET_TEXT
 

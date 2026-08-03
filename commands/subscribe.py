@@ -30,9 +30,6 @@ async def show_subscribe_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def handle_tier_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Fires a Telegram Stars invoice for the chosen tier. Stars payments use
-    currency='XTR' with an empty provider_token - Telegram handles the whole
-    payment UI natively, there's no external payment provider involved."""
     query = update.callback_query
     await query.answer()
     tier_key = query.data.split("|")[1]
@@ -51,7 +48,7 @@ async def handle_tier_selection(update: Update, context: ContextTypes.DEFAULT_TY
             label=tier["label"], limit=limit, points=tier["bonus_points"]
         ),
         payload=f"sub|{tier_key}",
-        provider_token="",  # Empty for Telegram Stars - no external payment provider
+        provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(tier["label"], tier["stars"])],  # For XTR, amount = star count directly (no cent multiplier)
+        prices=[LabeledPrice(tier["label"], tier["stars"])],
     )

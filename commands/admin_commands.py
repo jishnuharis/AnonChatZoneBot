@@ -131,10 +131,6 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(SEVERITY_RANGE_TEXT, parse_mode="HTML")
         return
 
-    # Admins (including the owner) can never be restricted through this bot -
-    # not by themselves, not by another admin, not automatically. Catch the
-    # self-ban case here with an explicit message rather than letting it
-    # silently no-op through apply_restriction.
     if target_id == user_id:
         await update.message.reply_text(CANT_RESTRICT_SELF_TEXT, parse_mode="HTML")
         return
@@ -217,10 +213,6 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/giveaway <user_id> <tier> - manually grants a subscription tier, same
-    perks and bonus points a paid purchase of that tier would give. Stacks
-    with (extends from) any existing active subscription rather than
-    overwriting it."""
     if not is_admin(update.effective_user.id):
         return
 
@@ -265,13 +257,6 @@ async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def referral_scheme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/referral <required_referrals> <promo_duration_days> - (re)configures the
-    referral scheme: refer `required_referrals` friends who finish onboarding
-    and you get a free referral.REWARD_TIER subscription, repeatable every
-    `required_referrals` referrals, for as long as the promo is live.
-
-    Turns the scheme off instead if required_referrals is -1, promo_duration_days
-    is 0 (or negative), or both - see referral.set_scheme for the exact rule."""
     if not is_admin(update.effective_user.id):
         return
 

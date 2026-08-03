@@ -16,7 +16,7 @@ user_to_session = {}
 TIMEOUT = 180
 GAME_TYPE = "guessit"
 RANGE_MAX = 20
-ROUNDS_TO_WIN = 2  # best of 3
+ROUNDS_TO_WIN = 2
 
 
 def create_session(user1, user2):

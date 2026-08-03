@@ -2,10 +2,6 @@ import time
 
 import init
 
-# ---------------------------------------------------------------------------
-# Report reasons -> how many severity points they add
-# ---------------------------------------------------------------------------
-# code: (label shown to the user, weight added to the target's severity_score)
 REPORT_REASONS = {
     "spam": ("Spam / Ads", 1),
     "rude": ("Rude / Toxic behaviour", 2),
@@ -16,15 +12,10 @@ REPORT_REASONS = {
     "minor": ("Underage concern", 10),
 }
 
-# Cumulative severity_score -> the ban severity (0-10) it should trigger.
-# Scaled deliberately high (top tier sits at 200) so a handful of reports -
-# including a single "underage concern" flag - can't auto-restrict someone on
-# their own. It takes a real, sustained pattern of reports to trip this.
 SEVERITY_SCORE_THRESHOLDS = [
     (200, 10), (181, 9), (162, 8), (143, 7), (124, 6), (105, 5), (86, 4), (67, 3), (48, 2), (32, 1),
 ]
 
-# Ban severity (0-10) -> restriction duration in seconds
 SEVERITY_DURATIONS = {
     0: 0,
     1: 5 * 60,
@@ -36,11 +27,9 @@ SEVERITY_DURATIONS = {
     7: 3 * 24 * 3600,
     8: 7 * 24 * 3600,
     9: 30 * 24 * 3600,
-    10: 3650 * 24 * 3600,  # effectively permanent, an admin can still /unban
+    10: 3650 * 24 * 3600,
 }
 
-# severity_score points shaved off per day of good behaviour so old minor
-# reports don't follow someone around forever
 SEVERITY_DECAY_PER_DAY = 1
 
 
@@ -68,9 +57,6 @@ def _ensure_user(user_id: int):
 
 
 def apply_restriction(user_id: int, severity: int, reason: str, duration_override: int = None) -> float:
-    """Restricts a user. Only extends the restriction if it's longer than whatever's active.
-    Admins (including the owner) can never end up restricted this way - manual or automatic -
-    so a wave of reports (or a fat-fingered /ban) can never lock an admin out of their own bot."""
     if is_admin(user_id):
         return None
 
@@ -100,8 +86,6 @@ def clear_restriction(user_id: int):
 
 
 def file_report(reporter_id: int, target_id: int, reason_code: str):
-    """Logs a report against target_id and auto-restricts them if their score crosses a new tier.
-    Returns (weight_added, new_score, new_severity_or_None)."""
     if reason_code not in REPORT_REASONS:
         return 0, 0, None
 
@@ -119,7 +103,6 @@ def file_report(reporter_id: int, target_id: int, reason_code: str):
         "weight": weight,
         "timestamp": time.time(),
     })
-    # Keep the log from growing forever
     if len(log) > 50:
         del log[: len(log) - 50]
 
@@ -137,8 +120,6 @@ def file_report(reporter_id: int, target_id: int, reason_code: str):
 
 
 def decay_severity_scores():
-    """Slowly forgives old severity points so a couple of stale minor reports don't
-    keep someone permanently on thin ice. Meant to run on a daily job."""
     now = time.time()
     for user_id, details in init.user_details.items():
         last_decay = details.get("last_severity_decay") or now

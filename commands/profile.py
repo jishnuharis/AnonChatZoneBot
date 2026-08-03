@@ -1,15 +1,14 @@
-# Imports everything needed from the telegram module
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from html import escape as esc
 
-from handlers.setup import check_user_profile  # Imports the handler which checks if the user's profile exists
+from handlers.setup import check_user_profile
 from handlers.preferences import describe_preferences
 from security import safe_tele_func_call
 import subscription
 
-import init  # Importing the bot credentials and users' details
+import init
 
 
 def _profile_keyboard():
@@ -53,7 +52,6 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
     )
 
 
-# Function shows the user their profile and asks if they wanna edit them and what to edit
 @check_user_profile
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -66,9 +64,6 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def send_profile_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    """Sends a fresh profile menu message. Used to bring the user right back to
-    /profile after they finish editing any single field, so editing never just
-    dead-ends - it always flows back into the same menu, consistently."""
     text = await _build_profile_text(user_id, context)
     if not text:
         return

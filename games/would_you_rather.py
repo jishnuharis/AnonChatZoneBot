@@ -17,8 +17,6 @@ TIMEOUT = 180
 GAME_TYPE = "wyr"
 TOTAL_ROUNDS = 5
 
-# Prompts grouped by preference tag so we can pull ones that fit the pair when possible,
-# plus a generic bucket that always works.
 PROMPTS = {
     "Gaming": [
         ("Only ever play mobile games", "Only ever play console games"),
@@ -121,7 +119,7 @@ async def send_round(context: ContextTypes.DEFAULT_TYPE, session_id):
     ])
 
     for user in game["players"]:
-        text = f"🤔 <b>Would You Rather</b> — Round {game['round'] + 1}/{len(game['prompts'])}\n\n<i>Would you rather...</i>\n🅰️ <b>{a}</b>\n<i>or</i>\n🅱️ <b>{b}</b>"
+        text = f"🤔 <b>Would You Rather</b> — Round {game['round'] + 1}/{len(game['prompts'])}\n\n<i>Would you rather...</i>"
         msg = await safe_tele_func_call(context.bot.send_message, chat_id=user, text=text, reply_markup=keyboard, parse_mode="HTML")
         if msg:
             game["messages"][user] = msg.message_id

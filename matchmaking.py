@@ -7,9 +7,7 @@ from subscription import is_subscribed
 
 import init
 
-# How long someone can sit in the queue before we stop caring about shared
-# interests and just pair them with whoever's oldest in line.
-MATCH_GRACE_PERIOD = 15  # seconds
+MATCH_GRACE_PERIOD = 15
 
 
 def _prefs(user_id: int) -> int:
@@ -33,9 +31,6 @@ def _best_match_for(user_id: int):
 
 
 def _partner_details_line(viewer_id: int, partner_id: int) -> str:
-    """Subscriber-only perk: reveal the partner's age/gender/country. Gated on the
-    *viewer's* own subscription, not the partner's - each side sees extra info
-    about the other only if they themselves paid for it."""
     if not is_subscribed(viewer_id):
         return ""
     partner = init.user_details.get(partner_id, {})
@@ -75,8 +70,6 @@ async def _pair_users(context: ContextTypes.DEFAULT_TYPE, user1: int, user2: int
 
 
 async def enqueue_and_match(context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    """Adds user_id to the queue (if not already there) and tries an immediate
-    interest-based match against everyone else currently waiting."""
     if user_id not in init.waiting_users:
         init.waiting_users.append(user_id)
         init.wait_started[user_id] = time.time()
@@ -94,11 +87,8 @@ async def enqueue_and_match(context: ContextTypes.DEFAULT_TYPE, user_id: int):
 
 
 async def queue_sweep(context: ContextTypes.DEFAULT_TYPE):
-    """Runs periodically. Pairs up anyone who's been waiting past the grace
-    period with the next oldest person in line, ignoring interest overlap."""
     now = time.time()
     while len(init.waiting_users) >= 2:
-        # Oldest waiter first
         oldest = min(init.waiting_users, key=lambda u: init.wait_started.get(u, now))
         if now - init.wait_started.get(oldest, now) < MATCH_GRACE_PERIOD:
             break
@@ -106,8 +96,6 @@ async def queue_sweep(context: ContextTypes.DEFAULT_TYPE):
         candidates = [u for u in init.waiting_users if u != oldest]
         if not candidates:
             break
-        # Prefer someone who shares an interest even in the fallback path, but
-        # never let it block the match past the grace period
         best_id, best_score = None, -1
         for other in candidates:
             score = _overlap_score(oldest, other)

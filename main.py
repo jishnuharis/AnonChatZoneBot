@@ -1,16 +1,13 @@
-# Imports everything needed from telegram module
 from telegram import BotCommand, Update
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler,
     TypeHandler, MessageReactionHandler, PreCheckoutQueryHandler,
 )
 
-# Imports everything needed from user-defined modules responsible for basic working of the bot
 from saveNload import save_user_data
 from app import keep_alive
 from relay import relay_message, relay_reaction
 
-# Imports everything needed from the user-defined command module
 from commands.start import start
 from commands.find import find
 from commands.next import skip_partner
@@ -24,7 +21,6 @@ from commands.subscribe import show_subscribe_menu, handle_tier_selection
 from handlers.payments import handle_pre_checkout, handle_successful_payment
 from referral import handle_referral_link_button
 
-# Imports everything needed from the user-defined handler module to handle the command inputs of the users
 from handlers.rating import handle_vote, handle_report_reason, handle_report_back
 from handlers.gender import handle_gender_selection
 from handlers.country import handle_country_selection
@@ -43,33 +39,29 @@ from media_privacy import handle_private_command, handle_view_once, sweep_expire
 from security import global_error_handler, restriction_gate
 from moderation import decay_severity_scores
 
-# Imports for basic functionality of bot and its data credentials
 import init
 
 
-# Function to preset the commands available in the bot
 async def set_commands(application):
     commands = [
-        BotCommand("start", "Start the bot"),  # start
-        BotCommand("find", "Find a new chat partner"),  # find
-        BotCommand("next", "Skip your current partner"),  # next
-        BotCommand("stop", "Stop the current chat"),  # stop
-        BotCommand("cancel", "Cancel your ongoing game"),  # cancel game
-        BotCommand("help", "Show help"),  # help
-        BotCommand("profile", "Show user profile"),  # profile
-        BotCommand("games", "Play a mini-game with your partner"),  # games menu
-        BotCommand("private", "Arm Privacy Mode for your next media"),  # privacy mode arm
-        BotCommand("subscribe", "View/purchase a subscription plan"),  # subscription menu
+        BotCommand("start", "Start the bot"),
+        BotCommand("find", "Find a new chat partner"),
+        BotCommand("next", "Skip your current partner"),
+        BotCommand("stop", "Stop the current chat"),
+        BotCommand("cancel", "Cancel your ongoing game"),
+        BotCommand("help", "Show help"),
+        BotCommand("profile", "Show user profile"),
+        BotCommand("games", "Play a mini-game with your partner"),
+        BotCommand("private", "Arm Privacy Mode for your next media"),
+        BotCommand("subscribe", "View/purchase a subscription plan"),
     ]
-    await application.bot.set_my_commands(commands)  # To set the commands to the bot menu
+    await application.bot.set_my_commands(commands)
 
 
-# Function to save the user data periodically every minute
 async def periodic_save(context):
     save_user_data(init.user_details, init.dirty_users)
 
 
-# Function to free the feedback_track to handle clean voting system while minimising data overflow
 async def periodic_feedback_clear(context):
     for user_id, details in init.user_details.items():
         if details.get("feedback_track"):
@@ -77,14 +69,10 @@ async def periodic_feedback_clear(context):
             init.dirty_users.add(user_id)
 
 
-# Function to slowly forgive old severity points so a few minor reports don't
-# permanently follow someone around
 async def periodic_severity_decay(context):
     decay_severity_scores()
 
 
-# Function to sweep the matchmaking queue and pair up anyone who's waited past
-# the grace period, ignoring interest overlap at that point
 async def periodic_queue_sweep(context):
     from matchmaking import queue_sweep
     await queue_sweep(context)
@@ -103,11 +91,11 @@ async def on_shutdown(application):
 
 
 async def on_startup(application):
-    application.job_queue.run_repeating(periodic_save, interval=60, first=60)  # Saves the user data
-    application.job_queue.run_repeating(periodic_feedback_clear, interval=28800, first=28800)  # Frees up the feedback_track
-    application.job_queue.run_repeating(periodic_severity_decay, interval=86400, first=3600)  # Slowly forgives old reports
-    application.job_queue.run_repeating(periodic_queue_sweep, interval=5, first=5)  # Fallback FIFO pairing once the grace period passes
-    application.job_queue.run_repeating(periodic_media_sweep, interval=3600, first=3600)  # Expires unopened Privacy Mode media
+    application.job_queue.run_repeating(periodic_save, interval=60, first=60)
+    application.job_queue.run_repeating(periodic_feedback_clear, interval=28800, first=28800)
+    application.job_queue.run_repeating(periodic_severity_decay, interval=86400, first=3600)
+    application.job_queue.run_repeating(periodic_queue_sweep, interval=5, first=5)
+    application.job_queue.run_repeating(periodic_media_sweep, interval=3600, first=3600)
 
 
 async def post_init_tasks(application):
@@ -115,9 +103,8 @@ async def post_init_tasks(application):
     await on_startup(application)
 
 
-# Main function to keep the bot alive, handle user commands and user inputs, relaying messages between users
 def main():
-    keep_alive()  # Keeps the bot alive
+    keep_alive()
 
     app = (
         ApplicationBuilder()
@@ -125,10 +112,8 @@ def main():
         .post_init(post_init_tasks)
         .post_shutdown(on_shutdown)
         .build()
-    )  # The app which makes the bot work
+    )
 
-    # Runs before every single other handler: blocks restricted users dead in
-    # their tracks (commands, buttons, media, everything) via ApplicationHandlerStop.
     app.add_handler(TypeHandler(Update, restriction_gate), group=-2)
 
     app.add_handler(CommandHandler("start", start))
@@ -149,12 +134,10 @@ def main():
     app.add_handler(CommandHandler("giveaway", giveaway_subscription))
     app.add_handler(CommandHandler("referral", referral_scheme_command))
 
-    # Subscriptions / Telegram Stars payments
     app.add_handler(CallbackQueryHandler(handle_tier_selection, pattern=r"^sub\|\w+$"))
     app.add_handler(PreCheckoutQueryHandler(handle_pre_checkout))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
 
-    # Profile / rating / reports
     app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^rate\|\d+\|(up|down)$"))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^report\|\d+$"))
     app.add_handler(CallbackQueryHandler(handle_report_reason, pattern=r"^reportreason\|\d+\|\w+$"))
@@ -174,24 +157,20 @@ def main():
     app.add_handler(CallbackQueryHandler(guess_it.handle_callback, pattern=r"^gi\|.+$"))
     app.add_handler(CallbackQueryHandler(would_you_rather.handle_callback, pattern=r"^wyr\|[AB]$"))
 
-    # Privacy Mode media
     app.add_handler(CallbackQueryHandler(handle_view_once, pattern=r"^viewonce\|.+$"))
 
     app.add_handler(MessageHandler(
         (filters.TEXT | filters.Sticker.ALL | filters.PHOTO | filters.VIDEO |
          filters.VIDEO_NOTE | filters.AUDIO | filters.Document.ALL | filters.VOICE | filters.ANIMATION) & ~filters.COMMAND,
         relay_message
-    ))  # filters the commands from the messages sent by the user
+    ))
 
-    app.add_handler(MessageReactionHandler(relay_reaction))  # Mirrors emoji reactions across the relay
+    app.add_handler(MessageReactionHandler(relay_reaction))
 
     app.add_error_handler(global_error_handler)
 
-    # allowed_updates must explicitly list message_reaction, since Telegram omits it
-    # from the default update set unless it's requested.
-    app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)  # Runs the app
+    app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
 
-# Part which keeps the event loop running
 if __name__ == '__main__':
     main()

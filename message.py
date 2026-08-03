@@ -1,7 +1,3 @@
-# Holds every constant, non-dynamic user-facing text used across the bot.
-# Anything built with an f-string (i.e. contains data that changes per-call)
-# stays inline at its call site - only fully-static text lives here.
-
 # ---------------------------------------------------------------------------
 # commands/start.py
 # ---------------------------------------------------------------------------

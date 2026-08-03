@@ -10,23 +10,12 @@ import subscription
 
 import init
 
-# The reward is always a subscription of this tier, granted every time an
-# inviter crosses another multiple of the scheme's required_referrals - the
-# admin only configures the threshold and how long the promo itself runs
-# (see set_scheme), not the reward's size or length.
 REWARD_TIER = "weekly"
 
-# 1-in-this-many chance the referral scheme gets mentioned after a chat ends
-# (see maybe_announce, called from handlers/rating.py).
 ANNOUNCE_CHANCE = 1 / 20
 
 
 def scheme_active() -> bool:
-    """Whether a referral promo is currently running. A scheme is active
-    only while BOTH required_referrals is a real threshold (>=1) AND the
-    promo hasn't passed its own expiry - admins set both at once via
-    /referral and the promo auto-expires on its own, no sweep job needed
-    since this is only ever checked lazily (mirrors subscription.is_subscribed)."""
     scheme = init.referral_scheme
     required = scheme.get("required_referrals") or 0
     expires = scheme.get("expires")
@@ -34,11 +23,6 @@ def scheme_active() -> bool:
 
 
 def set_scheme(required_referrals: int, duration_days: int) -> dict:
-    """Admin entry point (see commands/admin_commands.py /referral). Turns the
-    scheme off if required_referrals is -1, duration_days is <= 0, or both -
-    any of the three disables it. Otherwise (re)activates it for duration_days,
-    replacing whatever was configured before. Persisted immediately, not
-    batched, since admin config changes are rare and should apply right away."""
     if required_referrals == -1 or duration_days <= 0:
         init.referral_scheme = {"required_referrals": 0, "expires": None}
     else:
@@ -55,11 +39,6 @@ def referral_link(bot_username: str, user_id: int) -> str:
 
 
 def capture_referral(context, user_id: int):
-    """Called the moment a brand-new user's row is created (see
-    handlers/setup.py). If they arrived via a /start ref_<inviter_id> deep
-    link, remembers who invited them - once, forever. Never overwritten, and
-    never credited here; crediting only happens once they actually finish
-    onboarding (see credit_referral), so a link tap alone earns nothing."""
     args = context.args
     if not args or not args[0].startswith("ref_"):
         return
@@ -74,18 +53,6 @@ def capture_referral(context, user_id: int):
 
 
 async def credit_referral(context, user_id: int):
-    """Called once a new user finishes onboarding (gender+age+country all
-    set - see handlers/country.py). If they were referred, credits their
-    inviter's referral_count and, once the inviter has enough *unrewarded*
-    referrals to clear the scheme's current threshold, grants them a REWARD_TIER
-    subscription and notifies them. Rewards stack (extend, don't overwrite) on
-    top of any existing subscription, same as admin grants and purchases.
-
-    Referrals are only ever rewarded while the scheme is active at the moment
-    the threshold is crossed - but referral_count itself always increments
-    regardless, so nobody's referral is "lost" if the promo happens to be off;
-    it just won't pay out until (if) an admin reactivates the scheme and the
-    inviter's unrewarded count clears the new threshold."""
     details = init.user_details.get(user_id)
     if not details or details.get("referral_credited") or not details.get("referred_by"):
         return
@@ -132,9 +99,6 @@ def _link_keyboard():
 
 
 async def maybe_announce(bot, user_id: int):
-    """Called right after a chat ends (see handlers/rating.py). About 1 in 20
-    times, and only while a scheme is actually running, nudges the user
-    towards the referral program alongside the usual rate/report prompt."""
     if not scheme_active() or random.random() >= ANNOUNCE_CHANCE:
         return
 
@@ -154,8 +118,6 @@ async def maybe_announce(bot, user_id: int):
 
 
 async def handle_referral_link_button(update, context):
-    """Callback for the 🔗 button, whether it came from /profile or a
-    maybe_announce nudge - both just show the same link + progress card."""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id

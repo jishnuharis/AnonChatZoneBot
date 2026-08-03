@@ -16,21 +16,12 @@ from subscription import is_subscribed
 
 import init
 
-# How long a *photo* stays visible after being opened before the bot deletes its own copy.
-# Timed media (video/voice/video note) instead get their own duration added on top of this,
-# so playback never gets cut off mid-way.
 VIEW_LIFETIME = 45
-# How long an unopened Privacy Mode message can sit around before we give up on it
 EXPIRY = 24 * 3600
-# How long a bare "/private" command stays armed, waiting for the media to follow it
 PRIVATE_FLAG_WINDOW = 5 * 60
 
-# Kinds Privacy Mode supports. Text/stickers/documents/audio/animations still relay
-# instantly, untouched - the privacy concern is specifically photos/videos/voice notes.
 SUPPORTED_KINDS = {"photo", "video", "voice", "video_note"}
 
-# user_id -> timestamp their "/private" flag expires. Set by the bare /private command,
-# consumed by the next piece of supported media that user sends.
 _armed_until = {}
 
 
@@ -47,8 +38,6 @@ def extract_media(msg):
 
 
 def split_private_caption(caption):
-    """If caption is (or starts with) '/private', returns (True, remaining_caption_or_None).
-    Otherwise returns (False, original_caption)."""
     if not caption:
         return False, caption
     stripped = caption.strip()
@@ -62,8 +51,6 @@ def split_private_caption(caption):
 
 
 def arm_private_flag(user_id: int):
-    """Called by the standalone /private command. The next supported piece of media this
-    user sends (within PRIVATE_FLAG_WINDOW) goes out in Privacy Mode automatically."""
     _armed_until[user_id] = time.time() + PRIVATE_FLAG_WINDOW
 
 
@@ -73,14 +60,6 @@ def _consume_private_flag(user_id: int) -> bool:
 
 
 async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE, partner_id, kind, file_id, caption, duration) -> bool:
-    """Checks whether this piece of media should go out in Privacy Mode (via a '/private'
-    caption or a previously armed /private command) and sends it that way if so.
-    Returns True if it handled the send, False if the caller should relay normally.
-
-    Privacy Mode is a subscriber-only perk. A free-tier user's '/private' caption or
-    armed flag is intentionally *not* honoured - we pop any armed flag (so it doesn't
-    linger and surprise them later if they do subscribe) and let them know, then fall
-    through to a normal relay."""
     user_id = update.effective_user.id
 
     is_private, remaining_caption = split_private_caption(caption)
@@ -88,8 +67,6 @@ async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE,
         is_private = _consume_private_flag(user_id)
         remaining_caption = caption
     else:
-        # An explicit '/private' caption on this message also clears any armed flag,
-        # so it doesn't accidentally swallow the *next* piece of media too.
         _armed_until.pop(user_id, None)
 
     if not is_private:
@@ -129,8 +106,6 @@ async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 @check_user_profile
 async def handle_private_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Standalone /private command with no media attached - arms Privacy Mode for
-    whatever media the user sends next. Subscriber-only."""
     user_id = update.effective_user.id
     if not is_subscribed(user_id):
         await safe_tele_func_call(update.message.reply_text, text=PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT, parse_mode="HTML")
@@ -148,8 +123,6 @@ async def handle_private_command(update: Update, context: ContextTypes.DEFAULT_T
 
 
 def _lifetime_for(entry) -> int:
-    """Photos just get the flat VIEW_LIFETIME. Timed media (video/voice/video note) get
-    their own duration added on top, so the reveal never gets cut off mid-playback."""
     if entry["kind"] == "photo":
         return VIEW_LIFETIME
     return int(entry.get("duration") or 0) + VIEW_LIFETIME
@@ -222,8 +195,6 @@ async def _delete_revealed(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def sweep_expired_media(context: ContextTypes.DEFAULT_TYPE):
-    """Cleans up Privacy Mode media nobody ever opened, and lets the sender know.
-    Also clears out any armed /private flags nobody ever followed up on."""
     now = time.time()
 
     stale_flags = [uid for uid, expiry in _armed_until.items() if now >= expiry]
