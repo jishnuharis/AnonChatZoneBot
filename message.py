@@ -60,7 +60,7 @@ GIVEAWAY_UNKNOWN_TIER_TEXT = "<i>Unknown tier. Use one of:</i> <code>daily</code
 # ---------------------------------------------------------------------------
 PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT = (
     "🔒 <b>Privacy Mode is a subscriber perk.</b>\n"
-    "<i>Your media was sent as a normal message instead. Use</i> /subscribe <i>to unlock Privacy Mode.</i>"
+    "<i>Your media will be sent as a normal message instead. Use</i> /subscribe <i>to unlock Privacy Mode.</i>"
 )
 MEDIA_DAILY_LIMIT_REACHED_TEXT = (
     "📷 <b>You've used all {limit} of your daily credits, so this {kind} wasn't sent.</b>\n"
