@@ -14,7 +14,7 @@ def _tier_keyboard():
     for key in subscription.TIER_ORDER:
         tier = subscription.TIERS[key]
         rows.append([InlineKeyboardButton(
-            f"{tier['label']} — {tier['stars']} ⭐ (+{tier['limit_bonus']} daily credits, unlimited photos)",
+            f"{tier['label']} — {tier['stars']} ⭐ (+{tier['limit_bonus']} daily credits, unlimited media)",
             callback_data=f"sub|{key}",
         )])
     return InlineKeyboardMarkup(rows)

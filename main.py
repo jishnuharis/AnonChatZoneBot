@@ -19,9 +19,10 @@ from commands.cancel import cancel
 from commands.help import help_command
 from commands.profile import show_profile
 from commands.games import games_menu, handle_games_menu_selection
-from commands.admin_commands import broadcast, connect, ban_user, unban_user, check_user, giveaway_subscription
+from commands.admin_commands import broadcast, connect, ban_user, unban_user, check_user, giveaway_subscription, referral_scheme_command
 from commands.subscribe import show_subscribe_menu, handle_tier_selection
 from handlers.payments import handle_pre_checkout, handle_successful_payment
+from referral import handle_referral_link_button
 
 # Imports everything needed from the user-defined handler module to handle the command inputs of the users
 from handlers.rating import handle_vote, handle_report_reason, handle_report_back
@@ -146,6 +147,7 @@ def main():
     app.add_handler(CommandHandler("private", handle_private_command))
     app.add_handler(CommandHandler("subscribe", show_subscribe_menu))
     app.add_handler(CommandHandler("giveaway", giveaway_subscription))
+    app.add_handler(CommandHandler("referral", referral_scheme_command))
 
     # Subscriptions / Telegram Stars payments
     app.add_handler(CallbackQueryHandler(handle_tier_selection, pattern=r"^sub\|\w+$"))
@@ -161,6 +163,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_country_selection, pattern=r"^country\|.+$"))
     app.add_handler(CallbackQueryHandler(handle_edit_selection, pattern=r"^edit\|.+$"))
     app.add_handler(CallbackQueryHandler(handle_preferences_selection, pattern=r"^pref\|.+$"))
+    app.add_handler(CallbackQueryHandler(handle_referral_link_button, pattern=r"^refgen$"))
 
     # Games
     app.add_handler(CallbackQueryHandler(handle_games_menu_selection, pattern=r"^gamemenu\|\w+$"))

@@ -20,7 +20,7 @@ async def skip_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     # Daily credit cap - free users get FREE_DAILY_CREDIT_LIMIT credits/day shared
-    # between /next skips and photo sends (see relay.py), subscribers get more
+    # between /next skips and media sends (see relay.py), subscribers get more
     # depending on their tier. Checked before anything else changes state, so a
     # capped-out user just gets told "no" and stays with their current partner
     # rather than getting yanked out of their chat.

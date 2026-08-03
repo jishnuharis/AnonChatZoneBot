@@ -18,6 +18,7 @@ def _profile_keyboard():
          InlineKeyboardButton("✏️ Edit Age", callback_data="edit|age")],
         [InlineKeyboardButton("✏️ Edit Country", callback_data="edit|country"),
          InlineKeyboardButton("🏷️ Edit Interests", callback_data="edit|preferences")],
+        [InlineKeyboardButton("🔗 My Referral Link", callback_data="refgen")],
     ])
 
 

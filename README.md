@@ -16,8 +16,9 @@ Users start the bot, set up a quick profile (gender, age, country, and optional 
 - **Full-duplex message relay** — text, stickers, photos, videos, GIFs, voice notes, video notes, and emoji reactions all relay live between partners.
 - **Mini-games** — play Coin Steal, Tic Tac Toe, Rock Paper Scissors, Guess It, or Would You Rather with your partner via `/games`.
 - **Privacy Mode media** — a subscriber perk. Photos/videos/voice/video notes sent while paired relay normally by default; captioning the media `/private` (or sending a bare `/private` first, then the media within 5 minutes) sends it with forward/save protection instead, and the bot deletes its own copy shortly after your partner opens it.
-- **Daily credit system** — every account gets a shared daily pool of credits (reset at midnight UTC) that covers `/next` skips for everyone and photo sends for free-tier users. Subscribers get a larger pool and send photos free of charge.
-- **Stars subscriptions** — `/subscribe` sells Daily/Weekly/Monthly/Yearly plans via native Telegram Stars payments, granting a higher daily credit limit, unlimited free photos, Privacy Mode access, seeing your partner's age/gender/country on match, and bonus in-bot points.
+- **Daily credit system** — every account gets a shared daily pool of credits (reset at midnight UTC) that covers `/next` skips for everyone and photo/video/voice/video note sends for free-tier users. Subscribers get a larger pool and send all media free of charge.
+- **Stars subscriptions** — `/subscribe` sells Daily/Weekly/Monthly/Yearly plans via native Telegram Stars payments, granting a higher daily credit limit, unlimited free media sends, Privacy Mode access, seeing your partner's age/gender/country on match, and bonus in-bot points.
+- **Referral program** — grab your personal invite link anytime from the 🔗 button on `/profile`. When an admin-configured promo is running, getting enough friends to join through it and finish setting up their profile earns you a free subscription, repeatable each time you clear the threshold — the bot occasionally mentions this right after a chat ends, too.
 - **Severity-based moderation** — reports ask *why*, each reason carries a weight, and crossing a threshold auto-restricts the offender for a duration scaled to severity (0–10) — no admin has to be paged for every report. Admins can also manually `/ban`, `/unban`, and `/checkuser`.
 - **Admins can't be restricted, ever** — not manually, not automatically, not even by themselves.
 - **Full lockout while restricted** — a restricted user can't run any command, tap any button, or send any message until their restriction expires or an admin lifts it.
@@ -38,6 +39,7 @@ AnonChatZoneBot/
 ├── moderation.py                # Report reasons, severity scoring, ban/restrict logic
 ├── media_privacy.py             # Privacy Mode media flow
 ├── subscription.py             # Stars subscription tiers, daily credit limits
+├── referral.py                  # Referral scheme, link generation, crediting & rewards
 ├── saveNload.py                # PostgreSQL save/load layer
 ├── security.py                 # Safe Telegram API wrapper, restriction gate, error handler
 │
@@ -109,7 +111,7 @@ Admin accounts (the owner and anyone in `ADMIN_IDS`) can never be restricted —
 
 ## Daily credits & subscriptions
 
-Every account draws from a shared daily credit pool (`FREE_DAILY_CREDIT_LIMIT = 32` by default), reset at midnight UTC. `/next` skips draw from this pool for everyone; photo sends draw from it too, but only for free-tier users — subscribers send photos free of charge.
+Every account draws from a shared daily credit pool (`FREE_DAILY_CREDIT_LIMIT = 32` by default), reset at midnight UTC. `/next` skips draw from this pool for everyone; photo/video/voice/video note sends draw from it too, but only for free-tier users — subscribers send all media free of charge.
 
 `/subscribe` offers four tiers, all paid for with native Telegram Stars (no external payment provider):
 
@@ -121,6 +123,14 @@ Every account draws from a shared daily credit pool (`FREE_DAILY_CREDIT_LIMIT = 
 | Yearly | 365 days | +64 | 999 ⭐ | 3000 |
 
 Any active plan also unlocks Privacy Mode (`/private`) and shows your partner's age, gender, and country on match. Purchases stack on top of (extend) an existing active subscription rather than overwriting it. Admins can manually grant a tier, with the same perks and bonus points a real purchase would give.
+
+---
+
+## Referral program
+
+Everyone gets a personal invite link, generated on demand via the 🔗 button on `/profile` (also offered, occasionally, right after a chat ends). Share it — when someone joins the bot through your link and finishes setting up their profile (gender, age, country), it counts as a successful referral.
+
+Referrals are only *rewarded* while an admin has a promo running; how many referrals it takes and how long the promo stays live are both admin-configurable. Clearing the threshold grants a free Weekly subscription (stacking on top of any existing plan), and it's repeatable — every time you clear the threshold again while the promo is live, you get another one. Your referral count is never lost even if no promo happens to be running at the time; it's just held until (if) one starts.
 
 ---
 

@@ -31,6 +31,50 @@ def ensure_db():
                     points INTEGER
             )
         """)
+        # Referral columns, added on top of whatever's already there so existing
+        # deployments don't need a manual migration - see the note above
+        # save_user_data on why older columns above (preferences, subscription_*,
+        # etc.) aren't listed in the CREATE TABLE itself.
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referred_by BIGINT")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_count INTEGER")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_rewarded_count INTEGER")
+        cursor.execute("ALTER TABLE user_details ADD COLUMN IF NOT EXISTS referral_credited BOOLEAN")
+
+        # Tiny global key/value store - currently just holds the admin-configured
+        # referral scheme (see referral.py). Unlike user_details, this is written
+        # immediately on change rather than batched through dirty_users, since
+        # admin config changes are rare and should apply instantly.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS bot_config (
+                    key VARCHAR(64) PRIMARY KEY,
+                    value JSONB
+            )
+        """)
+        conn.commit()
+
+
+# Reads a single bot_config row, or None if it's never been set
+def load_config(key: str):
+    ensure_db()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM bot_config WHERE key = %s", (key,))
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+
+# Writes a single bot_config row immediately (not batched - see ensure_db note)
+def save_config(key: str, value: dict):
+    ensure_db()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO bot_config (key, value) VALUES (%s, %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            """,
+            (key, json.dumps(value)),
+        )
         conn.commit()
 
 
@@ -44,8 +88,9 @@ def save_user_data(data: dict, dirty_user: set):
                 vote_up, vote_down, voters, feedback_track, partner_id, points,
                 preferences, restricted_until, restriction_reason, severity_score,
                 report_log, last_severity_decay, subscription_expires, subscription_tier,
-                next_used_today, next_used_day
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                next_used_today, next_used_day, referred_by, referral_count,
+                referral_rewarded_count, referral_credited
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (user_id) DO UPDATE SET
                 gender = EXCLUDED.gender,
                 age = EXCLUDED.age,
@@ -67,7 +112,11 @@ def save_user_data(data: dict, dirty_user: set):
                 subscription_expires = EXCLUDED.subscription_expires,
                 subscription_tier = EXCLUDED.subscription_tier,
                 next_used_today = EXCLUDED.next_used_today,
-                next_used_day = EXCLUDED.next_used_day
+                next_used_day = EXCLUDED.next_used_day,
+                referred_by = EXCLUDED.referred_by,
+                referral_count = EXCLUDED.referral_count,
+                referral_rewarded_count = EXCLUDED.referral_rewarded_count,
+                referral_credited = EXCLUDED.referral_credited
     """
 
     with get_connection() as conn:
@@ -103,6 +152,10 @@ def save_user_data(data: dict, dirty_user: set):
                 details.get("subscription_tier"),
                 details.get("next_used_today", 0),
                 details.get("next_used_day"),
+                details.get("referred_by"),
+                details.get("referral_count", 0),
+                details.get("referral_rewarded_count", 0),
+                details.get("referral_credited", False),
             ))
 
         if values:
@@ -122,7 +175,8 @@ def load_user_data() -> dict:
             SELECT user_id, gender, age, country, reports, reporters, vote_up, vote_down,
                    voters, feedback_track, partner_id, points, preferences, restricted_until,
                    restriction_reason, severity_score, report_log, last_severity_decay,
-                   subscription_expires, subscription_tier, next_used_today, next_used_day
+                   subscription_expires, subscription_tier, next_used_today, next_used_day,
+                   referred_by, referral_count, referral_rewarded_count, referral_credited
             FROM user_details
         """)
         rows = cursor.fetchall()
@@ -154,5 +208,9 @@ def load_user_data() -> dict:
                 "subscription_tier": row[19],
                 "next_used_today": row[20] or 0,
                 "next_used_day": row[21],
+                "referred_by": row[22],
+                "referral_count": row[23] or 0,
+                "referral_rewarded_count": row[24] or 0,
+                "referral_credited": bool(row[25]),
             }
         return data

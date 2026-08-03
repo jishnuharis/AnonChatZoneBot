@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 from handlers.setup import handle_user_setup  # Importing the handler which handles the user setup
 from security import safe_tele_func_call
 from media_privacy import extract_media, maybe_send_private, split_private_caption, SUPPORTED_KINDS
-from message import FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, PHOTO_DAILY_LIMIT_REACHED_TEXT
+from message import FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, MEDIA_DAILY_LIMIT_REACHED_TEXT
 from subscription import is_subscribed, has_daily_credit, consume_daily_credit, daily_credit_limit
 
 import init  # Importing the bot credentials and users' details
@@ -13,6 +13,9 @@ import init  # Importing the bot credentials and users' details
 # Cap on how many message-id mappings we keep per user, so a very long
 # conversation can't grow message_map unbounded before /next or /stop clears it.
 MAX_MAP_ENTRIES = 300
+
+# Human-friendly names for MEDIA_DAILY_LIMIT_REACHED_TEXT's {kind} placeholder
+_KIND_LABELS = {"photo": "photo", "video": "video", "voice": "voice note", "video_note": "video note"}
 
 
 def _remember(a_id, a_msg_id, b_id, b_msg_id):
@@ -61,14 +64,15 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # doesn't show up literally in the normally-relayed caption.
             _, caption = split_private_caption(caption)
 
-        # Free-tier photo cost: each photo relayed costs 1 daily credit, shared with
-        # /next skips (see subscription.py). Subscribers send photos free & unlimited.
-        # Only pre-checked here (not consumed yet) - the actual charge happens after
-        # a successful send below, so a failed delivery never costs a phantom credit.
-        if kind in ("photo", "video", "voice", "video_note") and not is_subscribed(user_id) and not has_daily_credit(user_id):
+        # Free-tier media cost: each photo/video/voice/video note relayed costs 1 daily
+        # credit, shared with /next skips (see subscription.py). Subscribers send all
+        # media free & unlimited. Only pre-checked here (not consumed yet) - the actual
+        # charge happens after a successful send below, so a failed delivery never
+        # costs a phantom credit.
+        if kind in SUPPORTED_KINDS and not is_subscribed(user_id) and not has_daily_credit(user_id):
             await safe_tele_func_call(
                 update.message.reply_text,
-                text=PHOTO_DAILY_LIMIT_REACHED_TEXT.format(limit=daily_credit_limit(user_id)),
+                text=MEDIA_DAILY_LIMIT_REACHED_TEXT.format(limit=daily_credit_limit(user_id), kind=_KIND_LABELS.get(kind, "media")),
                 parse_mode="HTML",
             )
             return

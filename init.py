@@ -1,4 +1,4 @@
-from saveNload import load_user_data  # Importing to load the user data into the db when the program starts
+from saveNload import load_user_data, load_config  # Importing to load the user data and global config into the bot when the program starts
 
 import os  # Importing to help us get the desired constants from a separate file
 import time
@@ -60,6 +60,17 @@ def _default_user():
         # matches today's date (see subscription.py).
         "next_used_today": 0,
         "next_used_day": None,
+        # Referral program (see referral.py). referred_by is set once, forever,
+        # the moment this user's row is first created via a /start ref_<id>
+        # deep link - it's never overwritten. referral_count is how many people
+        # THIS user has successfully referred (their invitee finished profile
+        # setup); referral_rewarded_count is how much of that count has already
+        # been paid out as a subscription reward. referral_credited is set on
+        # the INVITEE once, so a referral can never be counted twice.
+        "referred_by": None,
+        "referral_count": 0,
+        "referral_rewarded_count": 0,
+        "referral_credited": False,
     }
 
 
@@ -84,3 +95,9 @@ pending_media = {}  # token -> {sender, recipient, kind, file_id, caption, creat
 # partner's chat, so replies and reactions can be mirrored across the relay.
 # user_id -> {local_message_id: (partner_id, partner_message_id)}
 message_map = {}
+
+# Global referral scheme, admin-configured via /referral (see referral.py and
+# commands/admin_commands.py). {"required_referrals": int, "expires": float|None}.
+# required_referrals <= 0 or expires in the past/None means the scheme is off.
+# Written to bot_config immediately on change (not batched via dirty_users).
+referral_scheme = load_config("referral_scheme") or {"required_referrals": 0, "expires": None}

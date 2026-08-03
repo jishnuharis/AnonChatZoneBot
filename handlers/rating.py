@@ -7,6 +7,7 @@ from moderation import REPORT_REASONS, file_report
 from message import RATE_PROMPT_TEXT, REPORT_REASON_PROMPT_TEXT, REPORT_LOGGED_TEXT, FEEDBACK_THANKS_TEXT
 
 import init  # Importing the bot credentials and users' details
+import referral
 
 
 def _feedback_keyboard(to_id, voted, reported):
@@ -27,6 +28,11 @@ async def ask_for_rating(bot, from_id, to_id):
     init.user_details[to_id]["feedback_track"][from_id] = {"voted": False, "reported": False}  # Sets both voted and reported state to False initially
     await safe_tele_func_call(bot.send_message, chat_id=from_id, text=RATE_PROMPT_TEXT,
                                reply_markup=markup, parse_mode="HTML")  # Asks the user if they wanna rate their partner and shows them the menu
+
+    # Every chat ending is also our one shot at reminding people the referral
+    # program exists - maybe_announce is a no-op unless a scheme is currently
+    # active, and even then only fires about 1 in 20 times.
+    await referral.maybe_announce(bot, from_id)
 
 
 # Handles the vote (up/down) done by the user, and kicks off the report-reason menu

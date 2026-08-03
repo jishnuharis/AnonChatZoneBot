@@ -11,6 +11,7 @@ from message import (
 )
 
 import init  # Importing the bot credentials and users' details
+import referral
 
 
 # Checks if the user profile exists
@@ -21,6 +22,7 @@ def check_user_profile(handler_func):
 
         if user_id not in init.user_details:  # If the user's ID is not in the users' database and if it's not present then it initialises the row
             init.user_details[user_id] = init._default_user()
+            referral.capture_referral(context, user_id)  # Remembers who invited them, if they arrived via a /start ref_<id> link
             init.user_input_stage[user_id] = "gender"  # Sets the input stage of the user to gender
             keyboard = [[
                 InlineKeyboardButton("♂️ Male", callback_data="gender|M"),

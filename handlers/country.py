@@ -7,6 +7,7 @@ from handlers.preferences import send_preferences_menu
 from message import SELECT_COUNTRY_TEXT
 
 import init  # Importing the bot credentials and users' details
+import referral
 
 
 # Function sends a selection menu of every country loaded into it in the form of buttons
@@ -50,6 +51,10 @@ async def handle_country_selection(update: Update, context: ContextTypes.DEFAULT
     # This part works if the user is setting up their profile for the first time
     init.user_details[user_id]["country"] = country
     await safe_tele_func_call(query.edit_message_text, text=f"✅ <i>Country set to</i> <b>{country}</b>.", parse_mode="HTML")
+
+    # Profile is now fully set up (gender+age+country) - if this user was
+    # referred, this is the moment their inviter gets credited for it.
+    await referral.credit_referral(context, user_id)
 
     # Move them on to picking their interests before wrapping up setup
     init.user_input_stage[user_id] = "preferences"

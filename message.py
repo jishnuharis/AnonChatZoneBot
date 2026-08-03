@@ -33,21 +33,21 @@ SUBSCRIBE_INTRO_TEXT = (
     "{status}\n\n"
     "<b>Perks on any active plan:</b>\n"
     "• Higher daily credit limit (more skips)\n"
-    "• Send unlimited photos — free-tier media files sends cost 1 daily credit each\n"
+    "• Send unlimited photos, videos, voice & video notes — free-tier media sends cost 1 daily credit each\n"
     "• Unlock /private (Privacy Mode) for photos/videos/voice notes\n"
     "• Get a peek at your partner's details when matched\n\n"
     "<b>Pick a plan:</b>"
 )
 SUBSCRIBE_INVOICE_TITLE = "Chat Zone — {label} Plan"
 SUBSCRIBE_INVOICE_DESCRIPTION = (
-    "{label} subscription: daily credit limit of {limit}, unlimited photos, "
+    "{label} subscription: daily credit limit of {limit}, unlimited media sends, "
     "Privacy Mode access, partner details on match, and {points} bonus points."
 )
 SUBSCRIBE_PAYMENT_SUCCESS_TEXT = (
     "✅ <b>{label} plan activated!</b>\n"
     "<i>Active until:</i> <code>{expires}</code>\n"
     "<i>+{points} points added to your account 🎉</i>\n"
-    "<i>Daily credit limit is now</i> <b>{limit}</b> — <i>and your photos are unlimited & free.</i>"
+    "<i>Daily credit limit is now</i> <b>{limit}</b> — <i>and your media sends are unlimited & free.</i>"
 )
 
 # ---------------------------------------------------------------------------
@@ -66,9 +66,9 @@ PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT = (
     "🔒 <b>Privacy Mode is a subscriber perk.</b>\n"
     "<i>Your media was sent as a normal message instead. Use</i> /subscribe <i>to unlock Privacy Mode.</i>"
 )
-PHOTO_DAILY_LIMIT_REACHED_TEXT = (
-    "📷 <b>You've used all {limit} of your daily credits, so this photo wasn't sent.</b>\n"
-    "<i>Your count resets at midnight UTC, or</i> /subscribe <i>for unlimited photos.</i>"
+MEDIA_DAILY_LIMIT_REACHED_TEXT = (
+    "📷 <b>You've used all {limit} of your daily credits, so this {kind} wasn't sent.</b>\n"
+    "<i>Your count resets at midnight UTC, or</i> /subscribe <i>for unlimited media sends.</i>"
 )
 
 # ---------------------------------------------------------------------------
@@ -97,11 +97,15 @@ HELP_TEXT = (
     "/private - <i>Send a photo, video, voice or video note in Privacy Mode, where it disappears once your "
     "partner opens it and can't be forwarded or saved, caption your media with /private, or send /private "
     "on its own first and then the media right after</i>\n"
-    "/subscribe - <i>View plans for higher daily credits, unlimited photos & Privacy Mode access</i>\n"
+    "/subscribe - <i>View plans for higher daily credits, unlimited media sends & Privacy Mode access</i>\n"
     "/help - <i>Show this message</i>\n\n"
     "<b>Daily credits:</b>\n"
-    "\t\tFree accounts share a daily credit pool between /find, /next skips and media files sends, resetting at midnight UTC. "
-    "Subscribers get a bigger pool, unlimited free photos, and unlock Privacy Mode — see /subscribe for plans.\n\n"
+    "\t\tFree accounts share a daily credit pool between /next skips and photo/video/voice/video note sends, resetting at midnight UTC. "
+    "Subscribers get a bigger pool, unlimited free media sends, and unlock Privacy Mode — see /subscribe for plans.\n\n"
+    "<b>Referral bonus:</b>\n"
+    "\t\tGrab your personal invite link anytime from the 🔗 button on /profile. When a referral promo is running, "
+    "getting enough friends to join through it and finish setting up their profile earns you a free subscription — "
+    "you might also see this pop up right after a chat ends.\n\n"
     "<b>Staying safe:</b>\n"
     "\t\tEvery chat ends with the option to rate or report your partner. Reports are reviewed and repeated "
     "bad behaviour gets punished automatically. If you ever get restricted and think it's a mistake, "
@@ -122,7 +126,9 @@ ADMIN_HELP_TEXT = (
     "<code>/unban &lt;user_id&gt;</code>\n"
     "<code>/checkuser &lt;user_id&gt;</code>\n"
     "<code>/connect &lt;user_id&gt;</code>\n"
-    "<code>/broadcast &lt;message&gt;</code>"
+    "<code>/broadcast &lt;message&gt;</code>\n"
+    "<code>/giveaway &lt;user_id&gt; &lt;tier&gt;</code>\n"
+    "<code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt;</code>"
 )
 
 BAN_USAGE_TEXT = "<i>Usage:</i> <code>/ban &lt;user_id&gt; &lt;severity 0-10&gt; [reason]</code>"
@@ -137,6 +143,15 @@ CHECKUSER_USAGE_TEXT = "<i>Usage:</i> <code>/checkuser &lt;user_id&gt;</code>"
 NO_RECORD_OF_USER_TEXT = "<i>No record of this user.</i>"
 NOT_RESTRICTED_TEXT = "✅ Not restricted"
 NO_REPORTS_TEXT = "  <i>None</i>"
+
+REFERRAL_USAGE_TEXT = (
+    "<i>Usage:</i> <code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt;</code>\n"
+    "<i>e.g.</i> <code>/referral 5 7</code> <i>= refer 5 friends who finish setup, get a free weekly "
+    "subscription, repeatable - promo stays live for 7 days.</i>\n"
+    "<i>To turn it off:</i> <code>/referral &lt;required_referrals&gt; 0</code>, "
+    "<code>/referral -1 &lt;promo_duration_days&gt;</code>, <i>or both.</i>"
+)
+REFERRAL_DISABLED_TEXT = "🛑 <i>Referral scheme turned off.</i>"
 
 # ---------------------------------------------------------------------------
 # commands/stop.py

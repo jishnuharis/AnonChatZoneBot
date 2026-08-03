@@ -8,8 +8,8 @@ import init
 # duration_days   : how long a purchase/grant of this tier lasts
 # limit_bonus     : added on top of FREE_DAILY_CREDIT_LIMIT for the daily
 #                   credit pool - shared by /next skips (all users) and
-#                   photo sends (free-tier users only; subscribers send
-#                   photos free of charge, see media_privacy.py/relay.py)
+#                   photo/video/voice/video note sends (free-tier users only;
+#                   subscribers send all media free of charge, see media_privacy.py/relay.py)
 # stars           : price in Telegram Stars (XTR) - see pricing note below
 # bonus_points    : one-off in-bot points awarded when this tier is bought/granted
 #
@@ -76,10 +76,10 @@ def active_tier(user_id: int):
 
 
 def daily_credit_limit(user_id: int) -> int:
-    """Max daily credits (shared by /next skips and photo sends for free-tier
-    users). Subscribers effectively never run out since /private removes the
-    per-photo cost entirely and only /next still draws from this pool for them
-    too - the tier's limit_bonus just gives paying users more headroom."""
+    """Max daily credits (shared by /next skips and photo/video/voice/video note
+    sends for free-tier users). Subscribers effectively never run out since
+    they send all media free & unlimited and only /next still draws from this
+    pool for them too - the tier's limit_bonus just gives paying users more headroom."""
     tier = active_tier(user_id)
     if not tier:
         return FREE_DAILY_CREDIT_LIMIT
@@ -88,8 +88,8 @@ def daily_credit_limit(user_id: int) -> int:
 
 def daily_credits_used(user_id: int) -> int:
     """Returns how many daily credits this user has used today (from /next
-    skips and, for free-tier users, photo sends), resetting the counter first
-    if the stored day doesn't match today (UTC)."""
+    skips and, for free-tier users, photo/video/voice/video note sends),
+    resetting the counter first if the stored day doesn't match today (UTC)."""
     details = _details(user_id)
     today = time.strftime("%Y-%m-%d", time.gmtime())
     if details.get("next_used_day") != today:
@@ -150,7 +150,7 @@ def status_text(user_id: int) -> str:
         f"✅ <b>{tier['label']}</b> <i>plan active</i> — "
         f"<i>{remaining_days:.1f} days left</i>\n"
         f"<i>Daily credit limit:</i> {daily_credit_limit(user_id)} "
-        f"<i>(/next skips; photos are free & unlimited on your plan)</i>"
+        f"<i>(/next skips; media sends are free & unlimited on your plan)</i>"
     )
 
 

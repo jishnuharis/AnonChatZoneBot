@@ -14,9 +14,10 @@ from message import (
     SEVERITY_RANGE_TEXT, CANT_RESTRICT_SELF_TEXT, ADMINS_CANT_BE_RESTRICTED_TEXT,
     SEVERITY_ZERO_NOOP_TEXT, UNBAN_USAGE_TEXT, GIVE_VALID_USER_ID_TEXT, RESTRICTION_LIFTED_TEXT,
     CHECKUSER_USAGE_TEXT, NO_RECORD_OF_USER_TEXT, NOT_RESTRICTED_TEXT, NO_REPORTS_TEXT,
-    GIVEAWAY_USAGE_TEXT, GIVEAWAY_UNKNOWN_TIER_TEXT,
+    GIVEAWAY_USAGE_TEXT, GIVEAWAY_UNKNOWN_TIER_TEXT, REFERRAL_USAGE_TEXT, REFERRAL_DISABLED_TEXT,
 )
 import subscription
+import referral
 
 import init
 
@@ -259,5 +260,44 @@ async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TY
             f"<i>Active until:</i> <code>{expires_str}</code>\n"
             f"<i>+{tier['bonus_points']} points added 🎉</i>"
         ),
+        parse_mode="HTML",
+    )
+
+
+async def referral_scheme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/referral <required_referrals> <promo_duration_days> - (re)configures the
+    referral scheme: refer `required_referrals` friends who finish onboarding
+    and you get a free referral.REWARD_TIER subscription, repeatable every
+    `required_referrals` referrals, for as long as the promo is live.
+
+    Turns the scheme off instead if required_referrals is -1, promo_duration_days
+    is 0 (or negative), or both - see referral.set_scheme for the exact rule."""
+    if not is_admin(update.effective_user.id):
+        return
+
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text(REFERRAL_USAGE_TEXT, parse_mode="HTML")
+        return
+
+    try:
+        required_referrals = int(args[0])
+        duration_days = int(args[1])
+    except ValueError:
+        await update.message.reply_text(REFERRAL_USAGE_TEXT, parse_mode="HTML")
+        return
+
+    scheme = referral.set_scheme(required_referrals, duration_days)
+
+    if not scheme.get("required_referrals"):
+        await update.message.reply_text(REFERRAL_DISABLED_TEXT, parse_mode="HTML")
+        return
+
+    tier = subscription.TIERS[referral.REWARD_TIER]
+    expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(scheme["expires"]))
+    await update.message.reply_text(
+        f"✅ <i>Referral scheme active: refer</i> <b>{scheme['required_referrals']}</b> "
+        f"<i>friends who finish onboarding →</i> <b>{tier['label']}</b> <i>subscription (repeatable).</i>\n"
+        f"<i>Promo runs until</i> <code>{esc(expires_str)}</code>.",
         parse_mode="HTML",
     )
