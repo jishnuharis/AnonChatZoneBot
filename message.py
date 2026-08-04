@@ -1,24 +1,24 @@
 # ---------------------------------------------------------------------------
 # commands/start.py
 # ---------------------------------------------------------------------------
-WELCOME_BACK_TEXT = "👋 <i>Welcome back to</i> <b>Chat Zone - Anonymous Chat Bot!</b>\n<i>Use</i> /find <i>to look for a partner.</i>"
+WELCOME_BACK_TEXT = "👋 <i>Welcome back to</i> <b>Chat Zone - Anonymous Chat Bot!</b>\nUse /find to look for a partner."
 
 # ---------------------------------------------------------------------------
 # commands/find.py
 # ---------------------------------------------------------------------------
-ALREADY_IN_CHAT_TEXT = "⚠️ <b>You're already in a chat.</b>\n<i>Use</i> /stop <i>or</i> /next <i>first.</i>"
-LOOKING_FOR_PARTNER_TEXT = "🔍 <b>Looking for a partner...</b>\n<i>Matching you with someone who shares your interests if possible.</i>"
+ALREADY_IN_CHAT_TEXT = "⚠️ <b>You're already in a chat.</b>\nUse /stop or /next first."
+LOOKING_FOR_PARTNER_TEXT = "🔍 <b>Looking for a partner...</b>\nMatching you with someone who shares your interests if possible."
 
 # ---------------------------------------------------------------------------
 # commands/next.py
 # ---------------------------------------------------------------------------
 PARTNER_LEFT_CHAT_TEXT = "⛔ <b>Your partner left the chat.</b>"
-PARTNER_SKIPPED_TEXT = "🔁 <b>Partner skipped...</b>\n<i>You're added to the waiting queue, finding a new one...</i>"
-NOT_IN_CHAT_USE_FIND_TEXT = "❗ <b>You're not in a chat.</b>\n<i>Use</i> /find <i>to connect.</i>"
+PARTNER_SKIPPED_TEXT = "🔁 <b>Partner skipped...</b>\nYou're added to the waiting queue, finding a new one..."
+NOT_IN_CHAT_USE_FIND_TEXT = "❗ <b>You're not in a chat.</b>\nUse /find to connect."
 DAILY_NEXT_LIMIT_REACHED_TEXT = (
     "⏳ <b>You've used all {limit} of your daily credits.</b>\n"
-    "<i>Credits are spent on /next skips and (for free-tier users) media files sends.</i>\n"
-    "<i>Your count resets at midnight UTC, or</i> /subscribe <i>for more credits + unlimited media files.</i>"
+    "Credits are spent on /next skips and (for free-tier users) media files sends.\n\n"
+    "Your count resets at midnight UTC, or /subscribe for more credits + unlimited media files."
 )
 
 # ---------------------------------------------------------------------------
@@ -53,26 +53,26 @@ GIVEAWAY_USAGE_TEXT = (
     "<i>Usage:</i> <code>/giveaway &lt;user_id&gt; &lt;tier&gt;</code>\n"
     "<i>Tier is one of:</i> <code>daily</code>, <code>weekly</code>, <code>monthly</code>, <code>yearly</code>"
 )
-GIVEAWAY_UNKNOWN_TIER_TEXT = "<i>Unknown tier. Use one of:</i> <code>daily</code>, <code>weekly</code>, <code>monthly</code>, <code>yearly</code>"
+GIVEAWAY_UNKNOWN_TIER_TEXT = "<i>Unknown tier.</i> Use one of: <code>daily</code>, <code>weekly</code>, <code>monthly</code>, <code>yearly</code>"
 
 # ---------------------------------------------------------------------------
 # media_privacy.py / relay.py
 # ---------------------------------------------------------------------------
 PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT = (
     "🔒 <b>Privacy Mode is a subscriber perk.</b>\n"
-    "<i>Your media will be sent as a normal message instead. Use</i> /subscribe <i>to unlock Privacy Mode.</i>"
+    "Your media will be sent as a normal message instead. Use /subscribe to unlock Privacy Mode."
 )
 MEDIA_DAILY_LIMIT_REACHED_TEXT = (
     "📷 <b>You've used all {limit} of your daily credits, so this {kind} wasn't sent.</b>\n"
-    "<i>Your count resets at midnight UTC, or</i> /subscribe <i>for unlimited media sends.</i>"
+    "Your count resets at midnight UTC, or /subscribe for unlimited media sends."
 )
 
 # ---------------------------------------------------------------------------
 # commands/games.py
 # ---------------------------------------------------------------------------
-NEED_PARTNER_FOR_GAME_TEXT = "<i>You need a partner first. Use</i> /find <i>to get matched up!</i>"
+NEED_PARTNER_FOR_GAME_TEXT = "<b>You need a partner first.</b>\n Use /find to get matched up!"
 PICK_GAME_TEXT = "🎮 <b>Pick a game to challenge your partner to:</b>"
-SENDING_GAME_REQUEST_TEXT = "⏳ <i>Sending your game request...</i>"
+SENDING_GAME_REQUEST_TEXT = "⏳ <b>Sending your game request...</b>"
 
 # ---------------------------------------------------------------------------
 # commands/help.py
@@ -101,7 +101,7 @@ HELP_TEXT = (
     "<b>Referral bonus:</b>\n"
     "\t\tGrab your personal invite link anytime from the 🔗 button on /profile. When a referral promo is running, "
     "getting enough friends to join through it and finish setting up their profile earns you a free subscription — "
-    "you might also see this pop up right after a chat ends.\n\n"
+    "you might also see this pop up while using the bot.\n\n"
     "<b>Staying safe:</b>\n"
     "\t\tEvery chat ends with the option to rate or report your partner. Reports are reviewed and repeated "
     "bad behaviour gets punished automatically. If you ever get restricted and think it's a mistake, "
@@ -111,58 +111,58 @@ HELP_TEXT = (
 # ---------------------------------------------------------------------------
 # commands/admin_commands.py
 # ---------------------------------------------------------------------------
-GIVE_BROADCAST_MESSAGE_TEXT = "<i>Give me a message to broadcast!</i>"
-GIVE_VALID_CONNECT_USER_ID_TEXT = "<i>Give me a valid user id to connect.</i>"
-TARGET_NOT_IN_DB_TEXT = "<i>The target user isn't in our database.</i>"
-ALREADY_CONNECTED_TO_TARGET_TEXT = "<i>You are already connected to the target.</i>"
+GIVE_BROADCAST_MESSAGE_TEXT = "<b>Give me a message to broadcast!</b>"
+GIVE_VALID_CONNECT_USER_ID_TEXT = "<b>Give me a valid user id to connect.</b>"
+TARGET_NOT_IN_DB_TEXT = "<b>The target user isn't in our database.</b>"
+ALREADY_CONNECTED_TO_TARGET_TEXT = "<b>You are already connected to the target.</b>"
 
 ADMIN_HELP_TEXT = (
     "<b>Admin commands:</b>\n"
-    "<code>/ban &lt;user_id&gt; &lt;severity 0-10&gt; [reason]</code>\n"
-    "<code>/unban &lt;user_id&gt;</code>\n"
-    "<code>/checkuser &lt;user_id&gt;</code>\n"
-    "<code>/connect &lt;user_id&gt;</code>\n"
-    "<code>/broadcast &lt;message&gt;</code>\n"
-    "<code>/giveaway &lt;user_id&gt; &lt;tier&gt;</code>\n"
-    "<code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt;</code>"
+    "\t\t<i>/ban</i> - <code>/ban &lt;user_id&gt; &lt;severity 0-10&gt; [reason]</code>\n"
+    "\t\t<i>/unban</i> - <code>/unban &lt;user_id&gt;</code>\n"
+    "\t\t<i>/checkuser</i> - <code>/checkuser &lt;user_id&gt;</code>\n"
+    "\t\t<i>/connect</i> - <code>/connect &lt;user_id&gt;</code>\n"
+    "\t\t<i>/broadcast</i> - <code>/broadcast &lt;message&gt;</code>\n"
+    "\t\t<i>/giveaway</i> - <code>/giveaway &lt;user_id&gt; &lt;tier&gt;</code>\n"
+    "\t\t<i>/referral</i> - <code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt;</code>"
 )
 
 BAN_USAGE_TEXT = "<i>Usage:</i> <code>/ban &lt;user_id&gt; &lt;severity 0-10&gt; [reason]</code>"
-SEVERITY_RANGE_TEXT = "<i>Severity has to be between 0 and 10.</i>"
-CANT_RESTRICT_SELF_TEXT = "<i>You can't restrict yourself.</i>"
-ADMINS_CANT_BE_RESTRICTED_TEXT = "<i>Admins can't be restricted.</i>"
-SEVERITY_ZERO_NOOP_TEXT = "<i>Severity 0 doesn't restrict anyone, nothing changed.</i>"
+SEVERITY_RANGE_TEXT = "<b>Severity has to be between 0 and 10.</b>"
+CANT_RESTRICT_SELF_TEXT = "<b>You can't restrict yourself.</b>"
+ADMINS_CANT_BE_RESTRICTED_TEXT = "<b>Admins can't be restricted.</b>"
+SEVERITY_ZERO_NOOP_TEXT = "<b>Severity 0 doesn't restrict anyone, nothing changed.</b>"
 UNBAN_USAGE_TEXT = "<i>Usage:</i> <code>/unban &lt;user_id&gt;</code>"
-GIVE_VALID_USER_ID_TEXT = "<i>Give me a valid user id.</i>"
-RESTRICTION_LIFTED_TEXT = "✅ <i>Your restriction has been lifted by an admin.</i>"
+GIVE_VALID_USER_ID_TEXT = "<b>Give me a valid user id.</b>"
+RESTRICTION_LIFTED_TEXT = "✅ <b>Your restriction has been lifted by an admin.</b>"
 CHECKUSER_USAGE_TEXT = "<i>Usage:</i> <code>/checkuser &lt;user_id&gt;</code>"
-NO_RECORD_OF_USER_TEXT = "<i>No record of this user.</i>"
+NO_RECORD_OF_USER_TEXT = "<b>No record of this user.</b>"
 NOT_RESTRICTED_TEXT = "✅ Not restricted"
-NO_REPORTS_TEXT = "  <i>None</i>"
+NO_REPORTS_TEXT = "\t\tNone"
 
 REFERRAL_USAGE_TEXT = (
     "<i>Usage:</i> <code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt;</code>\n"
-    "<i>e.g.</i> <code>/referral 5 7</code> <i>= refer 5 friends who finish setup, get a free weekly "
-    "subscription, repeatable - promo stays live for 7 days.</i>\n"
-    "<i>To turn it off:</i> <code>/referral &lt;required_referrals&gt; 0</code>, "
-    "<code>/referral -1 &lt;promo_duration_days&gt;</code>, <i>or both.</i>"
+    "<i>e.g.</i> <code>/referral 5 7</code> - refer 5 friends who finish setup, get a free weekly "
+    "subscription, repeatable - promo stays live for 7 days.\n\n"
+    "<i>To turn it off:</i>\n\t<code>/referral &lt;required_referrals&gt; 0</code>,"
+    "\n\t<code>/referral -1 &lt;promo_duration_days&gt;</code>, or both."
 )
-REFERRAL_DISABLED_TEXT = "🛑 <i>Referral scheme turned off.</i>"
+REFERRAL_DISABLED_TEXT = "🛑 <b>Referral scheme turned off.</b>"
 
 # ---------------------------------------------------------------------------
 # commands/stop.py
 # ---------------------------------------------------------------------------
 CHAT_ENDED_TEXT = "👋 <b>Chat ended.</b>"
-REMOVED_FROM_QUEUE_TEXT = "❗ <b>You've been removed from the waiting queue.</b>\n<i>Use</i> /find <i>to search for a partner.</i>"
+REMOVED_FROM_QUEUE_TEXT = "❗ <b>You've been removed from the waiting queue.</b>\nUse /find to search for a partner."
 NOT_IN_CHAT_TEXT = "❗ <b>You're not in a chat.</b>"
 
 # ---------------------------------------------------------------------------
 # handlers/rating.py
 # ---------------------------------------------------------------------------
-RATE_PROMPT_TEXT = "💡 <i>If your chat partner misbehaved or broke the rules, report them below.</i>\n<i>You can also rate them, which affects their profile rating.</i>"
-REPORT_REASON_PROMPT_TEXT = "🚩 <b>What happened?</b> <i>Pick the closest reason:</i>"
-REPORT_LOGGED_TEXT = "✅ <b>Thanks, we've logged that report.</b>\n<i>Your feedback helps keep this bot safe.</i>"
-FEEDBACK_THANKS_TEXT = "<b>Thank you for your feedback.</b>\n<i>It helps keep everyone here safe.</i>"
+RATE_PROMPT_TEXT = "💡 <b>If your chat partner misbehaved or broke the rules, report them below.</b>\nYou can also rate them, which affects their profile rating."
+REPORT_REASON_PROMPT_TEXT = "🚩 <b>What happened?</b> Pick the closest reason:"
+REPORT_LOGGED_TEXT = "✅ <b>Thanks, we've logged that report.</b>\nYour feedback helps keep this bot safe."
+FEEDBACK_THANKS_TEXT = "<b>Thank you for your feedback.</b>\nIt helps keep everyone here safe."
 
 # ---------------------------------------------------------------------------
 # handlers/preferences.py
@@ -180,11 +180,11 @@ NONE_PICKED_YET_TEXT = "None picked yet"
 # handlers/setup.py
 # ---------------------------------------------------------------------------
 WELCOME_NEW_USER_TEXT = "👋 <i>Welcome to</i> <b>Chat Zone - Anonymous Chat Bot!</b>"
-SETUP_PROFILE_GENDER_PROMPT_TEXT = "<b>Let's set up your profile.</b>\n<i>What's your gender?</i>"
+SETUP_PROFILE_GENDER_PROMPT_TEXT = "<b>Let's set up your profile.</b>\nWhat's your gender?"
 SELECT_GENDER_TEXT = "<b>Please select your gender:</b>"
 ENTER_AGE_TEXT = "📅 <b>Please enter your age:</b>"
 INVALID_AGE_TEXT = "❌ <b>Please enter a valid age.</b>"
-PREFERENCES_BUTTONS_NUDGE_TEXT = "🏷️ <i>Use the buttons above to pick your interests, then hit Done.</i>"
+PREFERENCES_BUTTONS_NUDGE_TEXT = "🏷️<b>Let us know your preferences</b>\nUse the buttons above to pick your interests, then hit <b>Done</b>."
 
 # ---------------------------------------------------------------------------
 # handlers/edit.py
@@ -201,21 +201,21 @@ SELECT_COUNTRY_TEXT = "🌍 <b>Select your country:</b>"
 # relay.py
 # ---------------------------------------------------------------------------
 FAILED_TO_SEND_MESSAGE_TEXT = "❌ <b>Failed to send message.</b>"
-NOT_IN_CHAT_USE_FIND_INLINE_TEXT = "❗ <b>You're not in a chat.</b> Use /find to connect."
+NOT_IN_CHAT_USE_FIND_INLINE_TEXT = "❗ <b>You're not in a chat.</b>\nUse /find to connect."
 
 # ---------------------------------------------------------------------------
 # media_privacy.py
 # ---------------------------------------------------------------------------
-SENT_PRIVACY_MODE_TEXT = "🔒 <i>Sent in Privacy Mode. It'll be gone once they've seen it.</i>"
-PRIVACY_MODE_PLACEHOLDER_TEXT = "🔒 <b>Privacy Mode media</b>\n<iIt disappears after you open it.</i>"
+SENT_PRIVACY_MODE_TEXT = "🔒 <i>Sent in <b>Privacy Mode</b>.</i>\nIt'll be gone once they've seen it."
+PRIVACY_MODE_PLACEHOLDER_TEXT = "🔒 <b>Privacy Mode media</b>\nIt disappears after you open it."
 PRIVACY_MEDIA_NO_LONGER_AVAILABLE_ALERT = "This media is no longer available."
-PRIVACY_MEDIA_NO_LONGER_AVAILABLE_TEXT = "🔒 <i>This Privacy Mode media is no longer available.</i>"
+PRIVACY_MEDIA_NO_LONGER_AVAILABLE_TEXT = "🔒 <b>This Privacy Mode media is no longer available.</b>"
 NOT_FOR_YOU_ALERT = "This isn't for you."
 ALREADY_VIEWED_ALERT = "Already viewed. It's gone."
-ALREADY_VIEWED_TEXT = "🔒 <i>This has already been viewed and is no longer available.</i>"
-YOUR_MEDIA_VIEWED_TEXT = "👀 <i>Your Privacy Mode media has been viewed.</i>"
-PRIVACY_MEDIA_EXPIRED_EDIT_TEXT = "🔒 This Privacy Mode media expired unopened."
-PRIVACY_MEDIA_EXPIRED_DM_TEXT = "⌛ <i>Your Privacy Mode media went unopened and has expired.</i>"
+ALREADY_VIEWED_TEXT = "🔒 <b>This has already been viewed and is no longer available.</b>"
+YOUR_MEDIA_VIEWED_TEXT = "👀 <b>Your Privacy Mode media has been viewed.</b>"
+PRIVACY_MEDIA_EXPIRED_EDIT_TEXT = "🔒 <b>This Privacy Mode media expired unopened.</b>"
+PRIVACY_MEDIA_EXPIRED_DM_TEXT = "⌛ <b>Your Privacy Mode media went unopened and has expired.</b>"
 
 # ---------------------------------------------------------------------------
 # app.py
@@ -225,22 +225,22 @@ BOT_RUNNING_STATUS_TEXT = "✅ Anonymous Chat Bot is running!"
 # ---------------------------------------------------------------------------
 # games/game_requests.py
 # ---------------------------------------------------------------------------
-NO_PARTNER_FOR_GAME_TEXT = "<i>No partner found. Go get one with</i> /find <i>first 💀.</i>"
-CANT_PLAY_WITH_YOURSELF_TEXT = "<i>Are you really trying to play with yourself 💀.</i>"
-ALREADY_IN_GAME_TEXT = "<i>You're already in a game. Finish that first.</i>"
-PARTNER_ALREADY_IN_GAME_TEXT = "<i>Your partner is already in a game. Let them finish first.</i>"
-CANT_SPAM_GAME_REQUESTS_TEXT = "<i>You can't just spam requests and expect your partner to accept it 💀.</i>"
+NO_PARTNER_FOR_GAME_TEXT = "<b>No partner found.</b> Go get one with /find first 💀."
+CANT_PLAY_WITH_YOURSELF_TEXT = "<b>Are you really trying to play with yourself 💀.</b>"
+ALREADY_IN_GAME_TEXT = "<b>You're already in a game.</b>\nFinish that first or use /cancel to cancel the currently running game."
+PARTNER_ALREADY_IN_GAME_TEXT = "<b>Your partner is already in a game.</b>\nLet them finish first."
+CANT_SPAM_GAME_REQUESTS_TEXT = "<b>You can't just spam requests and expect your partner to accept it 💀.</b>"
 WAITING_FOR_PARTNER_ACCEPT_TEXT = "⏳ <b>Waiting for your partner to accept...</b>"
-GAME_REQUEST_EXPIRED_TEXT = "<i>This request expired or doesn't exist.</i>"
-YOU_DECLINED_REQUEST_TEXT = "<i>You declined the request.</i>"
-PARTNER_DECLINED_REQUEST_TEXT = "<i>Your partner has declined the request.</i>"
+GAME_REQUEST_EXPIRED_TEXT = "<b>This request expired or doesn't exist.</b>"
+YOU_DECLINED_REQUEST_TEXT = "<b>You declined the request.</b>"
+PARTNER_DECLINED_REQUEST_TEXT = "<b>Your partner has declined the request.</b>"
 
 # ---------------------------------------------------------------------------
 # Shared across multiple mini-games (games/coin_steal.py, rps.py, tictactoe.py,
 # guess_it.py, would_you_rather.py)
 # ---------------------------------------------------------------------------
-PARTNER_LEFT_GAME_TEXT = "<i>Your partner left the game. Game ended...</i>"
-GAME_ENDED_INACTIVITY_TEXT = "<i>Game ended due to inactivity.</i>"
+PARTNER_LEFT_GAME_TEXT = "<b>Your partner left the game.</b>\nGame ended..."
+GAME_ENDED_INACTIVITY_TEXT = "<b>Game ended due to inactivity.</b>"
 WON_MATCH_TEXT = "🏆 <b>You won the match!</b> +8 points."
 LOST_MATCH_TEXT = "😔 <b>You lost the match.</b> Rematch sometime?"
 
@@ -249,32 +249,32 @@ LOST_MATCH_TEXT = "😔 <b>You lost the match.</b> Rematch sometime?"
 # ---------------------------------------------------------------------------
 GAME_CANCELLED_TEXT = "🛑 <b>Game cancelled.</b> \nYour chat is still open, use /games to start another."
 GAME_REQUEST_CANCELLED_TEXT = "🛑 <b>Game request cancelled.</b>"
-PARTNER_CANCELLED_REQUEST_TEXT = "<i>Your partner cancelled the game request.</i>"
-NOTHING_TO_CANCEL_TEXT = "<i>You don't have an active game or pending game request to cancel.</i>"
+PARTNER_CANCELLED_REQUEST_TEXT = "<b>Your partner cancelled the game request.</b>"
+NOTHING_TO_CANCEL_TEXT = "<b>You don't have an active game or pending game request to cancel.</b>"
 
 # ---------------------------------------------------------------------------
 # games/coin_steal.py
 # ---------------------------------------------------------------------------
-ALREADY_CHOSE_TEXT = "<i>You already chose. Chill 😭</i>"
-CHOICE_LOCKED_IN_TEXT = "<i>Your choice has been locked in 🔒.</i>"
-OPPONENT_MOVED_TEXT = "<i>Your opponent made their move... Do you trust them? 👀</i>"
-MUTUAL_SAVE_NO_STREAK_TEXT = "<i>You guys really trusted each other! 👀\nGood job saving your coins for now 😏</i>"
-BOTH_STOLE_TEXT = "<i>Both chose greed over the other and stole. Now no one wins 😏.</i>"
-GOT_STOLEN_FROM_TEXT = "<i>You shouldn't have done that to them 💀. They tried to save their coin and you just stole it...</i>"
-TRUSTED_WRONG_ONE_TEXT = "<i>You sure trusted the wrong one this time 💀. You just got stolen...</i>"
-COIN_STEAL_END_INTRO_TEXT = "<i>The game has come to an end. Well played both of you.</i>\n\n"
-WON_BY_DECEIVING_TEXT = "<i>You really won by deceiving them 💔.</i>"
-LOST_TRUST_LESSON_TEXT = "<i>Maybe that's why they tell us not to trust anyone on the internet 🥀.</i>"
-COIN_STEAL_DRAW_TEXT = "<i>You guys managed to make it a draw 👏. Well played for sure!</i>"
-COIN_STEAL_TIMEOUT_TEXT = "<i>Game ended due to inactivity.\nRestart if you guys wanna play again.</i>"
+ALREADY_CHOSE_TEXT = "<b>You already chose.</b> Chill 😭"
+CHOICE_LOCKED_IN_TEXT = "<b>Your choice has been locked in 🔒.</b>"
+OPPONENT_MOVED_TEXT = "<b>Your opponent made their move...<\b> Do you trust them? 👀"
+MUTUAL_SAVE_NO_STREAK_TEXT = "<b>You guys really trusted each other!</b> 👀\nGood job saving your coins for now 😏"
+BOTH_STOLE_TEXT = "<b>Both chose greed over the other and stole.</b>\nNow no one wins 😏."
+GOT_STOLEN_FROM_TEXT = "<b>You shouldn't have done that to them 💀.</b>\nThey tried to save their coin and you just stole it..."
+TRUSTED_WRONG_ONE_TEXT = "<b>You sure trusted the wrong one this time 💀.</b>\nYou just got stolen..."
+COIN_STEAL_END_INTRO_TEXT = "<b>The game has come to an end.</b>\nWell played both of you.\n\n"
+WON_BY_DECEIVING_TEXT = "<b>You really won by deceiving them 💔.</b>"
+LOST_TRUST_LESSON_TEXT = "<b>Maybe that's why they tell us not to trust anyone on the internet 🥀.</b>"
+COIN_STEAL_DRAW_TEXT = "<b>You guys managed to make it a draw 👏.</b>\nWell played for sure!"
+COIN_STEAL_TIMEOUT_TEXT = "<b>Game ended due to inactivity.</b>\nRestart if you guys wanna play again."
 
 # ---------------------------------------------------------------------------
 # games/rps.py
 # ---------------------------------------------------------------------------
-OPPONENT_ALREADY_PICKED_TEXT = "<i>Your opponent already picked.</i> Your move..."
+OPPONENT_ALREADY_PICKED_TEXT = "<b>Your opponent already picked.</b>\nYour move..."
 
 # ---------------------------------------------------------------------------
 # games/tictactoe.py
 # ---------------------------------------------------------------------------
-DRAW_NOTE_TEXT = "\n\n🤝 <b>It's a draw!</b> Well played both of you."
+DRAW_NOTE_TEXT = "\n\n🤝 <b>It's a draw!</b>\nWell played both of you."
 GAME_OVER_NOTE_TEXT = "\n\n🏆 <b>Game over!</b>"
