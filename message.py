@@ -42,8 +42,8 @@ SUBSCRIBE_INVOICE_DESCRIPTION = (
 SUBSCRIBE_PAYMENT_SUCCESS_TEXT = (
     "✅ <b>{label} plan activated!</b>\n"
     "<i>Active until:</i> <code>{expires}</code>\n"
-    "<i>+{points} points added to your account 🎉</i>\n"
-    "<i>Daily credit limit is now</i> <b>{limit}</b> — <i>and your media sends are unlimited & free.</i>"
+    "<b>+{points}</b> points added to your account 🎉\n"
+    "Daily credit limit is now <b>{limit}</b> — and your media sends are unlimited & free."
 )
 
 # ---------------------------------------------------------------------------
