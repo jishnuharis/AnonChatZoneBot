@@ -1,5 +1,3 @@
-from saveNload import load_user_data, load_config
-
 import os
 import time
 
@@ -63,12 +61,10 @@ def _default_user():
     }
 
 
-user_details = {int(k): v for k, v in load_user_data().items()}
-for user_id, details in user_details.items():
-    for key, value in _default_user().items():
-        details.setdefault(key, value)
-    if details["partner_id"] and user_id not in active_pairs:
-        active_pairs[user_id] = details["partner_id"]
+# These start empty and are populated by `await load_all()` during bot
+# startup (see main.py on_startup), since the DB driver is now async and
+# can no longer be queried at plain module-import time.
+user_details = {}
 
 user_input_stage = {}
 edit_stage = {}
@@ -80,4 +76,23 @@ pending_media = {}
 
 message_map = {}
 
-referral_scheme = load_config("referral_scheme") or {"required_referrals": 0, "expires": None}
+referral_scheme = {"required_referrals": 0, "expires": None}
+
+
+async def load_all():
+    """Populate user_details, active_pairs, and referral_scheme from the DB.
+    Must be awaited once during startup, before the bot starts polling."""
+    from saveNload import load_user_data, load_config
+
+    global referral_scheme
+
+    loaded = await load_user_data()
+    for k, v in loaded.items():
+        user_id = int(k)
+        for key, value in _default_user().items():
+            v.setdefault(key, value)
+        user_details[user_id] = v
+        if v["partner_id"] and user_id not in active_pairs:
+            active_pairs[user_id] = v["partner_id"]
+
+    referral_scheme = await load_config("referral_scheme") or {"required_referrals": 0, "expires": None}

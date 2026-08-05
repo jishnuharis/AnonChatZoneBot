@@ -3,4 +3,4 @@ python-telegram-bot[job-queue]
 Flask
 nest_asyncio
 aiofiles
-psycopg2-binary
+psycopg[binary,pool]

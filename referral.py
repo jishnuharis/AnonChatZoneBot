@@ -22,7 +22,7 @@ def scheme_active() -> bool:
     return required >= 1 and bool(expires) and expires > time.time()
 
 
-def set_scheme(required_referrals: int, duration_days: int) -> dict:
+async def set_scheme(required_referrals: int, duration_days: int) -> dict:
     if required_referrals == -1 or duration_days <= 0:
         init.referral_scheme = {"required_referrals": 0, "expires": None}
     else:
@@ -30,7 +30,7 @@ def set_scheme(required_referrals: int, duration_days: int) -> dict:
             "required_referrals": required_referrals,
             "expires": time.time() + duration_days * 86400,
         }
-    save_config("referral_scheme", init.referral_scheme)
+    await save_config("referral_scheme", init.referral_scheme)
     return init.referral_scheme
 
 

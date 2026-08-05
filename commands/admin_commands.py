@@ -272,7 +272,7 @@ async def referral_scheme_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(REFERRAL_USAGE_TEXT, parse_mode="HTML")
         return
 
-    scheme = referral.set_scheme(required_referrals, duration_days)
+    scheme = await referral.set_scheme(required_referrals, duration_days)
 
     if not scheme.get("required_referrals"):
         await update.message.reply_text(REFERRAL_DISABLED_TEXT, parse_mode="HTML")

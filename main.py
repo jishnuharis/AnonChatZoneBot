@@ -4,7 +4,7 @@ from telegram.ext import (
     TypeHandler, MessageReactionHandler, PreCheckoutQueryHandler,
 )
 
-from saveNload import save_user_data
+from saveNload import save_user_data, init_pool, close_pool
 from app import keep_alive
 from relay import relay_message, relay_reaction
 
@@ -59,7 +59,7 @@ async def set_commands(application):
 
 
 async def periodic_save(context):
-    save_user_data(init.user_details, init.dirty_users)
+    await save_user_data(init.user_details, init.dirty_users)
 
 
 async def periodic_feedback_clear(context):
@@ -85,12 +85,18 @@ async def periodic_media_sweep(context):
 async def on_shutdown(application):
     print("⚠️ Bot shutting down. Saving user data...")
     try:
-        save_user_data(init.user_details, init.dirty_users)
+        await save_user_data(init.user_details, init.dirty_users)
     except Exception as e:
         print("Failed to save during shutdown:", e)
+    finally:
+        await close_pool()
 
 
 async def on_startup(application):
+    # Open the DB pool and load persisted data before anything else runs.
+    await init_pool()
+    await init.load_all()
+
     application.job_queue.run_repeating(periodic_save, interval=60, first=60)
     application.job_queue.run_repeating(periodic_feedback_clear, interval=28800, first=28800)
     application.job_queue.run_repeating(periodic_severity_decay, interval=86400, first=3600)

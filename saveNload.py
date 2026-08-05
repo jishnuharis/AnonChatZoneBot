@@ -1,18 +1,29 @@
 import json
 import os
-import psycopg2
+
+from psycopg_pool import AsyncConnectionPool
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Created once, reused for the life of the process. open=False means it won't
+# try to connect at import time -- call `await init_pool()` during bot startup.
+pool = AsyncConnectionPool(DATABASE_URL, min_size=1, max_size=5, open=False)
 
-def get_connection():
-    return psycopg2.connect(DATABASE_URL)
+
+async def init_pool():
+    """Call this once during application startup (e.g. in on_startup)."""
+    await pool.open()
+    await ensure_db()
 
 
-def ensure_db():
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
+async def close_pool():
+    """Call this during shutdown."""
+    await pool.close()
+
+
+async def ensure_db():
+    async with pool.connection() as conn:
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_details (
                     user_id BIGINT PRIMARY KEY,
                     gender VARCHAR(1),
@@ -29,41 +40,33 @@ def ensure_db():
             )
         """)
 
-        cursor.execute("""
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS bot_config (
                     key VARCHAR(64) PRIMARY KEY,
                     value JSONB
             )
         """)
-        conn.commit()
 
 
-def load_config(key: str):
-    ensure_db()
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM bot_config WHERE key = %s", (key,))
-        row = cursor.fetchone()
+async def load_config(key: str):
+    async with pool.connection() as conn:
+        cursor = await conn.execute("SELECT value FROM bot_config WHERE key = %s", (key,))
+        row = await cursor.fetchone()
         return row[0] if row else None
 
 
-def save_config(key: str, value: dict):
-    ensure_db()
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
+async def save_config(key: str, value: dict):
+    async with pool.connection() as conn:
+        await conn.execute(
             """
             INSERT INTO bot_config (key, value) VALUES (%s, %s)
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
             """,
             (key, json.dumps(value)),
         )
-        conn.commit()
 
 
-def save_user_data(data: dict, dirty_user: set):
-    ensure_db()
-
+async def save_user_data(data: dict, dirty_user: set):
     QUERY = """
             INSERT INTO user_details (
                 user_id, gender, age, country, reports, reporters,
@@ -101,58 +104,55 @@ def save_user_data(data: dict, dirty_user: set):
                 referral_credited = EXCLUDED.referral_credited
     """
 
-    with get_connection() as conn:
-        cursor = conn.cursor()
+    values = []
+    for user_id in list(dirty_user):
+        details = data.get(user_id)
+        if details is None:
+            continue
 
-        values = []
+        values.append((
+            user_id,
+            details.get("gender"),
+            details.get("age"),
+            details.get("country"),
+            details.get("reports", 0),
+            json.dumps(details.get("reporters", [])),
+            details.get("votes", {}).get("up", 0),
+            details.get("votes", {}).get("down", 0),
+            json.dumps(details.get("voters", [])),
+            json.dumps(details.get("feedback_track", {})),
+            details.get("partner_id", None),
+            details.get("points", 0),
+            details.get("preferences", 0),
+            details.get("restricted_until"),
+            details.get("restriction_reason"),
+            details.get("severity_score", 0),
+            json.dumps(details.get("report_log", [])),
+            details.get("last_severity_decay"),
+            details.get("subscription_expires"),
+            details.get("subscription_tier"),
+            details.get("daily_credits_used", 0),
+            details.get("daily_credits_reset_day"),
+            details.get("referred_by"),
+            details.get("referral_count", 0),
+            details.get("referral_rewarded_count", 0),
+            details.get("referral_credited", False),
+        ))
 
-        for user_id in list(dirty_user):
-            details = data.get(user_id)
-            if details is None:
-                continue
+    if not values:
+        return
 
-            values.append((
-                user_id,
-                details.get("gender"),
-                details.get("age"),
-                details.get("country"),
-                details.get("reports", 0),
-                json.dumps(details.get("reporters", [])),
-                details.get("votes", {}).get("up", 0),
-                details.get("votes", {}).get("down", 0),
-                json.dumps(details.get("voters", [])),
-                json.dumps(details.get("feedback_track", {})),
-                details.get("partner_id", None),
-                details.get("points", 0),
-                details.get("preferences", 0),
-                details.get("restricted_until"),
-                details.get("restriction_reason"),
-                details.get("severity_score", 0),
-                json.dumps(details.get("report_log", [])),
-                details.get("last_severity_decay"),
-                details.get("subscription_expires"),
-                details.get("subscription_tier"),
-                details.get("daily_credits_used", 0),
-                details.get("daily_credits_reset_day"),
-                details.get("referred_by"),
-                details.get("referral_count", 0),
-                details.get("referral_rewarded_count", 0),
-                details.get("referral_credited", False),
-            ))
+    async with pool.connection() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.executemany(QUERY, values)
 
-        if values:
-            print(f"✅ User Data Saved to Drive Successfully. Updated Data of {len(dirty_user)} Users.")
-            cursor.executemany(QUERY, values)
-
-        conn.commit()
-        dirty_user.clear()
+    print(f"✅ User Data Saved to Drive Successfully. Updated Data of {len(dirty_user)} Users.")
+    dirty_user.clear()
 
 
-def load_user_data() -> dict:
-    ensure_db()
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
+async def load_user_data() -> dict:
+    async with pool.connection() as conn:
+        cursor = await conn.execute("""
             SELECT user_id, gender, age, country, reports, reporters, vote_up, vote_down,
                    voters, feedback_track, partner_id, points, preferences, restricted_until,
                    restriction_reason, severity_score, report_log, last_severity_decay,
@@ -160,7 +160,7 @@ def load_user_data() -> dict:
                    referred_by, referral_count, referral_rewarded_count, referral_credited
             FROM user_details
         """)
-        rows = cursor.fetchall()
+        rows = await cursor.fetchall()
 
         data = {}
         for row in rows:
