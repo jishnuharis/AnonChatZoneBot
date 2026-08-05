@@ -36,7 +36,21 @@ async def ensure_db():
                     voters TEXT,
                     feedback_track JSONB,
                     partner_id BIGINT,
-                    points INTEGER
+                    points INTEGER,
+                    preferences INTEGER,
+                    restricted_until DOUBLE PRECISION,
+                    restriction_reason TEXT,
+                    severity_score INTEGER,
+                    report_log JSONB,
+                    last_severity_decay DOUBLE PRECISION,
+                    subscription_expires DOUBLE PRECISION,
+                    subscription_tier VARCHAR(25),
+                    daily_credits_used INTEGER,
+                    daily_credits_reset_day VARCHAR(10),
+                    referred_by BIGINT,
+                    referral_count INTEGER,
+                    referral_rewarded_count INTEGER,
+                    referral_credited BOOLEAN
             )
         """)
 
@@ -139,14 +153,14 @@ async def save_user_data(data: dict, dirty_user: set):
             details.get("referral_credited", False),
         ))
 
-    if not values:
-        return
-
     async with pool.connection() as conn:
         async with conn.cursor() as cursor:
-            await cursor.executemany(QUERY, values)
+            if values:
+                await cursor.executemany(QUERY, values)
+                print(f"✅ User Data Saved to Drive Successfully. Updated Data of {len(dirty_user)} Users.")
+            else:
+                await cursor.execute("SELECT 1")
 
-    print(f"✅ User Data Saved to Drive Successfully. Updated Data of {len(dirty_user)} Users.")
     dirty_user.clear()
 
 
