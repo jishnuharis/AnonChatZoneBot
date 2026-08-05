@@ -5,19 +5,15 @@ from psycopg_pool import AsyncConnectionPool
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Created once, reused for the life of the process. open=False means it won't
-# try to connect at import time -- call `await init_pool()` during bot startup.
 pool = AsyncConnectionPool(DATABASE_URL, min_size=1, max_size=5, open=False)
 
 
 async def init_pool():
-    """Call this once during application startup (e.g. in on_startup)."""
     await pool.open()
     await ensure_db()
 
 
 async def close_pool():
-    """Call this during shutdown."""
     await pool.close()
 
 
