@@ -96,6 +96,7 @@ def file_report(reporter_id: int, target_id: int, reason_code: str):
     before_severity = severity_for_score(before_score)
 
     details["severity_score"] = before_score + weight
+    details["reports"] = details.get("reports", 0) + 1
     log = details.setdefault("report_log", [])
     log.append({
         "reporter": reporter_id,

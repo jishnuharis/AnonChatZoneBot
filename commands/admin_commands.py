@@ -7,7 +7,7 @@ import time
 from security import safe_tele_func_call, format_duration
 from handlers.rating import ask_for_rating
 from games.registry import end_any_active_game
-from moderation import is_admin, apply_restriction, clear_restriction
+from moderation import is_admin, apply_restriction, clear_restriction, severity_for_score, SEVERITY_DURATIONS
 from message import (
     GIVE_BROADCAST_MESSAGE_TEXT, GIVE_VALID_CONNECT_USER_ID_TEXT, TARGET_NOT_IN_DB_TEXT,
     ALREADY_CONNECTED_TO_TARGET_TEXT, PARTNER_LEFT_CHAT_TEXT, ADMIN_HELP_TEXT, BAN_USAGE_TEXT,
@@ -201,11 +201,41 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"  • <code>{esc(str(r['reason']))}</code> from <code>{r['reporter']}</code>" for r in recent_reports
     ) or NO_REPORTS_TEXT
 
+    lifetime_reports = details.get("reports", 0)
+    unique_reporters = len(details.get("reporters", []))
+
+    severity_score = details.get("severity_score", 0)
+    severity_level = severity_for_score(severity_score)
+    level_duration = SEVERITY_DURATIONS.get(severity_level, 0)
+    level_line = (
+        f"{severity_score} pts → Level {severity_level}/10"
+        + (f" (would restrict {format_duration(level_duration)})" if level_duration else " (no active restriction weight)")
+    )
+
+    last_decay = details.get("last_severity_decay")
+    decay_line = f"{format_duration(time.time() - last_decay)} ago" if last_decay else "Never"
+
+    if subscription.is_subscribed(target_id):
+        tier = subscription.active_tier(target_id)
+        expires = details.get("subscription_expires")
+        sub_line = f"{tier['label']} — expires in {format_duration(expires - time.time())}" if tier else "Active (unknown tier)"
+    else:
+        sub_line = "Not subscribed"
+
+    partner_id = details.get("partner_id")
+    partner_line = f"In chat with <code>{partner_id}</code>" if partner_id else "Not in a chat"
+
     text = (
         f"<b>User</b> <code>{target_id}</code>\n"
         f"Points: {details.get('points', 0)}\n"
         f"Votes: {details.get('votes', {}).get('up', 0)} 👍 {details.get('votes', {}).get('down', 0)} 👎\n"
-        f"Severity score: {details.get('severity_score', 0)}\n"
+        f"Subscription: {sub_line}\n"
+        f"Status: {partner_line}\n"
+        f"\n"
+        f"<b>Moderation</b>\n"
+        f"Lifetime reports: {lifetime_reports} (from {unique_reporters} unique reporter{'s' if unique_reporters != 1 else ''})\n"
+        f"Current severity: {level_line}\n"
+        f"Last decay: {decay_line}\n"
         f"{restriction_line}\n"
         f"Recent reports:\n{reports_text}"
     )
