@@ -92,9 +92,11 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
             COALESCE(p.preferred_gender, 'ANY') as pref_gender,
             COALESCE(p.preferred_country, 'ANY') as pref_country,
             s.tier as subscription_tier, s.expires_at as subscription_expires,
-            COALESCE(r_up.votes_up, 0) as votes_up,
-            COALESCE(r_down.votes_down, 0) as votes_down,
-            COALESCE(rep.reports_count, 0) as reports_count,
+            GREATEST(COALESCE(p.votes_up, 0), COALESCE(r_up.votes_up, 0)) as votes_up,
+            GREATEST(COALESCE(p.votes_down, 0), COALESCE(r_down.votes_down, 0)) as votes_down,
+            GREATEST(COALESCE(p.reports_count, 0), COALESCE(rep.reports_count, 0)) as reports_count,
+            COALESCE(p.feedback_track, '{}'::jsonb) as feedback_track,
+            COALESCE(p.report_log, '[]'::jsonb) as report_log,
             ref.referrer_id as referred_by,
             ref.credited as referral_credited,
             COALESCE(ref_count.total_referrals, 0) as referral_count,
@@ -146,6 +148,24 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                 sub_epoch = row["subscription_expires"].timestamp() if row["subscription_expires"] else None
                 decay_epoch = row["last_severity_decay"].timestamp() if row["last_severity_decay"] else None
                 
+                fb = row.get("feedback_track")
+                if isinstance(fb, str):
+                    try:
+                        fb = json.loads(fb)
+                    except Exception:
+                        fb = {}
+                elif not isinstance(fb, dict):
+                    fb = {}
+
+                rep_log = row.get("report_log")
+                if isinstance(rep_log, str):
+                    try:
+                        rep_log = json.loads(rep_log)
+                    except Exception:
+                        rep_log = []
+                elif not isinstance(rep_log, list):
+                    rep_log = []
+
                 return {
                     "user_id": row["user_id"],
                     "gender": row["gender"],
@@ -166,6 +186,8 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                     "subscription_expires": sub_epoch,
                     "votes": {"up": row["votes_up"], "down": row["votes_down"]},
                     "reports": row["reports_count"],
+                    "feedback_track": fb,
+                    "report_log": rep_log,
                     "referred_by": row["referred_by"],
                     "referral_credited": bool(row["referral_credited"]),
                     "referral_count": row["referral_count"],
@@ -222,12 +244,33 @@ async def upsert_user(user_id: int, **kwargs):
                     except ValueError:
                         reset_day = date.today()
 
+                votes_val = kwargs.get("votes")
+                if isinstance(votes_val, dict):
+                    v_up = votes_val.get("up", 0)
+                    v_down = votes_val.get("down", 0)
+                else:
+                    v_up = kwargs.get("votes_up", 0)
+                    v_down = kwargs.get("votes_down", 0)
+
+                rep_count = kwargs.get("reports", kwargs.get("reports_count", 0))
+
+                fb_track = kwargs.get("feedback_track")
+                if not isinstance(fb_track, dict):
+                    fb_track = {}
+                fb_track_json = json.dumps(fb_track)
+
+                rep_log = kwargs.get("report_log")
+                if not isinstance(rep_log, list):
+                    rep_log = []
+                rep_log_json = json.dumps(rep_log)
+
                 await conn.execute("""
                     INSERT INTO user_profiles (
                         user_id, severity_score, restricted_until, restriction_reason,
                         daily_credits_used, daily_credits_reset_day, is_banned,
-                        preferred_gender, preferred_country
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        preferred_gender, preferred_country,
+                        votes_up, votes_down, reports_count, feedback_track, report_log
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb)
                     ON CONFLICT (user_id) DO UPDATE SET
                         severity_score = COALESCE(EXCLUDED.severity_score, user_profiles.severity_score),
                         restricted_until = EXCLUDED.restricted_until,
@@ -236,7 +279,20 @@ async def upsert_user(user_id: int, **kwargs):
                         daily_credits_reset_day = COALESCE(EXCLUDED.daily_credits_reset_day, user_profiles.daily_credits_reset_day),
                         is_banned = COALESCE(EXCLUDED.is_banned, user_profiles.is_banned),
                         preferred_gender = COALESCE(EXCLUDED.preferred_gender, user_profiles.preferred_gender),
-                        preferred_country = COALESCE(EXCLUDED.preferred_country, user_profiles.preferred_country);
+                        preferred_country = COALESCE(EXCLUDED.preferred_country, user_profiles.preferred_country),
+                        votes_up = GREATEST(COALESCE(EXCLUDED.votes_up, 0), user_profiles.votes_up),
+                        votes_down = GREATEST(COALESCE(EXCLUDED.votes_down, 0), user_profiles.votes_down),
+                        reports_count = GREATEST(COALESCE(EXCLUDED.reports_count, 0), user_profiles.reports_count),
+                        feedback_track = CASE 
+                            WHEN EXCLUDED.feedback_track IS NOT NULL AND EXCLUDED.feedback_track != '{}'::jsonb 
+                            THEN EXCLUDED.feedback_track 
+                            ELSE user_profiles.feedback_track 
+                        END,
+                        report_log = CASE 
+                            WHEN EXCLUDED.report_log IS NOT NULL AND EXCLUDED.report_log != '[]'::jsonb 
+                            THEN EXCLUDED.report_log 
+                            ELSE user_profiles.report_log 
+                        END;
                 """, (
                     user_id,
                     kwargs.get("severity_score", 0),
@@ -247,6 +303,11 @@ async def upsert_user(user_id: int, **kwargs):
                     kwargs.get("is_banned", False),
                     kwargs.get("pref_gender", "ANY"),
                     kwargs.get("pref_country", "ANY"),
+                    v_up,
+                    v_down,
+                    rep_count,
+                    fb_track_json,
+                    rep_log_json,
                 ))
     except Exception as e:
         logger.warning(f"upsert_user({user_id}) error: {e}")
@@ -496,14 +557,7 @@ async def get_active_sessions_db() -> List[Tuple[str, int, int]]:
                     return [(str(r[0]), int(r[1]), int(r[2])) for r in rows]
 
             # Fallback to legacy table partner_id if available
-            cur = await conn.execute("""
-                SELECT CASE 
-                    WHEN (to_regclass('user_details') IS NOT NULL) THEN 'user_details'
-                    WHEN (to_regclass('legacy_user_details_backup') IS NOT NULL) THEN 'legacy_user_details_backup'
-                    ELSE NULL
-                END;
-            """)
-            tbl = (await cur.fetchone())[0]
+            tbl = await _get_legacy_table_name(conn)
             if tbl:
                 cur = await conn.execute(f"""
                     SELECT user_id, partner_id FROM {tbl} 
@@ -789,25 +843,55 @@ async def save_user_data(data: dict, dirty_user: set):
                 dirty_user.add(uid)
 
 
+async def _get_legacy_table_name(conn) -> Optional[str]:
+    """Resolves whether legacy table is named legacy_user_details_backup or user_details with records."""
+    for candidate in ("legacy_user_details_backup", "user_details"):
+        try:
+            cur = await conn.execute(f"SELECT (to_regclass('{candidate}') IS NOT NULL);")
+            if (await cur.fetchone())[0]:
+                cur = await conn.execute(f"SELECT COUNT(*) FROM {candidate};")
+                if (await cur.fetchone())[0] > 0:
+                    return candidate
+        except Exception:
+            continue
+    return None
+
+
 async def _get_legacy_user(conn, user_id: int) -> Optional[Dict[str, Any]]:
     try:
-        cur = await conn.execute("""
-            SELECT CASE 
-                WHEN (to_regclass('user_details') IS NOT NULL) THEN 'user_details'
-                WHEN (to_regclass('legacy_user_details_backup') IS NOT NULL) THEN 'legacy_user_details_backup'
-                ELSE NULL
-            END;
-        """)
-        tbl = (await cur.fetchone())[0]
+        tbl = await _get_legacy_table_name(conn)
         if not tbl:
             return None
         cur = await conn.execute(f"""
             SELECT user_id, gender, age, country, preferences, points,
-                   subscription_tier, subscription_expires
+                   subscription_tier, subscription_expires,
+                   COALESCE(vote_up, 0) as vote_up,
+                   COALESCE(vote_down, 0) as vote_down,
+                   COALESCE(reports, 0) as reports,
+                   feedback_track,
+                   report_log
             FROM {tbl} WHERE user_id = %s;
         """, (user_id,))
         r = await cur.fetchone()
         if r:
+            fb = r[11]
+            if isinstance(fb, str):
+                try:
+                    fb = json.loads(fb)
+                except Exception:
+                    fb = {}
+            elif not isinstance(fb, dict):
+                fb = {}
+
+            rep_log = r[12]
+            if isinstance(rep_log, str):
+                try:
+                    rep_log = json.loads(rep_log)
+                except Exception:
+                    rep_log = []
+            elif not isinstance(rep_log, list):
+                rep_log = []
+
             return {
                 "user_id": r[0],
                 "gender": r[1],
@@ -820,7 +904,11 @@ async def _get_legacy_user(conn, user_id: int) -> Optional[Dict[str, Any]]:
                 "pref_gender": "ANY",
                 "pref_country": "ANY",
                 "partner_id": None,
-                "blocked_users": {}
+                "blocked_users": {},
+                "votes": {"up": r[8], "down": r[9]},
+                "reports": r[10],
+                "feedback_track": fb,
+                "report_log": rep_log,
             }
     except Exception as e:
         logger.warning(f"_get_legacy_user error: {e}")
@@ -830,20 +918,39 @@ async def _get_legacy_user(conn, user_id: int) -> Optional[Dict[str, Any]]:
 async def _load_legacy_user_data(conn) -> dict:
     data = {}
     try:
-        cur = await conn.execute("""
-            SELECT CASE 
-                WHEN (to_regclass('user_details') IS NOT NULL) THEN 'user_details'
-                WHEN (to_regclass('legacy_user_details_backup') IS NOT NULL) THEN 'legacy_user_details_backup'
-                ELSE NULL
-            END;
-        """)
-        tbl = (await cur.fetchone())[0]
+        tbl = await _get_legacy_table_name(conn)
         if not tbl:
             return {}
-        cur = await conn.execute(f"SELECT user_id, gender, age, country, preferences, points FROM {tbl};")
+        cur = await conn.execute(f"""
+            SELECT user_id, gender, age, country, preferences, points,
+                   COALESCE(vote_up, 0) as vote_up,
+                   COALESCE(vote_down, 0) as vote_down,
+                   COALESCE(reports, 0) as reports,
+                   feedback_track,
+                   report_log
+            FROM {tbl};
+        """)
         rows = await cur.fetchall()
         for r in rows:
             uid = r[0]
+            fb = r[9]
+            if isinstance(fb, str):
+                try:
+                    fb = json.loads(fb)
+                except Exception:
+                    fb = {}
+            elif not isinstance(fb, dict):
+                fb = {}
+
+            rep_log = r[10]
+            if isinstance(rep_log, str):
+                try:
+                    rep_log = json.loads(rep_log)
+                except Exception:
+                    rep_log = []
+            elif not isinstance(rep_log, list):
+                rep_log = []
+
             data[uid] = {
                 "gender": r[1],
                 "age": r[2],
@@ -853,7 +960,11 @@ async def _load_legacy_user_data(conn) -> dict:
                 "pref_gender": "ANY",
                 "pref_country": "ANY",
                 "partner_id": None,
-                "blocked_users": {}
+                "blocked_users": {},
+                "votes": {"up": r[6], "down": r[7]},
+                "reports": r[8],
+                "feedback_track": fb,
+                "report_log": rep_log,
             }
         logger.info(f"Loaded {len(data)} legacy user records from {tbl} as fallback.")
     except Exception as e:
@@ -885,9 +996,26 @@ async def load_user_data() -> dict:
                 query = """
                     SELECT u.user_id, u.gender, u.age, u.country, u.preferences_bitmask as preferences, u.points,
                            COALESCE(p.preferred_gender, 'ANY') as pref_gender,
-                           COALESCE(p.preferred_country, 'ANY') as pref_country
+                           COALESCE(p.preferred_country, 'ANY') as pref_country,
+                           GREATEST(COALESCE(p.votes_up, 0), COALESCE(r_up.votes_up, 0)) as votes_up,
+                           GREATEST(COALESCE(p.votes_down, 0), COALESCE(r_down.votes_down, 0)) as votes_down,
+                           GREATEST(COALESCE(p.reports_count, 0), COALESCE(rep.reports_count, 0)) as reports_count,
+                           COALESCE(p.feedback_track, '{}'::jsonb) as feedback_track,
+                           COALESCE(p.report_log, '[]'::jsonb) as report_log
                     FROM users u
                     LEFT JOIN user_profiles p ON u.user_id = p.user_id
+                    LEFT JOIN (
+                        SELECT target_id, COUNT(*) as votes_up 
+                        FROM user_ratings WHERE vote_type = 'up' GROUP BY target_id
+                    ) r_up ON u.user_id = r_up.target_id
+                    LEFT JOIN (
+                        SELECT target_id, COUNT(*) as votes_down 
+                        FROM user_ratings WHERE vote_type = 'down' GROUP BY target_id
+                    ) r_down ON u.user_id = r_down.target_id
+                    LEFT JOIN (
+                        SELECT target_id, COUNT(*) as reports_count 
+                        FROM user_reports GROUP BY target_id
+                    ) rep ON u.user_id = rep.target_id
                     ORDER BY u.updated_at DESC
                     LIMIT 50000;
                 """
@@ -896,6 +1024,24 @@ async def load_user_data() -> dict:
                     rows = await cur.fetchall()
                     for r in rows:
                         uid = r["user_id"]
+                        fb = r.get("feedback_track")
+                        if isinstance(fb, str):
+                            try:
+                                fb = json.loads(fb)
+                            except Exception:
+                                fb = {}
+                        elif not isinstance(fb, dict):
+                            fb = {}
+
+                        rep_log = r.get("report_log")
+                        if isinstance(rep_log, str):
+                            try:
+                                rep_log = json.loads(rep_log)
+                            except Exception:
+                                rep_log = []
+                        elif not isinstance(rep_log, list):
+                            rep_log = []
+
                         data[uid] = {
                             "gender": r["gender"],
                             "age": r["age"],
@@ -905,7 +1051,11 @@ async def load_user_data() -> dict:
                             "pref_gender": r.get("pref_gender", "ANY"),
                             "pref_country": r.get("pref_country", "ANY"),
                             "partner_id": None,
-                            "blocked_users": {}
+                            "blocked_users": {},
+                            "votes": {"up": r.get("votes_up", 0), "down": r.get("votes_down", 0)},
+                            "reports": r.get("reports_count", 0),
+                            "feedback_track": fb,
+                            "report_log": rep_log,
                         }
             else:
                 data = await _load_legacy_user_data(conn)

@@ -79,3 +79,48 @@ async def test_check_user_profile_preserves_existing_user(monkeypatch):
     assert init.user_details[user_id]["age"] == 25
     assert init.user_details[user_id]["country"] == "Germany"
 
+
+@pytest.mark.asyncio
+async def test_legacy_user_votes_and_reports_structure(monkeypatch):
+    """Verify legacy user extraction extracts votes, reports, feedback_track, and report_log."""
+    from saveNload import _get_legacy_user
+    from unittest.mock import AsyncMock, MagicMock
+    import json
+
+    mock_conn = MagicMock()
+    # Mock _get_legacy_table_name to return 'legacy_user_details_backup'
+    monkeypatch.setattr("saveNload._get_legacy_table_name", AsyncMock(return_value="legacy_user_details_backup"))
+
+    mock_row = (
+        12345, "F", 22, "Canada", 3, 50, "pro", 1700000000,
+        15,  # vote_up
+        2,   # vote_down
+        4,   # reports
+        json.dumps({"999": {"voted": True, "reported": False}}),
+        json.dumps([{"reporter": 888, "reason": "spam", "weight": 1, "timestamp": 1690000000}])
+    )
+
+    mock_cur = MagicMock()
+    mock_cur.fetchone = AsyncMock(return_value=mock_row)
+    mock_conn.execute = AsyncMock(return_value=mock_cur)
+
+    user = await _get_legacy_user(mock_conn, 12345)
+    assert user is not None
+    assert user["user_id"] == 12345
+    assert user["gender"] == "F"
+    assert user["votes"] == {"up": 15, "down": 2}
+    assert user["reports"] == 4
+    assert user["feedback_track"] == {"999": {"voted": True, "reported": False}}
+    assert len(user["report_log"]) == 1
+    assert user["report_log"][0]["reason"] == "spam"
+
+
+def test_noisy_loggers_silenced():
+    """Verify that APScheduler, httpx, and telegram loggers are configured to WARNING."""
+    import logging
+    import main  # Trigger logger level configurations
+
+    for name in ("httpx", "httpcore", "apscheduler", "apscheduler.scheduler", "apscheduler.executors.default", "telegram"):
+        assert logging.getLogger(name).level >= logging.WARNING
+
+

@@ -36,7 +36,12 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     daily_credits_reset_day DATE NOT NULL DEFAULT CURRENT_DATE,
     is_banned BOOLEAN NOT NULL DEFAULT FALSE,
     preferred_gender VARCHAR(8) NOT NULL DEFAULT 'ANY',
-    preferred_country VARCHAR(64) NOT NULL DEFAULT 'ANY'
+    preferred_country VARCHAR(64) NOT NULL DEFAULT 'ANY',
+    votes_up INTEGER NOT NULL DEFAULT 0,
+    votes_down INTEGER NOT NULL DEFAULT 0,
+    reports_count INTEGER NOT NULL DEFAULT 0,
+    feedback_track JSONB NOT NULL DEFAULT '{}'::jsonb,
+    report_log JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
 -- User Blocks (M:N between users)
@@ -180,44 +185,35 @@ async def run_migrations(conn: AsyncConnection):
     # 1. Ensure target tables exist
     await conn.execute(CREATE_TABLES_SQL)
 
-    # Ensure preferred_gender and preferred_country exist on user_profiles (for existing installs)
+    # Ensure profile columns exist on user_profiles (for existing installs)
     await conn.execute("""
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_gender VARCHAR(8) DEFAULT 'ANY';
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_country VARCHAR(64) DEFAULT 'ANY';
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS votes_up INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS votes_down INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS reports_count INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS feedback_track JSONB NOT NULL DEFAULT '{}'::jsonb;
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS report_log JSONB NOT NULL DEFAULT '[]'::jsonb;
     """)
 
-    # 2. Check if legacy user_details table exists (either user_details or legacy_user_details_backup)
-    cur = await conn.execute("""
-        SELECT 
-            (to_regclass('user_details') IS NOT NULL) OR 
-            (to_regclass('public.user_details') IS NOT NULL) OR 
-            EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'user_details');
-    """)
-    legacy_exists = (await cur.fetchone())[0]
-    legacy_tbl = "user_details"
-
-    if not legacy_exists:
-        cur = await conn.execute("""
-            SELECT 
-                (to_regclass('legacy_user_details_backup') IS NOT NULL) OR 
-                (to_regclass('public.legacy_user_details_backup') IS NOT NULL) OR 
-                EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'legacy_user_details_backup');
-        """)
+    # 2. Check for legacy tables (works seamlessly whether named 'legacy_user_details_backup' or 'user_details')
+    legacy_candidates = []
+    for candidate in ('legacy_user_details_backup', 'user_details'):
+        cur = await conn.execute(f"SELECT (to_regclass('{candidate}') IS NOT NULL);")
         if (await cur.fetchone())[0]:
-            legacy_exists = True
-            legacy_tbl = "legacy_user_details_backup"
+            cur = await conn.execute(f"SELECT COUNT(*) FROM {candidate};")
+            count = (await cur.fetchone())[0]
+            if count > 0:
+                legacy_candidates.append((candidate, count))
 
-    if not legacy_exists:
-        logger.info("No legacy user_details table found. Schema is clean.")
+    if not legacy_candidates:
+        logger.info("No legacy tables with records found. Schema is clean.")
         return
 
-    # Check if legacy table has records
-    cur = await conn.execute(f"SELECT COUNT(*) FROM {legacy_tbl};")
-    row_count = (await cur.fetchone())[0]
-    logger.info(f"Found legacy {legacy_tbl} table with {row_count} records. Starting migration...")
+    for legacy_tbl, row_count in legacy_candidates:
+        logger.info(f"Found legacy table '{legacy_tbl}' with {row_count} records. Starting complete migration...")
 
-    if row_count > 0:
-        # 3. Migrate users core data
+        # 3. Migrate core user records
         await conn.execute(f"""
             INSERT INTO users (user_id, gender, age, country, preferences_bitmask, points)
             SELECT 
@@ -233,14 +229,15 @@ async def run_migrations(conn: AsyncConnection):
                 age = COALESCE(EXCLUDED.age, users.age),
                 country = COALESCE(EXCLUDED.country, users.country),
                 preferences_bitmask = COALESCE(EXCLUDED.preferences_bitmask, users.preferences_bitmask),
-                points = COALESCE(EXCLUDED.points, users.points);
+                points = GREATEST(COALESCE(EXCLUDED.points, 0), users.points);
         """)
 
-        # 4. Migrate user profiles & moderation
+        # 4. Migrate user profiles, moderation state, votes, and reports count
         await conn.execute(f"""
             INSERT INTO user_profiles (
                 user_id, severity_score, restricted_until, restriction_reason,
-                last_severity_decay, daily_credits_used, daily_credits_reset_day, is_banned
+                last_severity_decay, daily_credits_used, daily_credits_reset_day, is_banned,
+                votes_up, votes_down, reports_count, feedback_track, report_log
             )
             SELECT 
                 user_id,
@@ -254,7 +251,14 @@ async def run_migrations(conn: AsyncConnection):
                 CASE WHEN daily_credits_reset_day ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}$' 
                      THEN daily_credits_reset_day::DATE ELSE CURRENT_DATE END,
                 CASE WHEN restricted_until IS NOT NULL AND restricted_until > 2000000000 
-                     THEN TRUE ELSE FALSE END
+                     THEN TRUE ELSE FALSE END,
+                COALESCE(vote_up, 0),
+                COALESCE(vote_down, 0),
+                COALESCE(reports, 0),
+                CASE WHEN feedback_track IS NOT NULL AND jsonb_typeof(feedback_track::jsonb) = 'object' 
+                     THEN feedback_track::jsonb ELSE '{{}}'::jsonb END,
+                CASE WHEN report_log IS NOT NULL AND jsonb_typeof(report_log::jsonb) = 'array'
+                     THEN report_log::jsonb ELSE '[]'::jsonb END
             FROM {legacy_tbl}
             ON CONFLICT (user_id) DO UPDATE SET
                 severity_score = EXCLUDED.severity_score,
@@ -263,10 +267,23 @@ async def run_migrations(conn: AsyncConnection):
                 last_severity_decay = EXCLUDED.last_severity_decay,
                 daily_credits_used = EXCLUDED.daily_credits_used,
                 daily_credits_reset_day = EXCLUDED.daily_credits_reset_day,
-                is_banned = EXCLUDED.is_banned;
+                is_banned = EXCLUDED.is_banned,
+                votes_up = GREATEST(COALESCE(EXCLUDED.votes_up, 0), user_profiles.votes_up),
+                votes_down = GREATEST(COALESCE(EXCLUDED.votes_down, 0), user_profiles.votes_down),
+                reports_count = GREATEST(COALESCE(EXCLUDED.reports_count, 0), user_profiles.reports_count),
+                feedback_track = CASE 
+                    WHEN user_profiles.feedback_track IS NULL OR user_profiles.feedback_track = '{{}}'::jsonb 
+                    THEN EXCLUDED.feedback_track 
+                    ELSE user_profiles.feedback_track 
+                END,
+                report_log = CASE 
+                    WHEN user_profiles.report_log IS NULL OR user_profiles.report_log = '[]'::jsonb 
+                    THEN EXCLUDED.report_log 
+                    ELSE user_profiles.report_log 
+                END;
         """)
 
-        # 5. Migrate subscriptions (isolated try/except so optional fields don't block user profile)
+        # 5. Migrate subscriptions
         try:
             await conn.execute(f"""
                 INSERT INTO subscriptions (user_id, tier, starts_at, expires_at, source, is_active)
@@ -302,7 +319,7 @@ async def run_migrations(conn: AsyncConnection):
         except Exception as e:
             logger.warning(f"Referrals legacy migration notice: {e}")
 
-        # 7. Migrate report logs from JSONB
+        # 7. Migrate detailed report logs into user_reports audit table (safely without duplicates)
         try:
             await conn.execute(f"""
                 INSERT INTO user_reports (reporter_id, target_id, reason_code, weight, created_at)
@@ -313,24 +330,43 @@ async def run_migrations(conn: AsyncConnection):
                     COALESCE((elem->>'weight')::INTEGER, 1),
                     to_timestamp(COALESCE((elem->>'timestamp')::DOUBLE PRECISION, EXTRACT(EPOCH FROM NOW())))
                 FROM {legacy_tbl} u,
-                     jsonb_array_elements(u.report_log) AS elem
+                     jsonb_array_elements(u.report_log::jsonb) AS elem
                 WHERE u.report_log IS NOT NULL 
-                  AND jsonb_typeof(u.report_log) = 'array'
+                  AND jsonb_typeof(u.report_log::jsonb) = 'array'
                   AND (elem->>'reporter') IS NOT NULL
-                  AND (elem->>'reporter')::BIGINT IN (SELECT user_id FROM users);
+                  AND (elem->>'reporter')::BIGINT IN (SELECT user_id FROM users)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM user_reports ur 
+                      WHERE ur.reporter_id = (elem->>'reporter')::BIGINT 
+                        AND ur.target_id = u.user_id
+                  );
             """)
         except Exception as e:
             logger.warning(f"Report logs legacy migration notice: {e}")
 
-        logger.info("Successfully migrated all legacy data into normalized tables.")
-
-    # 8. Safely rename old table to preserve as backup if still named user_details
-    if legacy_tbl == "user_details":
+        # 8. Migrate active chat sessions from partner_id
         try:
-            cur = await conn.execute("SELECT (to_regclass('legacy_user_details_backup') IS NOT NULL);")
-            backup_exists = (await cur.fetchone())[0]
-            if not backup_exists:
-                await conn.execute("ALTER TABLE IF EXISTS user_details RENAME TO legacy_user_details_backup;")
-                logger.info("Renamed user_details to legacy_user_details_backup.")
+            await conn.execute(f"""
+                INSERT INTO chat_sessions (id, user1_id, user2_id, status, started_at)
+                SELECT 
+                    gen_random_uuid(),
+                    user_id,
+                    partner_id,
+                    'active',
+                    NOW()
+                FROM {legacy_tbl}
+                WHERE partner_id IS NOT NULL 
+                  AND partner_id > 0
+                  AND user_id < partner_id
+                  AND partner_id IN (SELECT user_id FROM users)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM chat_sessions cs 
+                      WHERE cs.status = 'active' 
+                        AND ((cs.user1_id = {legacy_tbl}.user_id AND cs.user2_id = {legacy_tbl}.partner_id)
+                          OR (cs.user1_id = {legacy_tbl}.partner_id AND cs.user2_id = {legacy_tbl}.user_id))
+                  );
+            """)
         except Exception as e:
-            logger.warning(f"Table rename notice: {e}")
+            logger.warning(f"Chat sessions legacy migration notice: {e}")
+
+        logger.info(f"Successfully migrated all data from '{legacy_tbl}'.")

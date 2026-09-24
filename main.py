@@ -55,6 +55,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Silence noisy background libraries so console logs remain clean and focused
+for _noisy in (
+    "httpx", "httpcore", "apscheduler", "apscheduler.scheduler",
+    "apscheduler.executors.default", "telegram", "telegram.ext",
+    "telegram.ext.Application", "werkzeug"
+):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
 
 async def set_commands(application):
     commands = [
@@ -118,6 +126,11 @@ async def on_startup(application):
     application.job_queue.run_repeating(periodic_severity_decay, interval=86400, first=3600)
     application.job_queue.run_repeating(periodic_queue_sweep, interval=5, first=5)
     application.job_queue.run_repeating(periodic_media_sweep, interval=3600, first=3600)
+
+    active_chats_count = len(init.active_pairs) // 2
+    users_count = len(init.user_details)
+    print(f"🚀 Bot is active. {users_count} active users, {active_chats_count} active chats.", flush=True)
+    logger.info(f"🚀 Bot is active. {users_count} active users, {active_chats_count} active chats.")
 
 
 async def post_init_tasks(application):
