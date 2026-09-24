@@ -1,6 +1,9 @@
 import time
+import logging
 
 import init
+
+logger = logging.getLogger(__name__)
 
 FREE_DAILY_CREDIT_LIMIT = 32
 
@@ -11,6 +14,7 @@ TIERS = {
         "limit_bonus": 16,
         "stars": 20,
         "bonus_points": 40,
+        "priority": 1,
     },
     "weekly": {
         "label": "Weekly",
@@ -18,6 +22,7 @@ TIERS = {
         "limit_bonus": 32,
         "stars": 70,
         "bonus_points": 150,
+        "priority": 2,
     },
     "monthly": {
         "label": "Monthly",
@@ -25,6 +30,7 @@ TIERS = {
         "limit_bonus": 48,
         "stars": 150,
         "bonus_points": 400,
+        "priority": 3,
     },
     "yearly": {
         "label": "Yearly",
@@ -32,6 +38,7 @@ TIERS = {
         "limit_bonus": 64,
         "stars": 999,
         "bonus_points": 3000,
+        "priority": 4,
     },
 }
 
@@ -40,8 +47,7 @@ TIER_ORDER = ["daily", "weekly", "monthly", "yearly"]
 
 def _details(user_id: int) -> dict:
     if user_id not in init.user_details:
-        from init import _default_user
-        init.user_details[user_id] = _default_user()
+        init.user_details[user_id] = init._default_user()
     return init.user_details[user_id]
 
 
@@ -86,21 +92,36 @@ def has_daily_credit(user_id: int) -> bool:
 
 
 def grant_subscription(user_id: int, tier_key: str, source: str = "purchase") -> float:
+    """
+    Grants or extends a subscription.
+    Guarantees no accidental tier downgrading when adding shorter plans to a higher plan.
+    """
     if tier_key not in TIERS:
         raise ValueError(f"Unknown subscription tier: {tier_key}")
 
-    tier = TIERS[tier_key]
+    new_tier_info = TIERS[tier_key]
     details = _details(user_id)
 
     now = time.time()
     current_expiry = details.get("subscription_expires") or 0
+    current_tier_key = details.get("subscription_tier")
+
     base = current_expiry if current_expiry > now else now
-    new_expiry = base + tier["duration_days"] * 86400
+    new_expiry = base + new_tier_info["duration_days"] * 86400
 
     details["subscription_expires"] = new_expiry
-    details["subscription_tier"] = tier_key
-    details["points"] = details.get("points", 0) + tier["bonus_points"]
 
+    # Prevent tier downgrade: keep higher priority tier if currently active
+    if current_tier_key in TIERS and current_expiry > now:
+        current_priority = TIERS[current_tier_key].get("priority", 0)
+        new_priority = new_tier_info.get("priority", 0)
+        if new_priority >= current_priority:
+            details["subscription_tier"] = tier_key
+        # else retain current_tier_key
+    else:
+        details["subscription_tier"] = tier_key
+
+    details["points"] = details.get("points", 0) + new_tier_info["bonus_points"]
     init.dirty_users.add(user_id)
     return new_expiry
 

@@ -1,167 +1,290 @@
-# 💬 AnonChatZoneBot
+# 💬 AnonChatZoneBot (v2.0 Scalable Architecture)
 
-An anonymous chat bot for Telegram that pairs strangers — by shared interests when possible — for real-time private conversations, with moderation, Privacy Mode media, mini-games, and an optional Stars subscription for power users.
-
----
-
-## How It Works
-
-Users start the bot, set up a quick profile (gender, age, country, and optional interest tags), then use `/find` to enter a waiting queue. The bot pairs them up — preferring someone who shares interests — and relays messages between them in real time. Neither user ever sees the other's Telegram ID or username.
+An enterprise-ready, anonymous chat bot for Telegram engineered to handle **500,000+ users** with high concurrency, transactional PostgreSQL storage (3NF baseline), robust matchmaking, silent chat preservation, multi-layer ban/block enforcement, data-driven mini-games, and a sponsors/promotions engine.
 
 ---
 
-## Features
+## 🌟 Key Capabilities & Upgrades
 
-- **Interest-based matching** — pick tags (Gaming, Anime, Flirting, Music, Movies, Sports, Memes, Relationships, Study, Politics) and `/find` tries to pair you with someone who shares them, falling back to FIFO after a short grace period so nobody waits forever.
-- **Full-duplex message relay** — text, stickers, photos, videos, GIFs, voice notes, video notes, and emoji reactions all relay live between partners.
-- **Mini-games** — play Coin Steal, Tic Tac Toe, Rock Paper Scissors, Guess It, or Would You Rather with your partner via `/games`.
-- **Privacy Mode media** — a subscriber perk. Photos/videos/voice/video notes sent while paired relay normally by default; captioning the media `/private` (or sending a bare `/private` first, then the media within 5 minutes) sends it with forward/save protection instead, and the bot deletes its own copy shortly after your partner opens it.
-- **Daily credit system** — every account gets a shared daily pool of credits (reset at midnight UTC) that covers `/next` skips for everyone and photo/video/voice/video note sends for free-tier users. Subscribers get a larger pool and send all media free of charge.
-- **Stars subscriptions** — `/subscribe` sells Daily/Weekly/Monthly/Yearly plans via native Telegram Stars payments, granting a higher daily credit limit, unlimited free media sends, Privacy Mode access, seeing your partner's age/gender/country on match, and bonus in-bot points.
-- **Referral program** — grab your personal invite link anytime from the 🔗 button on `/profile`. When an admin-configured promo is running, getting enough friends to join through it and finish setting up their profile earns you a free subscription, repeatable each time you clear the threshold — the bot occasionally mentions this right after a chat ends, too.
-- **Severity-based moderation** — reports ask *why*, each reason carries a weight, and crossing a threshold auto-restricts the offender for a duration scaled to severity (0–10) — no admin has to be paged for every report. Admins can also manually `/ban`, `/unban`, and `/checkuser`.
-- **Admins can't be restricted, ever** — not manually, not automatically, not even by themselves.
-- **Full lockout while restricted** — a restricted user can't run any command, tap any button, or send any message until their restriction expires or an admin lifts it.
-- **Consistent profile editing** — editing your gender, age, country, or interests from `/profile` always drops you back into the profile menu afterward.
-- **HTML formatting everywhere** — every message the bot sends uses Telegram's HTML parse mode, and anything derived from user input (report reasons, ban reasons, etc.) is escaped before being sent.
+1. **Silent Chat Guarantee**:
+   - **Silence ≠ Disconnection**: Two users who remain silent in an active chat will stay connected indefinitely. Inactivity timers are eliminated.
+   - Genuine transport disconnects (e.g. user blocking the bot in Telegram) are caught proactively via `TelegramError` (`Forbidden`) and cleanly terminated without ghost sessions or crashes.
+2. **PostgreSQL 3NF Database & Data Migration**:
+   - Redesigned from a monolithic text table (`user_details`) into normalized 3NF relational tables (`users`, `user_profiles`, `user_blocks`, `user_reports`, `user_ratings`, `chat_sessions`, `subscriptions`, `payment_transactions`, `referrals`, `bot_config`, `promotions`, `game_questions`).
+   - Atomic zero-data-loss migration module (`migrations.py`) that safely migrates legacy user records into normalized tables and preserves legacy tables as `legacy_user_details_backup`.
+   - Sized `AsyncConnectionPool` (`DB_POOL_MIN=5`, `DB_POOL_MAX=30`) preventing connection starvation under high concurrency.
+3. **Multi-Layer Ban & Block Enforcement**:
+   - Banned or blocked users can never enter the waiting queue, remain in queue, or be matched.
+   - Enforced at 4 separate layers: (1) Queue entry, (2) Real-time restriction triggers, (3) Candidate filtering during matching, and (4) Pre-match atomic check.
+   - Dynamic user-to-user blocking via `/block` or post-chat inline buttons (`rateblock|<id>`) with 24-hour block duration (blocks automatically expire after 24 hours).
+4. **Scalability for 500,000+ Users**:
+   - No O(N) memory scans at startup or on timer ticks. Daily severity score decay is computed in O(1) inside PostgreSQL via `UPDATE ... RETURNING`.
+   - Thread-safe matchmaking using `asyncio.Lock` preventing duplicate matches or race conditions.
+   - In-memory working cache with dirty-tracking flushing to PostgreSQL via parameterized batch operations.
+5. **Data-Driven Games Engine**:
+   - **Would You Rather**: Extracted from hardcoded arrays into data-driven JSON / database content (`games/content/wyr_questions.json` & `game_questions` table) supporting categories (General, Deep, Fun, Dating, Moral) and dynamic random selection.
+   - **Trivia Duel (New Game)**: 5-round interactive multiplayer trivia battle with instant scoring, multiple choice options, and clean forfeit handling.
+   - Extensible base game framework decoupled from the core chat relay.
+6. **Sponsors & Promotions Engine**:
+   - Native campaign system supporting priority scheduling, configurable display frequency, cooldowns, impressions, and click tracking.
+   - Non-intrusive post-chat promo delivery with inline URL buttons.
+   - Full admin control via `/campaign` command (add, pause, activate, delete, stats).
+7. **Production Observability & Security**:
+   - Health check HTTP endpoint (`GET /health`) with live metrics (active sessions, queue size, pool status, uptime).
+   - Anti-spam per-user rate limiting token bucket.
+   - OWNER error alert throttling (max 1 notification per 15s) preventing Telegram flood/ban during API issues.
+   - HTML injection immunity and 100% parameterized SQL queries.
 
 ---
 
-## Project Structure
+## 🏗️ Project Architecture
 
 ```
 AnonChatZoneBot/
-├── main.py                     # App entry point, handler wiring, periodic jobs
-├── app.py                      # Flask keep-alive server (for cloud deployment)
-├── init.py                     # Global state: queue, active pairs, user details, preference tags
-├── relay.py                    # Message relay + Privacy Mode media interception
-├── matchmaking.py              # Interest-aware pairing + FIFO fallback sweep
-├── moderation.py                # Report reasons, severity scoring, ban/restrict logic
-├── media_privacy.py             # Privacy Mode media flow
-├── subscription.py             # Stars subscription tiers, daily credit limits
-├── referral.py                  # Referral scheme, link generation, crediting & rewards
-├── saveNload.py                # PostgreSQL save/load layer
-├── security.py                 # Safe Telegram API wrapper, restriction gate, error handler
+├── main.py                     # Bot startup, lifecycle hooks, and periodic jobs
+├── app.py                      # Flask server + GET /health endpoint for cloud monitoring
+├── init.py                     # Global state, queue primitives, bitmask interest definitions
+├── migrations.py               # 3NF PostgreSQL DDL, composite indexes, and data migration
+├── saveNload.py                # Transactional DB operations & connection pool (AsyncConnectionPool)
+├── session_manager.py          # Chat session lifecycle, silent chat preservation, transport drops
+├── matchmaking.py              # Interest-based pairing, FIFO sweep, multi-layer ban/block filter
+├── relay.py                    # Message relay with rate-limiting, dice, and Privacy Mode media
+├── moderation.py                # Severity scoring, auto-restriction, eviction triggers, SQL decay
+├── media_privacy.py             # Atomic view-once media revelation
+├── subscription.py             # Telegram Stars subscriptions, tier stacking, atomic credit consumption
+├── referral.py                  # Referral scheme with multi-tier reward accumulation
+├── security.py                 # Rate limiting, throttled error reporter, safe Telegram API call wrapper
 │
 ├── commands/
 │   ├── start.py / find.py / next.py / stop.py / cancel.py / help.py / profile.py / games.py
-│   └── admin_commands.py       # /broadcast, /connect, /ban, /unban, /checkuser, /giveaway
+│   ├── block.py                # User-to-user blocking command (/block)
+│   ├── nudge.py                # Partner presence ping (/nudge) and status checker (/status)
+│   └── admin_commands.py       # /broadcast, /connect, /ban, /unban, /checkuser, /giveaway, /stats, /queue, /campaign
 │
 ├── handlers/
-│   ├── setup.py                # New user onboarding flow (decorator + handler)
+│   ├── setup.py                # Profile onboarding flow
 │   ├── gender.py / country.py / edit.py
 │   ├── preferences.py          # Interest tag toggle menu (bitmask storage)
-│   ├── payments.py             # Pre-checkout + successful payment handlers (Telegram Stars)
-│   └── rating.py               # Post-chat rating + reason-based reporting
+│   ├── payments.py             # Telegram Stars invoice & pre-checkout handlers
+│   └── rating.py               # Post-chat rating, reason-based reporting, and instant blocking
 │
 ├── games/
-│   ├── registry.py             # Tracks which game each user is in, for cleanup on disconnect
-│   ├── game_requests.py        # Generic request/accept/decline flow for all games
-│   └── coin_steal.py / tictactoe.py / rps.py / guess_it.py / would_you_rather.py
+│   ├── registry.py             # Active game registry & disconnect teardown
+│   ├── game_requests.py        # Generic request/accept/decline challenge flow with TTL
+│   ├── would_you_rather.py     # Data-driven Would You Rather engine
+│   ├── trivia.py               # 5-Round Trivia Duel mini-game engine
+│   ├── coin_steal.py / tictactoe.py / rps.py / guess_it.py
+│   └── content/
+│       ├── content_manager.py  # Content loader from JSON seed files & PostgreSQL
+│       ├── wyr_questions.json  # Seed questions for Would You Rather
+│       └── trivia_questions.json # Seed questions for Trivia Duel
 │
-├── tests/                      # Lightweight import + logic sanity checks (no live bot/DB needed)
-├── requirements.txt
-└── Procfile
+├── promotions/
+│   └── service.py              # Campaign engine, cooldowns, impressions, and post-chat delivery
+│
+├── tests/                      # Automated test suite (pytest + pytest-asyncio)
+│   ├── test_database.py        # DDL & constraint verification
+│   ├── test_matchmaking.py     # Concurrent matchmaking, bans, blocks, and fairness
+│   ├── test_sessions.py        # Silent chat preservation, transport drops, duplicate prevention
+│   ├── test_moderation.py      # Severity scoring, auto-escalation, admin immunity
+│   ├── test_games.py           # Would You Rather & Trivia Duel question loading and state
+│   ├── test_promotions.py      # Campaign cooldowns, impressions, and display logic
+│   ├── test_security.py        # Rate limiting, anti-spam, HTML escaping, subscription stacking
+│   └── test_presence.py        # Nudge, status command, and official channel broadcast tests
+│
+├── requirements.txt            # Pinned production dependencies
+└── Procfile                    # Deployment process configuration
 ```
 
 ---
 
-## Configuration
+## 🗄️ Database Schema (3NF Baseline)
 
-| Variable | Required | Description |
-|---|---|---|
-| `BOT_TOKEN` | ✅ | Telegram bot token from BotFather |
-| `OWNER` | ✅ | Your Telegram user ID (full admin, error reports) |
-| `DATABASE_URL` | ✅ | PostgreSQL connection string |
-| `ADMIN_IDS` | optional | Comma-separated extra admin user IDs (e.g. `111,222`) |
+The database uses PostgreSQL with foreign key constraints, cascade triggers, and partial indexes:
 
-Telegram Stars payments need no extra provider token or configuration — `/subscribe` uses native Stars invoices (`currency="XTR"`) once the bot has payments enabled in BotFather.
-
----
-
-## Commands
-
-| Command | Description |
-|---|---|
-| `/start` | Welcome message; triggers profile setup for new users |
-| `/find` | Join the waiting queue, matched by shared interests when possible |
-| `/next` | Skip current partner, rate them, and search for a new one |
-| `/stop` | End the current chat and rate your partner |
-| `/cancel` | Cancel whatever multi-step flow you're currently in (profile setup, editing, etc.) |
-| `/help` | Show all available commands |
-| `/profile` | View/edit your profile and interests |
-| `/games` | Pick a mini-game to challenge your partner to |
-| `/coinsteal` | Quick-start a Coin Steal game request |
-| `/private` | Send your next photo/video/voice/video note in Privacy Mode (subscriber perk; caption the media `/private` directly, or send it bare first) |
-| `/subscribe` | View subscription plans and pay with Telegram Stars |
-
-**Admin only (not shown in `/help` or the bot's command menu):** `/broadcast <message>`, `/connect <user_id>`, `/ban <user_id> <severity 0-10> [reason]`, `/unban <user_id>`, `/checkuser <user_id>`, `/giveaway <user_id> <tier>`
+- **`users`**: Core user record (`user_id` PK, `gender`, `age`, `country`, `preferences_bitmask`, `points`, `created_at`, `updated_at`).
+- **`user_profiles`**: Volatile user states (`severity_score`, `restricted_until`, `restriction_reason`, `daily_credits_used`, `daily_credits_reset_day`, `is_banned`).
+- **`user_blocks`**: User-to-user blocking table (`blocker_id`, `blocked_id`, `created_at`) with unique constraint and 24-hour expiration window.
+- **`user_reports`**: Moderation audit trail (`reporter_id`, `target_id`, `reason_code`, `weight`, `created_at`).
+- **`user_ratings`**: Up/down karma feedback (`voter_id`, `target_id`, `vote_type`, `created_at`).
+- **`chat_sessions`**: Session audit history (`id` UUID PK, `user1_id`, `user2_id`, `started_at`, `ended_at`, `end_reason`).
+- **`subscriptions`**: Stars subscriptions (`user_id`, `tier`, `starts_at`, `expires_at`, `source`, `is_active`).
+- **`payment_transactions`**: Stars payment audit log (`telegram_payment_charge_id` UNIQUE).
+- **`referrals`**: Referral link tracking with idempotency (`referred_id` UNIQUE).
+- **`bot_config`**: Dynamic key-value configuration (`key` PK, `value` JSONB).
+- **`promotions`**: Sponsor campaigns (`title`, `sponsor_name`, `message_text`, `button_text`, `button_url`, `priority`, `impressions_count`, `clicks_count`, `is_active`).
+- **`game_questions`**: Data-driven question repository (`game_type`, `category`, `prompt_a`, `prompt_b`, `correct_answer`).
 
 ---
 
-## Moderation system
+## ⚙️ Environment Variables
 
-Reports go through a reason picker (spam, rude/toxic, unwanted NSFW, harassment, scam, leaked private media, underage concern), each adding weighted points to the target's `severity_score`. Crossing a threshold auto-computes a ban severity (0–10) and restricts the user for a duration scaled to that severity — from a few minutes up to long-term. This all happens silently: no message is sent to the owner when a report comes in or a restriction triggers. Restricted users are told why they're restricted and can reach out to an admin themselves if they think it's a mistake — admins can look up the full report history with `/checkuser`. `severity_score` decays slowly over time so a couple of old minor reports don't follow someone around forever.
-
-`restricted_until` is `NULL` when a user isn't restricted, and a timestamp otherwise. A restricted user is blocked at the very first stage of update processing, before any command or button handler runs, so *everything* is locked, not just chat.
-
-Admin accounts (the owner and anyone in `ADMIN_IDS`) can never be restricted — not through `/ban` (including on yourself), and not automatically through reports, no matter how many pile up.
-
----
-
-## Daily credits & subscriptions
-
-Every account draws from a shared daily credit pool (`FREE_DAILY_CREDIT_LIMIT = 32` by default), reset at midnight UTC. `/next` skips draw from this pool for everyone; photo/video/voice/video note sends draw from it too, but only for free-tier users — subscribers send all media free of charge.
-
-`/subscribe` offers four tiers, all paid for with native Telegram Stars (no external payment provider):
-
-| Tier | Duration | Extra daily credits | Stars | Bonus points |
-|---|---|---|---|---|
-| Daily | 1 day | +16 | 20 ⭐ | 40 |
-| Weekly | 7 days | +32 | 70 ⭐ | 150 |
-| Monthly | 30 days | +48 | 150 ⭐ | 400 |
-| Yearly | 365 days | +64 | 999 ⭐ | 3000 |
-
-Any active plan also unlocks Privacy Mode (`/private`) and shows your partner's age, gender, and country on match. Purchases stack on top of (extend) an existing active subscription rather than overwriting it. Admins can manually grant a tier, with the same perks and bonus points a real purchase would give.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `BOT_TOKEN` | ✅ | - | Telegram Bot API token from `@BotFather` |
+| `OWNER` | ✅ | - | Telegram user ID of the primary owner/admin |
+| `DATABASE_URL` | ✅ | - | PostgreSQL connection URI (`postgresql://user:pass@host:5432/dbname`) |
+| `ADMIN_IDS` | ❌ | `""` | Comma-separated list of secondary admin IDs (e.g. `123,456`) |
+| `PORT` | ❌ | `8080` | Port for the Flask health-check server |
+| `DB_POOL_MIN` | ❌ | `5` | Minimum connection pool size |
+| `DB_POOL_MAX` | ❌ | `30` | Maximum connection pool size |
+| `ANNOUNCEMENT_CHANNEL` | ❌ | - | Official Telegram Channel (`@Channel` or `-100...`) for instant broadcast |
+| `LOCAL_BOT_API_URL` | ❌ | - | Base URL for self-hosted Telegram Bot API server (enables 2GB media & high speed) |
 
 ---
 
-## Referral program
+## 🚀 Local Development & Setup
 
-Everyone gets a personal invite link, generated on demand via the 🔗 button on `/profile` (also offered, occasionally, right after a chat ends). Share it — when someone joins the bot through your link and finishes setting up their profile (gender, age, country), it counts as a successful referral.
+### 1. Prerequisites
+- Python 3.10+ (tested on Python 3.12)
+- PostgreSQL 14+ (local or hosted, e.g., Supabase / Neon / Render)
 
-Referrals are only *rewarded* while an admin has a promo running; how many referrals it takes and how long the promo stays live are both admin-configurable. Clearing the threshold grants a free Weekly subscription (stacking on top of any existing plan), and it's repeatable — every time you clear the threshold again while the promo is live, you get another one. Your referral count is never lost even if no promo happens to be running at the time; it's just held until (if) one starts.
-
----
-
-## Privacy note on Privacy Mode media
-
-Sending a photo/video/voice/video note while paired relays normally by default. Subscribers can caption it `/private` (or send a bare `/private` command first, then the media within 5 minutes) and it goes out in Privacy Mode instead. Once opened, the bot sends it with `protect_content` (blocks forward/save in stock Telegram clients) and deletes its own copy shortly after — 45s for photos, or the media's own duration plus 45s for video/voice/video notes, so playback never gets cut off mid-way. What this **can't** guarantee: once media is delivered to a device, that device has it — a modified client can still retain a file it already downloaded, and Telegram gives bots no visibility into screenshots. That's true of every bot on the platform, not something fixable in code. The report system's "leaked my private media" reason (high severity) is the real backstop for misuse, not a technical promise.
-
----
-
-## Mini-games
-
-All playable via `/games` (or `/coinsteal` directly for that one) between two currently paired users. Whoever leaves the chat mid-game auto-forfeits and their partner is notified — no orphaned sessions.
-
-- **Coin Steal 🪙** — 3-round trust game, Save or Steal each round, streak bonuses for repeated mutual trust, wildcard round 3.
-- **Tic Tac Toe ⭕❌** — classic, first to three in a row.
-- **Rock Paper Scissors 🪨📄✂️** — best of 5.
-- **Guess It 🔢** — alternating number-guessing duel with hot/cold hints, best of 3.
-- **Would You Rather 🤔** — 5-round compatibility duel, prompts pulled from your shared interest tags when possible, ends with a match percentage.
-
----
-
-## Running the Bot
-
+### 2. Installation
 ```bash
+git clone https://github.com/jishnuharis/AnonChatZoneBot.git
+cd AnonChatZoneBot
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install pinned dependencies
 pip install -r requirements.txt
+```
+
+### 3. Configure Environment
+Create a `.env` file in the project root:
+```env
+BOT_TOKEN=123456789:ABCDefghIJKlmNoPQRsTUVwxyZ
+OWNER=987654321
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/anonchat
+PORT=8080
+```
+
+### 4. Run Migrations & Start Bot
+Migrations execute automatically on startup during `init_pool()`:
+```bash
 python main.py
 ```
 
-### Running the sanity tests (no live bot/DB required)
-
+### 5. Running the Test Suite
+The automated test suite runs offline without requiring a live Telegram connection or active PostgreSQL database:
 ```bash
-python tests/test_imports.py
-python tests/test_logic.py
+python -m pytest -v
 ```
+All 32 tests will run and validate matchmaking, sessions, silent chat, games, promotions, moderation, presence, security, and paid match filters.
+
+---
+
+## ⭐ Paid Subscriber Match Filters (Gender & Country Preferences)
+
+Paid users with active Telegram Stars subscriptions unlock custom matchmaking criteria:
+
+- **Configure in Profile**: Navigate to `/profile` and click **"⭐ Match Filters (Gender/Country)"**.
+- **Gender Preference**:
+  - `Any Gender`: Connect with anyone regardless of gender.
+  - `Male Only (M)`: Connect exclusively with male partners.
+  - `Female Only (F)`: Connect exclusively with female partners.
+- **Country Preference**:
+  - `Any Country`: Connect with users worldwide.
+  - `Same Country Only`: Pair only with users registered with the same country as you.
+- **Mutual Compatibility**: If both users are subscribed, the matchmaking engine enforces both criteria symmetrically before forming a chat.
+- **VIP Queue Priority**: Paid candidates receive a scoring boost (`+100`) over neutral zero-overlap free pairings, ensuring subscribers are matched first.
+- **Paywall Protection**: Free users can inspect the menu and are presented with an upgrade prompt with subscription tiers (`/subscribe`).
+
+---
+
+## 🎮 Games & Content Expansion
+
+### How to Add More "Would You Rather" Questions
+1. Edit `games/content/wyr_questions.json` and append your question:
+   ```json
+   {
+     "category": "fun",
+     "a": "Always speak in rhymes",
+     "b": "Sing everything you say"
+   }
+   ```
+2. Or insert directly into the database:
+   ```sql
+   INSERT INTO game_questions (game_type, category, prompt_a, prompt_b)
+   VALUES ('wyr', 'deep', 'Know how you will die', 'Know when you will die');
+   ```
+
+### Trivia Duel Mini-Game
+- Challenge partner via `/games` or `/trivia`.
+- Both players receive 5 randomized multiple-choice trivia questions.
+- Answers are scored in real time with an inline summary at the end.
+
+---
+
+## 📢 Sponsors & Promotions Management
+
+Admins can manage sponsor promotions live without modifying bot code:
+
+- **Create a campaign**:
+  ```
+  /campaign add <title> | <sponsor> | <priority> | <message> | [button_text] | [button_url]
+  ```
+- **List active campaigns**:
+  ```
+  /campaign list
+  ```
+- **Pause a campaign**:
+  ```
+  /campaign pause <id>
+  ```
+- **View impression & click statistics**:
+  ```
+  /campaign stats
+  ```
+
+---
+
+## 👥 Partner Presence & Interaction Indicators
+
+AnonChatZoneBot v2.0 features real-time presence indicators to eliminate ghosting anxiety and keep conversations engaging:
+
+- **Docked Typing Area Keyboard**: When paired, a persistent `ReplyKeyboardMarkup` docks directly below the typing input with `["👋 Nudge", "⏱️ /status"]` and `["/next", "/stop"]`. Cleanly unmounted on chat exit.
+- **"👋 Nudge" Button & `/nudge` Command**: Gentle ping with a 15-second anti-spam cooldown that sends a notification (`"👋 *NUDGE!* Your partner is nudging you!"`) and triggers typing actions on the partner's screen.
+- **`/status` Command**: Displays partner connection status and relative last activity (`Active right now`, `25s ago`, `2m ago`).
+- **Dynamic Media Chat Actions**: Automatically sends native Telegram chat actions (`upload_photo`, `upload_video`, `record_voice`, `record_video_note`, `upload_document`, `typing`) as media relays, keeping partners visually aware while media transfers.
+
+---
+
+## 🛡️ Admin & Operational Commands
+
+| Command | Permission | Description |
+|---|---|---|
+| `/stats` | Admin | Real-time bot metrics (users, active chats, queue, memory) |
+| `/queue` | Admin | Inspect queue contents, waiting times, and active counts |
+| `/campaign` | Admin | Manage sponsor promotions and view conversion stats |
+| `/broadcast <msg>` | Admin | Post to `ANNOUNCEMENT_CHANNEL` instantly (1 API call) or use `/broadcast direct <msg>` for batch PMs |
+| `/ban <id> <sev> [reason]` | Admin | Apply moderation restriction (severity 0-10) |
+| `/unban <id>` | Admin | Lift restriction and unban user immediately |
+| `/checkuser <id>` | Admin | View detailed user record, reports, and rating history |
+| `/giveaway <id> <tier>` | Admin | Grant complimentary Stars subscription tier |
+| `/connect <id>` | Owner | Force-pair with target user for support/testing |
+
+---
+
+## 📊 Cloud Deployment
+
+### Health Check Endpoint
+The built-in web server exposes `GET /health` which returns JSON:
+```json
+{
+  "status": "healthy",
+  "active_chats": 142,
+  "queue_length": 8,
+  "loaded_users": 1530,
+  "pool_ready": true,
+  "uptime_seconds": 86400
+}
+```
+Use this endpoint with keep-alive services (e.g. UptimeRobot, Render Health Check, Koyeb, AWS ALB).
+
+---
+
+## 📄 License
+MIT License. Created for AnonChatZoneBot.

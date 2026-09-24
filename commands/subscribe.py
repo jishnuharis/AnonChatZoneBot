@@ -33,6 +33,13 @@ async def handle_tier_selection(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     tier_key = query.data.split("|")[1]
+
+    if tier_key == "upgrade_prompt":
+        user_id = query.from_user.id
+        text = SUBSCRIBE_INTRO_TEXT.format(status=subscription.status_text(user_id))
+        await safe_tele_func_call(query.edit_message_text, text=text, reply_markup=_tier_keyboard(), parse_mode="HTML")
+        return
+
     tier = subscription.TIERS.get(tier_key)
     if not tier:
         return

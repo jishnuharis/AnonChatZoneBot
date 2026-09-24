@@ -1,13 +1,17 @@
+import os
+import asyncio
+import time
+import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from html import escape as esc
-import asyncio
-import time
 
 from security import safe_tele_func_call, format_duration
 from handlers.rating import ask_for_rating
 from games.registry import end_any_active_game
 from moderation import is_admin, apply_restriction, clear_restriction, severity_for_score, SEVERITY_DURATIONS
+from saveNload import add_promotion_db, get_active_promotions_db, get_pool
+from games.content.content_manager import get_stats as get_game_content_stats, add_wyr_question, add_trivia_question
 from message import (
     GIVE_BROADCAST_MESSAGE_TEXT, GIVE_VALID_CONNECT_USER_ID_TEXT, TARGET_NOT_IN_DB_TEXT,
     ALREADY_CONNECTED_TO_TARGET_TEXT, PARTNER_LEFT_CHAT_TEXT, ADMIN_HELP_TEXT, BAN_USAGE_TEXT,
@@ -21,6 +25,8 @@ import referral
 
 import init
 
+logger = logging.getLogger(__name__)
+
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
@@ -31,24 +37,79 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = message[len("/broadcast"):].lstrip()
 
     if not message:
-        await update.message.reply_text(GIVE_BROADCAST_MESSAGE_TEXT, parse_mode="HTML")
+        await update.message.reply_text(
+            "<b>Usage:</b>\n"
+            "• <code>/broadcast &lt;message&gt;</code> - Posts to official announcement channel (Instant 1 API call)\n"
+            "• <code>/broadcast direct &lt;message&gt;</code> - Direct messages all individual users in batches\n",
+            parse_mode="HTML"
+        )
         return
 
+    is_direct = False
+    if message.lower().startswith("direct "):
+        is_direct = True
+        message = message[len("direct "):].lstrip()
+
+    channel_id = os.getenv("ANNOUNCEMENT_CHANNEL")
+    # If not explicitly marked 'direct', post to official announcement channel if configured!
+    if not is_direct:
+        if channel_id:
+            try:
+                sent_msg = await safe_tele_func_call(
+                    context.bot.send_message,
+                    chat_id=channel_id,
+                    text=message,
+                    parse_mode="HTML"
+                )
+                if sent_msg:
+                    await update.message.reply_text(
+                        f"📢 <b>Announcement posted to channel {channel_id} successfully!</b> ✅",
+                        parse_mode="HTML"
+                    )
+                    return
+                else:
+                    await update.message.reply_text(
+                        f"⚠️ <i>Failed to post to {channel_id}. Verify bot is an admin with post permissions in channel.</i>",
+                        parse_mode="HTML"
+                    )
+                    return
+            except Exception as e:
+                logger.error(f"Error posting announcement to channel {channel_id}: {e}")
+                await update.message.reply_text(f"⚠️ Channel error: {e}", parse_mode="HTML")
+                return
+        else:
+            # Inform admin how to configure channel or use direct broadcast
+            await update.message.reply_text(
+                "⚠️ <b>ANNOUNCEMENT_CHANNEL</b> is not configured in .env.\n"
+                "• Set <code>ANNOUNCEMENT_CHANNEL=@YourChannel</code> in your .env to post to your official channel instantly.\n"
+                "• Or use <code>/broadcast direct &lt;message&gt;</code> to send individual private messages.",
+                parse_mode="HTML"
+            )
+            return
+
+    # Direct individual user broadcast
     sent = 0
-    for user_id in init.user_details:
-        try:
-            await safe_tele_func_call(
+    target_users = list(init.user_details.keys())
+    batch_size = 20
+
+    for i in range(0, len(target_users), batch_size):
+        chunk = target_users[i:i + batch_size]
+        tasks = [
+            safe_tele_func_call(
                 context.bot.send_message,
-                chat_id=user_id,
+                chat_id=uid,
                 text=message,
                 parse_mode="HTML",
             )
-            sent += 1
-            await asyncio.sleep(0.1)
-        except Exception as e:
-            print(f"Failed to send to {user_id}: {e}")
+            for uid in chunk
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for res in results:
+            if res and not isinstance(res, Exception):
+                sent += 1
+        await asyncio.sleep(0.05)
 
-    await update.message.reply_text(f"<i>Broadcast sent to</i> <b>{sent}</b> <i>users ✅.</i>", parse_mode="HTML")
+    await update.message.reply_text(f"<i>Direct broadcast sent to</i> <b>{sent}</b> <i>users ✅.</i>", parse_mode="HTML")
 
 
 async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -104,8 +165,8 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uv1, uv2 = init.user_details[user_id]["votes"], init.user_details[target_id]["votes"]
     init.user_details[user_id]["partner_id"] = target_id
     init.user_details[target_id]["partner_id"] = user_id
-    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"🎯 <b>Found user.... Say hi!!</b>\n<i>Rating:</i> {uv2['up']} 👍 {uv2['down']} 👎\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>", parse_mode="HTML")
-    await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=f"🎯 <b>Someone found you.... Say hi!!</b>\n<i>Rating:</i> {uv1['up']} 👍 {uv1['down']} 👎\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>", parse_mode="HTML")
+    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"🎯 <b>Connected to target user! Say hi!</b>\n/next <i>- Next</i>\n/stop <i>- Stop</i>", parse_mode="HTML")
+    await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=f"🎯 <b>Someone found you.... Say hi!!</b>\n/next <i>- Next</i>\n/stop <i>- Stop</i>", parse_mode="HTML")
 
     init.dirty_users.update([user_id, target_id])
 
@@ -140,7 +201,8 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     reason = " ".join(args[2:]) if len(args) > 2 else "Manual admin action"
 
-    until = apply_restriction(target_id, severity, reason)
+    # Enforce queue eviction & chat severance
+    until = await apply_restriction(target_id, severity, reason, context=context)
     if not until:
         await update.message.reply_text(SEVERITY_ZERO_NOOP_TEXT, parse_mode="HTML")
         return
@@ -165,7 +227,7 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(GIVE_VALID_USER_ID_TEXT, parse_mode="HTML")
         return
 
-    clear_restriction(target_id)
+    await clear_restriction(target_id)
     await update.message.reply_text(f"✅ <i>User</i> <code>{target_id}</code> <i>has been unrestricted.</i>", parse_mode="HTML")
     await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=RESTRICTION_LIFTED_TEXT, parse_mode="HTML")
 
@@ -185,10 +247,8 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(GIVE_VALID_USER_ID_TEXT, parse_mode="HTML")
         return
 
-    details = init.user_details.get(target_id)
-    if not details:
-        await update.message.reply_text(NO_RECORD_OF_USER_TEXT, parse_mode="HTML")
-        return
+    from init import ensure_user_loaded
+    details = await ensure_user_loaded(target_id)
 
     restricted_until = details.get("restricted_until")
     if restricted_until and restricted_until > time.time():
@@ -202,8 +262,6 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ) or NO_REPORTS_TEXT
 
     lifetime_reports = details.get("reports", 0)
-    unique_reporters = len(details.get("reporters", []))
-
     severity_score = details.get("severity_score", 0)
     severity_level = severity_for_score(severity_score)
     level_duration = SEVERITY_DURATIONS.get(severity_level, 0)
@@ -218,7 +276,7 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if subscription.is_subscribed(target_id):
         tier = subscription.active_tier(target_id)
         expires = details.get("subscription_expires")
-        sub_line = f"{tier['label']} — expires in {format_duration(expires - time.time())}" if tier else "Active (unknown tier)"
+        sub_line = f"{tier['label']} — expires in {format_duration(expires - time.time())}" if tier else "Active"
     else:
         sub_line = "Not subscribed"
 
@@ -233,7 +291,7 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Status: {partner_line}\n"
         f"\n"
         f"<b>Moderation</b>\n"
-        f"Lifetime reports: {lifetime_reports} (from {unique_reporters} unique reporter{'s' if unique_reporters != 1 else ''})\n"
+        f"Lifetime reports: {lifetime_reports}\n"
         f"Current severity: {level_line}\n"
         f"Last decay: {decay_line}\n"
         f"{restriction_line}\n"
@@ -260,10 +318,6 @@ async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TY
     tier_key = args[1].lower()
     if tier_key not in subscription.TIERS:
         await update.message.reply_text(GIVEAWAY_UNKNOWN_TIER_TEXT, parse_mode="HTML")
-        return
-
-    if target_id not in init.user_details:
-        await update.message.reply_text(TARGET_NOT_IN_DB_TEXT, parse_mode="HTML")
         return
 
     tier = subscription.TIERS[tier_key]
@@ -312,7 +366,91 @@ async def referral_scheme_command(update: Update, context: ContextTypes.DEFAULT_
     expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(scheme["expires"]))
     await update.message.reply_text(
         f"✅ <i>Referral scheme active: refer</i> <b>{scheme['required_referrals']}</b> "
-        f"<i>friends who finish onboarding →</i> <b>{tier['label']}</b> <i>subscription (repeatable).</i>\n"
+        f"<i>friends who finish onboarding →</i> <b>{tier['label']}</b> <i>subscription.</i>\n"
         f"<i>Promo runs until</i> <code>{esc(expires_str)}</code>.",
         parse_mode="HTML",
     )
+
+
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shows operational bot health and statistics."""
+    if not is_admin(update.effective_user.id):
+        return
+
+    total_cached = len(init.user_details)
+    active_matches = len(init.active_pairs) // 2
+    waiting_count = len(init.waiting_users)
+
+    text = (
+        "📊 <b>System & Operational Stats</b>\n\n"
+        f"• <b>Active Chat Pairs:</b> {active_matches}\n"
+        f"• <b>Users in Queue:</b> {waiting_count}\n"
+        f"• <b>Cached Active Users:</b> {total_cached}\n"
+        f"• <b>Active Sessions:</b> {len(init.active_sessions) // 2}\n"
+        f"• <b>Game Requests In-Flight:</b> {len(init.game_requests)}\n"
+    )
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+async def queue_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shows queue details."""
+    if not is_admin(update.effective_user.id):
+        return
+
+    async with init.queue_lock:
+        now = time.time()
+        count = len(init.waiting_users)
+        oldest_wait = 0.0
+        if init.wait_started:
+            oldest_wait = max(0.0, now - min(init.wait_started.values()))
+
+    text = (
+        "👥 <b>Queue Overview</b>\n\n"
+        f"• <b>Waiting Users:</b> {count}\n"
+        f"• <b>Longest Wait:</b> {int(oldest_wait)}s\n"
+    )
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+async def campaign_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to manage sponsor campaigns."""
+    if not is_admin(update.effective_user.id):
+        return
+
+    args = context.args
+    if not args or args[0] == "help":
+        await update.message.reply_text(
+            "📢 <b>Campaign Management</b>\n\n"
+            "<i>/campaign list</i> - View all active campaigns\n"
+            "<i>/campaign create Sponsor | Title | Text | ButtonText | ButtonURL</i>\n",
+            parse_mode="HTML"
+        )
+        return
+
+    action = args[0].lower()
+    if action == "list":
+        promos = await get_active_promotions_db()
+        if not promos:
+            await update.message.reply_text("<i>No active campaigns right now.</i>", parse_mode="HTML")
+            return
+        lines = []
+        for p in promos:
+            lines.append(f"• <b>[{p['id']}] {esc(p['title'])}</b> ({esc(p['sponsor_name'])}) — Views: {p['impressions_count']}, Clicks: {p['clicks_count']}")
+        await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+        return
+
+    if action == "create":
+        full_text = " ".join(args[1:])
+        parts = [part.strip() for part in full_text.split("|")]
+        if len(parts) < 3:
+            await update.message.reply_text("<i>Usage: /campaign create Sponsor | Title | Text [| ButtonText | ButtonURL]</i>", parse_mode="HTML")
+            return
+
+        sponsor = parts[0]
+        title = parts[1]
+        msg_text = parts[2]
+        btn_text = parts[3] if len(parts) > 3 else None
+        btn_url = parts[4] if len(parts) > 4 else None
+
+        promo_id = await add_promotion_db(title, sponsor, msg_text, btn_text, btn_url)
+        await update.message.reply_text(f"✅ <i>Campaign created with ID</i> <code>{promo_id}</code>.", parse_mode="HTML")

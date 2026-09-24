@@ -2,11 +2,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from handlers.setup import check_user_profile
-from handlers.rating import ask_for_rating
 from security import safe_tele_func_call
-from games.registry import end_any_active_game
-from games.game_requests import clear_pending_requests
-from message import PARTNER_LEFT_CHAT_TEXT, CHAT_ENDED_TEXT, REMOVED_FROM_QUEUE_TEXT, NOT_IN_CHAT_TEXT
+from session_manager import end_chat_session, is_in_chat
+from message import REMOVED_FROM_QUEUE_TEXT, NOT_IN_CHAT_TEXT
 
 import init
 
@@ -14,30 +12,21 @@ import init
 @check_user_profile
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id in init.active_pairs:
-        partner = init.active_pairs.pop(user_id)
-        init.user_details[partner]["partner_id"] = None
-        init.user_details[user_id]["partner_id"] = None
-        init.active_pairs.pop(partner, None)
-        init.message_map.pop(user_id, None)
-        init.message_map.pop(partner, None)
 
-        init.dirty_users.update([user_id, partner])
-
-        await end_any_active_game(context, user_id)
-        await end_any_active_game(context, partner)
-
-        clear_pending_requests(user_id)
-        clear_pending_requests(partner)
-
-        await safe_tele_func_call(context.bot.send_message, chat_id=partner, text=PARTNER_LEFT_CHAT_TEXT, parse_mode="HTML")
-        await safe_tele_func_call(update.message.reply_text, text=CHAT_ENDED_TEXT, parse_mode="HTML")
-
-        await ask_for_rating(context.bot, user_id, partner)
-        await ask_for_rating(context.bot, partner, user_id)
+    if is_in_chat(user_id):
+        # Gracefully end session using unified session manager
+        await end_chat_session(
+            context,
+            user_id,
+            reason="user_stopped",
+            notify_initiator=True,
+            notify_partner=True,
+        )
     elif user_id in init.waiting_users:
-        init.waiting_users.remove(user_id)
-        init.wait_started.pop(user_id, None)
+        async with init.queue_lock:
+            if user_id in init.waiting_users:
+                init.waiting_users.remove(user_id)
+            init.wait_started.pop(user_id, None)
         await safe_tele_func_call(update.message.reply_text, text=REMOVED_FROM_QUEUE_TEXT, parse_mode="HTML")
     else:
         await safe_tele_func_call(update.message.reply_text, text=NOT_IN_CHAT_TEXT, parse_mode="HTML")

@@ -139,18 +139,21 @@ async def handle_view_once(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_tele_func_call(query.edit_message_text, text=PRIVACY_MEDIA_NO_LONGER_AVAILABLE_TEXT, parse_mode="HTML")
         return
 
-    if entry["recipient"] != user_id:
-        await query.answer(NOT_FOR_YOU_ALERT, show_alert=True)
-        return
-
-    if entry["opened"]:
+    if entry.get("opened"):
         await query.answer(ALREADY_VIEWED_ALERT, show_alert=True)
         await safe_tele_func_call(query.edit_message_text, text=ALREADY_VIEWED_TEXT, parse_mode="HTML")
         init.pending_media.pop(token, None)
         return
 
-    await query.answer()
+    if entry["recipient"] != user_id:
+        await query.answer(NOT_FOR_YOU_ALERT, show_alert=True)
+        return
+
+    # Atomically lock and consume the view-once token before any await
     entry["opened"] = True
+    init.pending_media.pop(token, None)
+
+    await query.answer()
 
     revealed = None
     if entry["kind"] == "photo":
@@ -182,8 +185,6 @@ async def handle_view_once(update: Update, context: ContextTypes.DEFAULT_TYPE):
             when=lifetime,
             data={"chat_id": user_id, "message_id": revealed.message_id},
         )
-
-    init.pending_media.pop(token, None)
 
 
 async def _delete_revealed(context: ContextTypes.DEFAULT_TYPE):
