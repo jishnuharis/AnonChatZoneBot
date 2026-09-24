@@ -351,5 +351,109 @@ async def test_check_user_profile_country_stage_signature(monkeypatch):
     mock_send_country.assert_awaited_once_with(user_id, mock_context)
 
 
+def test_parse_id_list_formats():
+    """Verify _parse_id_list parses diverse PostgreSQL and JSON representations cleanly."""
+    from migrations import _parse_id_list
+
+    assert _parse_id_list(None) == []
+    assert _parse_id_list("") == []
+    assert _parse_id_list("[]") == []
+    assert _parse_id_list("{}") == []
+    assert _parse_id_list([111, 222, 333]) == [111, 222, 333]
+    assert _parse_id_list(["111", "222"]) == [111, 222]
+    assert _parse_id_list("[123, 456, 789]") == [123, 456, 789]
+    assert _parse_id_list("{123, 456, 789}") == [123, 456, 789]
+    assert _parse_id_list("{123,456}") == [123, 456]
+
+
+@pytest.mark.asyncio
+async def test_migrate_ratings_and_reports():
+    """Verify _migrate_ratings_and_reports inserts into users, user_ratings, and user_reports."""
+    from migrations import _migrate_ratings_and_reports
+    from unittest.mock import AsyncMock, MagicMock
+    import json
+
+    executed_queries = []
+
+    mock_conn = MagicMock()
+
+    async def mock_execute(query, params=None):
+        executed_queries.append((query, params))
+        cur = MagicMock()
+        if "information_schema.columns" in query:
+            cur.fetchall = AsyncMock(return_value=[
+                ("user_id",), ("vote_up",), ("vote_down",), ("voters",),
+                ("reports",), ("reporters",), ("report_log",)
+            ])
+        elif "SELECT" in query and "FROM legacy_user_details_backup" in query:
+            cur.fetchall = AsyncMock(return_value=[
+                (
+                    555, # user_id
+                    2,   # vote_up
+                    1,   # vote_down
+                    "[101]", # voters (1 real voter for 3 total votes -> 2 synthetic needed)
+                    2,   # reports
+                    "[201]", # reporters
+                    json.dumps([{"reporter": 301, "reason": "harassment", "weight": 2, "timestamp": 1700000000}])
+                )
+            ])
+        else:
+            cur.fetchall = AsyncMock(return_value=[])
+            cur.fetchone = AsyncMock(return_value=None)
+        return cur
+
+    mock_conn.execute = AsyncMock(side_effect=mock_execute)
+
+    await _migrate_ratings_and_reports(mock_conn, "legacy_user_details_backup")
+
+    # Verify user foreign keys ensured
+    users_insert = [q for q, p in executed_queries if "INSERT INTO users" in q]
+    assert len(users_insert) > 0, "Must insert users to ensure foreign keys"
+
+    # Verify user_ratings inserted
+    ratings_insert = [q for q, p in executed_queries if "INSERT INTO user_ratings" in q]
+    assert len(ratings_insert) > 0, "Must insert into user_ratings"
+
+    # Verify user_reports inserted
+    reports_insert = [q for q, p in executed_queries if "INSERT INTO user_reports" in q]
+    assert len(reports_insert) > 0, "Must insert into user_reports"
+
+
+@pytest.mark.asyncio
+async def test_run_migrations_checks_ratings_migrated():
+    """Verify run_migrations continues if legacy_migration_completed lacks ratings_migrated."""
+    from migrations import run_migrations
+    from unittest.mock import AsyncMock, MagicMock
+    import json
+
+    executed_queries = []
+    mock_conn = MagicMock()
+
+    async def mock_execute(query, params=None):
+        executed_queries.append((query, params))
+        cur = MagicMock()
+        if "WHERE key = 'legacy_migration_completed'" in query:
+            # Simulated partial run: completed: true, but ratings_migrated is missing
+            cur.fetchone = AsyncMock(return_value=(json.dumps({"completed": True}),))
+        elif "to_regclass" in query:
+            cur.fetchone = AsyncMock(return_value=(False,))
+        elif "information_schema.columns" in query:
+            cur.fetchall = AsyncMock(return_value=[])
+        else:
+            cur.fetchall = AsyncMock(return_value=[])
+            cur.fetchone = AsyncMock(return_value=(0,))
+        return cur
+
+    mock_conn.execute = AsyncMock(side_effect=mock_execute)
+
+    await run_migrations(mock_conn)
+
+    # Since ratings_migrated was not True, it should NOT have returned early at step 2
+    # It must have checked for legacy tables
+    legacy_checks = [q for q, p in executed_queries if "to_regclass" in q]
+    assert len(legacy_checks) > 0, "Should inspect legacy tables when ratings_migrated is absent"
+
+
+
 
 

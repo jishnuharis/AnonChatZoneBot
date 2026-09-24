@@ -1066,7 +1066,7 @@ async def load_user_data() -> dict:
             users_tbl_exists = (await cur.fetchone())[0]
 
             if users_tbl_exists:
-                cur = await conn.execute("SELECT COUNT(*) FROM users;")
+                cur = await conn.execute("SELECT COUNT(*) FROM users WHERE user_id > 0;")
                 users_count = (await cur.fetchone())[0]
             else:
                 users_count = 0
@@ -1125,6 +1125,7 @@ async def load_user_data() -> dict:
                         ) ORDER BY created_at DESC) as report_log
                         FROM user_reports GROUP BY target_id
                     ) rep_data ON u.user_id = rep_data.target_id
+                    WHERE u.user_id > 0
                     ORDER BY u.updated_at DESC
                     LIMIT 50000;
                 """

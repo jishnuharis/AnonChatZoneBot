@@ -7,6 +7,8 @@ Preserves existing ~1,000 production records from legacy `user_details`.
 
 import json
 import logging
+from datetime import datetime, timezone
+from typing import List, Set, Dict, Any, Optional
 from psycopg import AsyncConnection
 
 logger = logging.getLogger(__name__)
@@ -172,6 +174,190 @@ CREATE INDEX IF NOT EXISTS idx_game_questions_lookup ON game_questions (game_typ
 """
 
 
+def _parse_id_list(val) -> List[int]:
+    """Parses user ID lists from diverse legacy formats (list, JSON string, Postgres array string)."""
+    if not val:
+        return []
+    if isinstance(val, list):
+        ids = []
+        for x in val:
+            try:
+                ids.append(int(x))
+            except (ValueError, TypeError):
+                pass
+        return ids
+    if isinstance(val, str):
+        val = val.strip()
+        if not val or val in ("[]", "{}"):
+            return []
+        if val.startswith("[") and val.endswith("]"):
+            try:
+                parsed = json.loads(val)
+                if isinstance(parsed, list):
+                    return [int(x) for x in parsed if str(x).lstrip("-").isdigit()]
+            except Exception:
+                pass
+        if val.startswith("{") and val.endswith("}"):
+            items = val[1:-1].split(",")
+            return [int(x.strip()) for x in items if x.strip().lstrip("-").isdigit()]
+    return []
+
+
+async def _migrate_ratings_and_reports(conn: AsyncConnection, legacy_tbl: str):
+    """
+    Migrates historical votes into user_ratings and historical reports into user_reports.
+    Preserves all vote_up, vote_down, voters, reports, reporters, and report_log.
+    """
+    try:
+        cur = await conn.execute(f"""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = '{legacy_tbl}';
+        """)
+        existing_cols = {row[0] for row in await cur.fetchall()}
+
+        up_col = "vote_up" if "vote_up" in existing_cols else ("votes_up" if "votes_up" in existing_cols else None)
+        down_col = "vote_down" if "vote_down" in existing_cols else ("votes_down" if "votes_down" in existing_cols else None)
+        voters_col = "voters" if "voters" in existing_cols else None
+        rep_col = "reports" if "reports" in existing_cols else ("reports_count" if "reports_count" in existing_cols else None)
+        reporters_col = "reporters" if "reporters" in existing_cols else None
+        rep_log_col = "report_log" if "report_log" in existing_cols else None
+
+        select_parts = ["user_id"]
+        select_parts.append(f"COALESCE({up_col}, 0)" if up_col else "0")
+        select_parts.append(f"COALESCE({down_col}, 0)" if down_col else "0")
+        select_parts.append(f"{voters_col}" if voters_col else "NULL")
+        select_parts.append(f"COALESCE({rep_col}, 0)" if rep_col else "0")
+        select_parts.append(f"{reporters_col}" if reporters_col else "NULL")
+        select_parts.append(f"{rep_log_col}" if rep_log_col else "NULL")
+
+        cur = await conn.execute(f"SELECT {', '.join(select_parts)} FROM {legacy_tbl};")
+        rows = await cur.fetchall()
+
+        ratings_to_insert = []
+        reports_to_insert = []
+        users_to_ensure = set()
+
+        for row in rows:
+            uid = row[0]
+            if not uid:
+                continue
+            vote_up = int(row[1] or 0)
+            vote_down = int(row[2] or 0)
+            voters = _parse_id_list(row[3])
+            rep_count = int(row[4] or 0)
+            reporters = _parse_id_list(row[5])
+            rep_log = row[6]
+            if isinstance(rep_log, str):
+                try:
+                    rep_log = json.loads(rep_log)
+                except Exception:
+                    rep_log = []
+            elif not isinstance(rep_log, list):
+                rep_log = []
+
+            # 1. Migrate votes to user_ratings
+            assigned_up = 0
+            assigned_down = 0
+            for v_id in voters:
+                if v_id == uid:
+                    continue
+                if assigned_up < vote_up:
+                    users_to_ensure.add(v_id)
+                    ratings_to_insert.append((v_id, uid, "up"))
+                    assigned_up += 1
+                elif assigned_down < vote_down:
+                    users_to_ensure.add(v_id)
+                    ratings_to_insert.append((v_id, uid, "down"))
+                    assigned_down += 1
+
+            for i in range(assigned_up, vote_up):
+                synth_id = -(uid * 10000 + i + 1)
+                users_to_ensure.add(synth_id)
+                ratings_to_insert.append((synth_id, uid, "up"))
+
+            for j in range(assigned_down, vote_down):
+                synth_id = -(uid * 10000 + 5000 + j + 1)
+                users_to_ensure.add(synth_id)
+                ratings_to_insert.append((synth_id, uid, "down"))
+
+            # 2. Migrate reports to user_reports
+            inserted_reporters = set()
+            for item in rep_log:
+                if isinstance(item, dict) and item.get("reporter"):
+                    try:
+                        r_id = int(item["reporter"])
+                        if r_id != uid:
+                            users_to_ensure.add(r_id)
+                            reason = str(item.get("reason") or "unspecified")
+                            weight = int(item.get("weight") or 1)
+                            ts = item.get("timestamp")
+                            reports_to_insert.append((r_id, uid, reason, weight, ts))
+                            inserted_reporters.add(r_id)
+                    except (ValueError, TypeError):
+                        pass
+
+            for r_id in reporters:
+                if r_id != uid and r_id not in inserted_reporters:
+                    users_to_ensure.add(r_id)
+                    reports_to_insert.append((r_id, uid, "legacy_report", 1, None))
+                    inserted_reporters.add(r_id)
+
+            needed_synth_reports = rep_count - len(inserted_reporters)
+            for k in range(max(0, needed_synth_reports)):
+                synth_id = -(uid * 10000 + 8000 + k + 1)
+                users_to_ensure.add(synth_id)
+                reports_to_insert.append((synth_id, uid, "legacy_report", 1, None))
+
+        # Batch insert users to ensure foreign keys
+        if users_to_ensure:
+            user_tuples = [(u,) for u in users_to_ensure]
+            for i in range(0, len(user_tuples), 500):
+                chunk = user_tuples[i:i + 500]
+                placeholders = ", ".join(["(%s)"] * len(chunk))
+                flat = [val for tup in chunk for val in tup]
+                await conn.execute(f"""
+                    INSERT INTO users (user_id) VALUES {placeholders}
+                    ON CONFLICT (user_id) DO NOTHING;
+                """, flat)
+
+        # Batch insert user_ratings
+        if ratings_to_insert:
+            for i in range(0, len(ratings_to_insert), 500):
+                chunk = ratings_to_insert[i:i + 500]
+                placeholders = ", ".join(["(%s, %s, %s)"] * len(chunk))
+                flat = [val for tup in chunk for val in tup]
+                await conn.execute(f"""
+                    INSERT INTO user_ratings (voter_id, target_id, vote_type) 
+                    VALUES {placeholders}
+                    ON CONFLICT (voter_id, target_id) DO NOTHING;
+                """, flat)
+            logger.info(f"Migrated {len(ratings_to_insert)} ratings into user_ratings from {legacy_tbl}.")
+
+        # Batch insert user_reports
+        if reports_to_insert:
+            for r_id, t_id, reason, weight, ts in reports_to_insert:
+                if ts:
+                    await conn.execute("""
+                        INSERT INTO user_reports (reporter_id, target_id, reason_code, weight, created_at)
+                        SELECT %s, %s, %s, %s, to_timestamp(%s)
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM user_reports WHERE reporter_id = %s AND target_id = %s
+                        );
+                    """, (r_id, t_id, reason, weight, ts, r_id, t_id))
+                else:
+                    await conn.execute("""
+                        INSERT INTO user_reports (reporter_id, target_id, reason_code, weight)
+                        SELECT %s, %s, %s, %s
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM user_reports WHERE reporter_id = %s AND target_id = %s
+                        );
+                    """, (r_id, t_id, reason, weight, r_id, t_id))
+            logger.info(f"Migrated {len(reports_to_insert)} reports into user_reports from {legacy_tbl}.")
+
+    except Exception as e:
+        logger.warning(f"_migrate_ratings_and_reports error: {e}", exc_info=True)
+
+
 async def run_migrations(conn: AsyncConnection):
     """
     Executes DDL and migrates existing ~1,000 rows from legacy `user_details`
@@ -217,7 +403,7 @@ async def run_migrations(conn: AsyncConnection):
                     cfg_val = json.loads(cfg_val)
                 except Exception:
                     cfg_val = {}
-            if isinstance(cfg_val, dict) and cfg_val.get("completed"):
+            if isinstance(cfg_val, dict) and cfg_val.get("completed") and cfg_val.get("ratings_migrated"):
                 logger.info("Legacy migration was already completed. Schema is clean and up to date.")
                 return
     except Exception as e:
@@ -318,30 +504,8 @@ async def run_migrations(conn: AsyncConnection):
         except Exception as e:
             logger.warning(f"Referrals legacy migration notice: {e}")
 
-        # 8. Migrate detailed report logs into user_reports audit table (safely without duplicates)
-        try:
-            await conn.execute(f"""
-                INSERT INTO user_reports (reporter_id, target_id, reason_code, weight, created_at)
-                SELECT 
-                    (elem->>'reporter')::BIGINT,
-                    u.user_id,
-                    COALESCE(elem->>'reason', 'unspecified'),
-                    COALESCE((elem->>'weight')::INTEGER, 1),
-                    to_timestamp(COALESCE((elem->>'timestamp')::DOUBLE PRECISION, EXTRACT(EPOCH FROM NOW())))
-                FROM {legacy_tbl} u,
-                     jsonb_array_elements(u.report_log::jsonb) AS elem
-                WHERE u.report_log IS NOT NULL 
-                  AND jsonb_typeof(u.report_log::jsonb) = 'array'
-                  AND (elem->>'reporter') IS NOT NULL
-                  AND (elem->>'reporter')::BIGINT IN (SELECT user_id FROM users)
-                  AND NOT EXISTS (
-                      SELECT 1 FROM user_reports ur 
-                      WHERE ur.reporter_id = (elem->>'reporter')::BIGINT 
-                        AND ur.target_id = u.user_id
-                  );
-            """)
-        except Exception as e:
-            logger.warning(f"Report logs legacy migration notice: {e}")
+        # 8. Migrate ratings into user_ratings and reports into user_reports
+        await _migrate_ratings_and_reports(conn, legacy_tbl)
 
         # 9. Migrate active chat sessions from partner_id
         try:
@@ -385,7 +549,7 @@ async def run_migrations(conn: AsyncConnection):
     try:
         await conn.execute("""
             INSERT INTO bot_config (key, value)
-            VALUES ('legacy_migration_completed', '{"completed": true}'::jsonb)
+            VALUES ('legacy_migration_completed', '{"completed": true, "ratings_migrated": true}'::jsonb)
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
         """)
         logger.info("Recorded legacy migration completion in bot_config.")
