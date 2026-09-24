@@ -33,6 +33,23 @@ def test_schema_ddl_syntax():
     assert "idx_blocks_lookup" in CREATE_TABLES_SQL
 
 
+def test_user_profiles_schema_normalized_no_obsolete_columns():
+    """Verify user_profiles DDL does not contain votes, reports, or feedback_track."""
+    import re
+    match = re.search(r"CREATE TABLE IF NOT EXISTS user_profiles \((.*?)\);", CREATE_TABLES_SQL, re.DOTALL)
+    assert match is not None
+    table_def = match.group(1)
+
+    obsolete_columns = [
+        "feedback_track", "partner_id", "voters", "points", "preferences",
+        "subscription_expires", "subscription_tier", "referred_by", "referral_count",
+        "votes_up", "votes_down", "reports_count", "report_log"
+    ]
+    for col in obsolete_columns:
+        assert col not in table_def, f"Obsolete column '{col}' should not be in user_profiles schema DDL"
+
+
+
 @pytest.mark.asyncio
 async def test_check_user_profile_preserves_existing_user(monkeypatch):
     """

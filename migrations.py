@@ -36,11 +36,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     daily_credits_reset_day DATE NOT NULL DEFAULT CURRENT_DATE,
     is_banned BOOLEAN NOT NULL DEFAULT FALSE,
     preferred_gender VARCHAR(8) NOT NULL DEFAULT 'ANY',
-    preferred_country VARCHAR(64) NOT NULL DEFAULT 'ANY',
-    votes_up INTEGER NOT NULL DEFAULT 0,
-    votes_down INTEGER NOT NULL DEFAULT 0,
-    reports_count INTEGER NOT NULL DEFAULT 0,
-    report_log JSONB NOT NULL DEFAULT '[]'::jsonb
+    preferred_country VARCHAR(64) NOT NULL DEFAULT 'ANY'
 );
 
 -- User Blocks (M:N between users)
@@ -188,10 +184,26 @@ async def run_migrations(conn: AsyncConnection):
     await conn.execute("""
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_gender VARCHAR(8) DEFAULT 'ANY';
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_country VARCHAR(64) DEFAULT 'ANY';
-        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS votes_up INTEGER NOT NULL DEFAULT 0;
-        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS votes_down INTEGER NOT NULL DEFAULT 0;
-        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS reports_count INTEGER NOT NULL DEFAULT 0;
-        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS report_log JSONB NOT NULL DEFAULT '[]'::jsonb;
+    """)
+
+    # Drop removed/obsolete columns from user_profiles
+    await conn.execute("""
+        ALTER TABLE user_profiles 
+            DROP COLUMN IF EXISTS feedback_track,
+            DROP COLUMN IF EXISTS partner_id,
+            DROP COLUMN IF EXISTS voters,
+            DROP COLUMN IF EXISTS points,
+            DROP COLUMN IF EXISTS preferences,
+            DROP COLUMN IF EXISTS subscription_expires,
+            DROP COLUMN IF EXISTS subscription_tier,
+            DROP COLUMN IF EXISTS referred_by,
+            DROP COLUMN IF EXISTS referral_count,
+            DROP COLUMN IF EXISTS referral_rewarded_count,
+            DROP COLUMN IF EXISTS referral_credited,
+            DROP COLUMN IF EXISTS votes_up,
+            DROP COLUMN IF EXISTS votes_down,
+            DROP COLUMN IF EXISTS reports_count,
+            DROP COLUMN IF EXISTS report_log;
     """)
 
     # 2. Check for legacy tables (works seamlessly whether named 'legacy_user_details_backup' or 'user_details')
@@ -230,12 +242,11 @@ async def run_migrations(conn: AsyncConnection):
                 points = GREATEST(COALESCE(EXCLUDED.points, 0), users.points);
         """)
 
-        # 4. Migrate user profiles, moderation state, votes, and reports count
+        # 4. Migrate user profiles & moderation state
         await conn.execute(f"""
             INSERT INTO user_profiles (
                 user_id, severity_score, restricted_until, restriction_reason,
-                last_severity_decay, daily_credits_used, daily_credits_reset_day, is_banned,
-                votes_up, votes_down, reports_count, report_log
+                last_severity_decay, daily_credits_used, daily_credits_reset_day, is_banned
             )
             SELECT 
                 user_id,
@@ -249,12 +260,7 @@ async def run_migrations(conn: AsyncConnection):
                 CASE WHEN daily_credits_reset_day ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}$' 
                      THEN daily_credits_reset_day::DATE ELSE CURRENT_DATE END,
                 CASE WHEN restricted_until IS NOT NULL AND restricted_until > 2000000000 
-                     THEN TRUE ELSE FALSE END,
-                COALESCE(vote_up, 0),
-                COALESCE(vote_down, 0),
-                COALESCE(reports, 0),
-                CASE WHEN report_log IS NOT NULL AND jsonb_typeof(report_log::jsonb) = 'array'
-                     THEN report_log::jsonb ELSE '[]'::jsonb END
+                     THEN TRUE ELSE FALSE END
             FROM {legacy_tbl}
             ON CONFLICT (user_id) DO UPDATE SET
                 severity_score = EXCLUDED.severity_score,
@@ -263,15 +269,7 @@ async def run_migrations(conn: AsyncConnection):
                 last_severity_decay = EXCLUDED.last_severity_decay,
                 daily_credits_used = EXCLUDED.daily_credits_used,
                 daily_credits_reset_day = EXCLUDED.daily_credits_reset_day,
-                is_banned = EXCLUDED.is_banned,
-                votes_up = GREATEST(COALESCE(EXCLUDED.votes_up, 0), user_profiles.votes_up),
-                votes_down = GREATEST(COALESCE(EXCLUDED.votes_down, 0), user_profiles.votes_down),
-                reports_count = GREATEST(COALESCE(EXCLUDED.reports_count, 0), user_profiles.reports_count),
-                report_log = CASE 
-                    WHEN user_profiles.report_log IS NULL OR user_profiles.report_log = '[]'::jsonb 
-                    THEN EXCLUDED.report_log 
-                    ELSE user_profiles.report_log 
-                END;
+                is_banned = EXCLUDED.is_banned;
         """)
 
         # 5. Migrate subscriptions

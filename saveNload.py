@@ -117,10 +117,10 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
             COALESCE(p.preferred_gender, 'ANY') as pref_gender,
             COALESCE(p.preferred_country, 'ANY') as pref_country,
             s.tier as subscription_tier, s.expires_at as subscription_expires,
-            GREATEST(COALESCE(p.votes_up, 0), COALESCE(r_up.votes_up, 0)) as votes_up,
-            GREATEST(COALESCE(p.votes_down, 0), COALESCE(r_down.votes_down, 0)) as votes_down,
-            GREATEST(COALESCE(p.reports_count, 0), COALESCE(rep.reports_count, 0)) as reports_count,
-            COALESCE(p.report_log, '[]'::jsonb) as report_log,
+            COALESCE(r_up.votes_up, 0) as votes_up,
+            COALESCE(r_down.votes_down, 0) as votes_down,
+            COALESCE(rep.reports_count, 0) as reports_count,
+            COALESCE(rep_data.report_log, '[]'::jsonb) as report_log,
             ref.referrer_id as referred_by,
             ref.credited as referral_credited,
             COALESCE(ref_count.total_referrals, 0) as referral_count,
@@ -145,6 +145,15 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
             SELECT target_id, COUNT(*) as reports_count 
             FROM user_reports GROUP BY target_id
         ) rep ON u.user_id = rep.target_id
+        LEFT JOIN (
+            SELECT target_id, jsonb_agg(jsonb_build_object(
+                'reporter', reporter_id,
+                'reason', reason_code,
+                'weight', weight,
+                'timestamp', EXTRACT(EPOCH FROM created_at)
+            ) ORDER BY created_at DESC) as report_log
+            FROM user_reports GROUP BY target_id
+        ) rep_data ON u.user_id = rep_data.target_id
         LEFT JOIN referrals ref ON u.user_id = ref.referred_id
         LEFT JOIN (
             SELECT referrer_id, COUNT(*) as total_referrals 
@@ -258,28 +267,12 @@ async def upsert_user(user_id: int, **kwargs):
                     except ValueError:
                         reset_day = date.today()
 
-                votes_val = kwargs.get("votes")
-                if isinstance(votes_val, dict):
-                    v_up = votes_val.get("up", 0)
-                    v_down = votes_val.get("down", 0)
-                else:
-                    v_up = kwargs.get("votes_up", 0)
-                    v_down = kwargs.get("votes_down", 0)
-
-                rep_count = kwargs.get("reports", kwargs.get("reports_count", 0))
-
-                rep_log = kwargs.get("report_log")
-                if not isinstance(rep_log, list):
-                    rep_log = []
-                rep_log_json = json.dumps(rep_log)
-
                 await conn.execute("""
                     INSERT INTO user_profiles (
                         user_id, severity_score, restricted_until, restriction_reason,
                         daily_credits_used, daily_credits_reset_day, is_banned,
-                        preferred_gender, preferred_country,
-                        votes_up, votes_down, reports_count, report_log
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                        preferred_gender, preferred_country
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET
                         severity_score = COALESCE(EXCLUDED.severity_score, user_profiles.severity_score),
                         restricted_until = EXCLUDED.restricted_until,
@@ -288,15 +281,7 @@ async def upsert_user(user_id: int, **kwargs):
                         daily_credits_reset_day = COALESCE(EXCLUDED.daily_credits_reset_day, user_profiles.daily_credits_reset_day),
                         is_banned = COALESCE(EXCLUDED.is_banned, user_profiles.is_banned),
                         preferred_gender = COALESCE(EXCLUDED.preferred_gender, user_profiles.preferred_gender),
-                        preferred_country = COALESCE(EXCLUDED.preferred_country, user_profiles.preferred_country),
-                        votes_up = GREATEST(COALESCE(EXCLUDED.votes_up, 0), user_profiles.votes_up),
-                        votes_down = GREATEST(COALESCE(EXCLUDED.votes_down, 0), user_profiles.votes_down),
-                        reports_count = GREATEST(COALESCE(EXCLUDED.reports_count, 0), user_profiles.reports_count),
-                        report_log = CASE 
-                            WHEN EXCLUDED.report_log IS NOT NULL AND EXCLUDED.report_log != '[]'::jsonb 
-                            THEN EXCLUDED.report_log 
-                            ELSE user_profiles.report_log 
-                        END;
+                        preferred_country = COALESCE(EXCLUDED.preferred_country, user_profiles.preferred_country);
                 """, (
                     user_id,
                     kwargs.get("severity_score", 0),
@@ -307,10 +292,6 @@ async def upsert_user(user_id: int, **kwargs):
                     kwargs.get("is_banned", False),
                     kwargs.get("pref_gender", "ANY"),
                     kwargs.get("pref_country", "ANY"),
-                    v_up,
-                    v_down,
-                    rep_count,
-                    rep_log_json,
                 ))
     except Exception as e:
         logger.warning(f"upsert_user({user_id}) error: {e}")
@@ -980,10 +961,10 @@ async def load_user_data() -> dict:
                     SELECT u.user_id, u.gender, u.age, u.country, u.preferences_bitmask as preferences, u.points,
                            COALESCE(p.preferred_gender, 'ANY') as pref_gender,
                            COALESCE(p.preferred_country, 'ANY') as pref_country,
-                           GREATEST(COALESCE(p.votes_up, 0), COALESCE(r_up.votes_up, 0)) as votes_up,
-                           GREATEST(COALESCE(p.votes_down, 0), COALESCE(r_down.votes_down, 0)) as votes_down,
-                           GREATEST(COALESCE(p.reports_count, 0), COALESCE(rep.reports_count, 0)) as reports_count,
-                           COALESCE(p.report_log, '[]'::jsonb) as report_log
+                           COALESCE(r_up.votes_up, 0) as votes_up,
+                           COALESCE(r_down.votes_down, 0) as votes_down,
+                           COALESCE(rep.reports_count, 0) as reports_count,
+                           COALESCE(rep_data.report_log, '[]'::jsonb) as report_log
                     FROM users u
                     LEFT JOIN user_profiles p ON u.user_id = p.user_id
                     LEFT JOIN (
@@ -998,6 +979,15 @@ async def load_user_data() -> dict:
                         SELECT target_id, COUNT(*) as reports_count 
                         FROM user_reports GROUP BY target_id
                     ) rep ON u.user_id = rep.target_id
+                    LEFT JOIN (
+                        SELECT target_id, jsonb_agg(jsonb_build_object(
+                            'reporter', reporter_id,
+                            'reason', reason_code,
+                            'weight', weight,
+                            'timestamp', EXTRACT(EPOCH FROM created_at)
+                        ) ORDER BY created_at DESC) as report_log
+                        FROM user_reports GROUP BY target_id
+                    ) rep_data ON u.user_id = rep_data.target_id
                     ORDER BY u.updated_at DESC
                     LIMIT 50000;
                 """
