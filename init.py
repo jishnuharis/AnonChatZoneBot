@@ -47,7 +47,6 @@ def _default_user() -> Dict[str, Any]:
         "reporters": [],
         "votes": {"up": 0, "down": 0},
         "voters": [],
-        "feedback_track": {},
         "partner_id": None,
         "points": 0,
         "restricted_until": None,

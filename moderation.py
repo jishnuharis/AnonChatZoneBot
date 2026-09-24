@@ -158,18 +158,30 @@ async def file_report(reporter_id: int, target_id: int, reason_code: str, contex
 
     label, weight = REPORT_REASONS[reason_code]
     details = _ensure_user(target_id)
+    now_ts = time.time()
+
+    # Anti-griefing guard: prevent a single user from spamming penalty weights within 24 hours
+    log = details.setdefault("report_log", [])
+    already_reported_recently = any(
+        isinstance(entry, dict)
+        and entry.get("reporter") == reporter_id
+        and (now_ts - entry.get("timestamp", 0) < 86400)
+        for entry in log
+    )
+    effective_weight = 0 if already_reported_recently else weight
 
     before_score = details.get("severity_score", 0)
     before_severity = severity_for_score(before_score)
 
-    details["severity_score"] = before_score + weight
-    details["reports"] = details.get("reports", 0) + 1
-    log = details.setdefault("report_log", [])
+    details["severity_score"] = before_score + effective_weight
+    if not already_reported_recently:
+        details["reports"] = details.get("reports", 0) + 1
+
     log.append({
         "reporter": reporter_id,
         "reason": reason_code,
-        "weight": weight,
-        "timestamp": time.time(),
+        "weight": effective_weight,
+        "timestamp": now_ts,
     })
     if len(log) > 50:
         del log[: len(log) - 50]
@@ -181,7 +193,7 @@ async def file_report(reporter_id: int, target_id: int, reason_code: str, contex
 
     # Record normalized report in database
     try:
-        await record_user_report(reporter_id, target_id, reason_code, weight)
+        await record_user_report(reporter_id, target_id, reason_code, effective_weight)
     except Exception as e:
         logger.error(f"Failed to record report in DB: {e}")
 
@@ -190,7 +202,7 @@ async def file_report(reporter_id: int, target_id: int, reason_code: str, contex
         await apply_restriction(target_id, after_severity, f"Multiple reports ({label})", context=context)
         triggered = after_severity
 
-    return weight, after_score, triggered
+    return effective_weight, after_score, triggered
 
 
 async def decay_severity_scores():

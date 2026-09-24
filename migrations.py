@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     votes_up INTEGER NOT NULL DEFAULT 0,
     votes_down INTEGER NOT NULL DEFAULT 0,
     reports_count INTEGER NOT NULL DEFAULT 0,
-    feedback_track JSONB NOT NULL DEFAULT '{}'::jsonb,
     report_log JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
@@ -192,7 +191,6 @@ async def run_migrations(conn: AsyncConnection):
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS votes_up INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS votes_down INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS reports_count INTEGER NOT NULL DEFAULT 0;
-        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS feedback_track JSONB NOT NULL DEFAULT '{}'::jsonb;
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS report_log JSONB NOT NULL DEFAULT '[]'::jsonb;
     """)
 
@@ -237,7 +235,7 @@ async def run_migrations(conn: AsyncConnection):
             INSERT INTO user_profiles (
                 user_id, severity_score, restricted_until, restriction_reason,
                 last_severity_decay, daily_credits_used, daily_credits_reset_day, is_banned,
-                votes_up, votes_down, reports_count, feedback_track, report_log
+                votes_up, votes_down, reports_count, report_log
             )
             SELECT 
                 user_id,
@@ -255,8 +253,6 @@ async def run_migrations(conn: AsyncConnection):
                 COALESCE(vote_up, 0),
                 COALESCE(vote_down, 0),
                 COALESCE(reports, 0),
-                CASE WHEN feedback_track IS NOT NULL AND jsonb_typeof(feedback_track::jsonb) = 'object' 
-                     THEN feedback_track::jsonb ELSE '{{}}'::jsonb END,
                 CASE WHEN report_log IS NOT NULL AND jsonb_typeof(report_log::jsonb) = 'array'
                      THEN report_log::jsonb ELSE '[]'::jsonb END
             FROM {legacy_tbl}
@@ -271,11 +267,6 @@ async def run_migrations(conn: AsyncConnection):
                 votes_up = GREATEST(COALESCE(EXCLUDED.votes_up, 0), user_profiles.votes_up),
                 votes_down = GREATEST(COALESCE(EXCLUDED.votes_down, 0), user_profiles.votes_down),
                 reports_count = GREATEST(COALESCE(EXCLUDED.reports_count, 0), user_profiles.reports_count),
-                feedback_track = CASE 
-                    WHEN user_profiles.feedback_track IS NULL OR user_profiles.feedback_track = '{{}}'::jsonb 
-                    THEN EXCLUDED.feedback_track 
-                    ELSE user_profiles.feedback_track 
-                END,
                 report_log = CASE 
                     WHEN user_profiles.report_log IS NULL OR user_profiles.report_log = '[]'::jsonb 
                     THEN EXCLUDED.report_log 

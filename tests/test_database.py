@@ -82,7 +82,7 @@ async def test_check_user_profile_preserves_existing_user(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_legacy_user_votes_and_reports_structure(monkeypatch):
-    """Verify legacy user extraction extracts votes, reports, feedback_track, and report_log."""
+    """Verify legacy user extraction extracts votes, reports, and report_log."""
     from saveNload import _get_legacy_user
     from unittest.mock import AsyncMock, MagicMock
     import json
@@ -96,7 +96,6 @@ async def test_legacy_user_votes_and_reports_structure(monkeypatch):
         15,  # vote_up
         2,   # vote_down
         4,   # reports
-        json.dumps({"999": {"voted": True, "reported": False}}),
         json.dumps([{"reporter": 888, "reason": "spam", "weight": 1, "timestamp": 1690000000}])
     )
 
@@ -110,7 +109,6 @@ async def test_legacy_user_votes_and_reports_structure(monkeypatch):
     assert user["gender"] == "F"
     assert user["votes"] == {"up": 15, "down": 2}
     assert user["reports"] == 4
-    assert user["feedback_track"] == {"999": {"voted": True, "reported": False}}
     assert len(user["report_log"]) == 1
     assert user["report_log"][0]["reason"] == "spam"
 

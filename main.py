@@ -85,14 +85,6 @@ async def periodic_save(context):
     await save_user_data(init.user_details, init.dirty_users)
 
 
-async def periodic_feedback_clear(context):
-    # Safely clear ephemeral feedback tracking from working memory
-    for user_id in list(init.user_details.keys()):
-        details = init.user_details.get(user_id)
-        if details and details.get("feedback_track"):
-            details["feedback_track"] = {}
-
-
 async def periodic_severity_decay(context):
     await decay_severity_scores()
 
@@ -122,7 +114,6 @@ async def on_startup(application):
     await init.load_all()
 
     application.job_queue.run_repeating(periodic_save, interval=60, first=60)
-    application.job_queue.run_repeating(periodic_feedback_clear, interval=28800, first=28800)
     application.job_queue.run_repeating(periodic_severity_decay, interval=86400, first=3600)
     application.job_queue.run_repeating(periodic_queue_sweep, interval=5, first=5)
     application.job_queue.run_repeating(periodic_media_sweep, interval=3600, first=3600)

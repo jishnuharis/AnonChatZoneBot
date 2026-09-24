@@ -83,12 +83,19 @@ async def test_file_report_and_auto_escalation():
     weight, score, triggered = await file_report(reporter, target, "minor", context=mock_context)
     assert weight == 10
     assert score == 10
-    # Score 10 does not cross threshold 32, so triggered is None
     assert triggered is None
 
-    # Manually raise score to 30 and report again
+    # Duplicate report from same reporter within 24 hours has 0 effective weight (anti-griefing)
+    dup_weight, dup_score, _ = await file_report(reporter, target, "nsfw", context=mock_context)
+    assert dup_weight == 0
+    assert dup_score == 10
+
+    # A different reporter reporting increases severity score
+    reporter2 = 333
+    init.user_details[reporter2] = init._default_user()
     init.user_details[target]["severity_score"] = 30
-    weight, score, triggered = await file_report(reporter, target, "nsfw", context=mock_context) # +4 -> 34
+    weight, score, triggered = await file_report(reporter2, target, "nsfw", context=mock_context) # +4 -> 34
+    assert weight == 4
     assert score == 34
     # Crosses threshold 32 -> Level 1 restriction triggered!
     assert triggered == 1
