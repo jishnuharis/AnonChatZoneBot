@@ -206,7 +206,17 @@ async def run_migrations(conn: AsyncConnection):
             DROP COLUMN IF EXISTS report_log;
     """)
 
-    # 2. Check for legacy tables (works seamlessly whether named 'legacy_user_details_backup' or 'user_details')
+    # 2. Check if legacy migration was already completed
+    try:
+        cur = await conn.execute("SELECT value FROM bot_config WHERE key = 'legacy_migration_completed';")
+        cfg_row = await cur.fetchone()
+        if cfg_row and isinstance(cfg_row[0], dict) and cfg_row[0].get("completed"):
+            logger.info("Legacy migration was already completed. Schema is clean and up to date.")
+            return
+    except Exception as e:
+        logger.warning(f"Notice while checking legacy_migration_completed: {e}")
+
+    # 3. Check for legacy tables (works seamlessly whether named 'legacy_user_details_backup' or 'user_details')
     legacy_candidates = []
     for candidate in ('legacy_user_details_backup', 'user_details'):
         cur = await conn.execute(f"SELECT (to_regclass('{candidate}') IS NOT NULL);")
@@ -223,7 +233,7 @@ async def run_migrations(conn: AsyncConnection):
     for legacy_tbl, row_count in legacy_candidates:
         logger.info(f"Found legacy table '{legacy_tbl}' with {row_count} records. Starting complete migration...")
 
-        # 3. Migrate core user records
+        # 4. Migrate core user records (never overwrite existing active user data)
         await conn.execute(f"""
             INSERT INTO users (user_id, gender, age, country, preferences_bitmask, points)
             SELECT 
@@ -234,15 +244,10 @@ async def run_migrations(conn: AsyncConnection):
                 COALESCE(preferences, 0),
                 COALESCE(points, 0)
             FROM {legacy_tbl}
-            ON CONFLICT (user_id) DO UPDATE SET
-                gender = COALESCE(EXCLUDED.gender, users.gender),
-                age = COALESCE(EXCLUDED.age, users.age),
-                country = COALESCE(EXCLUDED.country, users.country),
-                preferences_bitmask = COALESCE(EXCLUDED.preferences_bitmask, users.preferences_bitmask),
-                points = GREATEST(COALESCE(EXCLUDED.points, 0), users.points);
+            ON CONFLICT (user_id) DO NOTHING;
         """)
 
-        # 4. Migrate user profiles & moderation state
+        # 5. Migrate user profiles & moderation state (never overwrite existing active user profile)
         await conn.execute(f"""
             INSERT INTO user_profiles (
                 user_id, severity_score, restricted_until, restriction_reason,
@@ -262,17 +267,10 @@ async def run_migrations(conn: AsyncConnection):
                 CASE WHEN restricted_until IS NOT NULL AND restricted_until > 2000000000 
                      THEN TRUE ELSE FALSE END
             FROM {legacy_tbl}
-            ON CONFLICT (user_id) DO UPDATE SET
-                severity_score = EXCLUDED.severity_score,
-                restricted_until = EXCLUDED.restricted_until,
-                restriction_reason = EXCLUDED.restriction_reason,
-                last_severity_decay = EXCLUDED.last_severity_decay,
-                daily_credits_used = EXCLUDED.daily_credits_used,
-                daily_credits_reset_day = EXCLUDED.daily_credits_reset_day,
-                is_banned = EXCLUDED.is_banned;
+            ON CONFLICT (user_id) DO NOTHING;
         """)
 
-        # 5. Migrate subscriptions
+        # 6. Migrate subscriptions (prevent duplicate rows)
         try:
             await conn.execute(f"""
                 INSERT INTO subscriptions (user_id, tier, starts_at, expires_at, source, is_active)
@@ -286,12 +284,17 @@ async def run_migrations(conn: AsyncConnection):
                 FROM {legacy_tbl}
                 WHERE subscription_tier IS NOT NULL 
                   AND subscription_expires IS NOT NULL 
-                  AND subscription_expires > 0;
+                  AND subscription_expires > 0
+                  AND NOT EXISTS (
+                      SELECT 1 FROM subscriptions s
+                      WHERE s.user_id = {legacy_tbl}.user_id
+                        AND s.source = 'legacy_migration'
+                  );
             """)
         except Exception as e:
             logger.warning(f"Subscriptions legacy migration notice: {e}")
 
-        # 6. Migrate referrals
+        # 7. Migrate referrals
         try:
             await conn.execute(f"""
                 INSERT INTO referrals (referred_id, referrer_id, credited)
@@ -308,7 +311,7 @@ async def run_migrations(conn: AsyncConnection):
         except Exception as e:
             logger.warning(f"Referrals legacy migration notice: {e}")
 
-        # 7. Migrate detailed report logs into user_reports audit table (safely without duplicates)
+        # 8. Migrate detailed report logs into user_reports audit table (safely without duplicates)
         try:
             await conn.execute(f"""
                 INSERT INTO user_reports (reporter_id, target_id, reason_code, weight, created_at)
@@ -333,7 +336,7 @@ async def run_migrations(conn: AsyncConnection):
         except Exception as e:
             logger.warning(f"Report logs legacy migration notice: {e}")
 
-        # 8. Migrate active chat sessions from partner_id
+        # 9. Migrate active chat sessions from partner_id
         try:
             await conn.execute(f"""
                 INSERT INTO chat_sessions (id, user1_id, user2_id, status, started_at)
@@ -358,4 +361,27 @@ async def run_migrations(conn: AsyncConnection):
         except Exception as e:
             logger.warning(f"Chat sessions legacy migration notice: {e}")
 
+        # 10. Safely rename user_details to legacy_user_details_backup if still named user_details
+        if legacy_tbl == "user_details":
+            try:
+                cur = await conn.execute("SELECT (to_regclass('legacy_user_details_backup') IS NOT NULL);")
+                backup_exists = (await cur.fetchone())[0]
+                if not backup_exists:
+                    await conn.execute("ALTER TABLE user_details RENAME TO legacy_user_details_backup;")
+                    logger.info("Renamed user_details to legacy_user_details_backup.")
+            except Exception as e:
+                logger.warning(f"Notice during user_details rename: {e}")
+
         logger.info(f"Successfully migrated all data from '{legacy_tbl}'.")
+
+    # 11. Record completion in bot_config so future startups skip scanning legacy tables
+    try:
+        await conn.execute("""
+            INSERT INTO bot_config (key, value)
+            VALUES ('legacy_migration_completed', '{"completed": true}'::jsonb)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+        """)
+        logger.info("Recorded legacy migration completion in bot_config.")
+    except Exception as e:
+        logger.warning(f"Notice recording legacy migration completion: {e}")
+
