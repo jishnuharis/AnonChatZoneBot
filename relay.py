@@ -1,29 +1,37 @@
+import logging
+import time
 from telegram import Update
+from telegram.constants import ChatAction
+from telegram.error import Forbidden
 from telegram.ext import ContextTypes
 
 from handlers.setup import handle_user_setup
-from security import safe_tele_func_call
+from security import safe_tele_func_call, check_rate_limit
 from media_privacy import extract_media, maybe_send_private, split_private_caption, SUPPORTED_KINDS
 from message import FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, MEDIA_DAILY_LIMIT_REACHED_TEXT
 from subscription import is_subscribed, has_daily_credit, consume_daily_credit, daily_credit_limit
+from session_manager import handle_transport_disconnect
 
 import init
+
+logger = logging.getLogger(__name__)
 
 MAX_MAP_ENTRIES = 300
 
 _KIND_LABELS = {"photo": "photo", "video": "video", "voice": "voice note", "video_note": "video note"}
 
 
-def _remember(a_id, a_msg_id, b_id, b_msg_id):
+def _remember(a_id: int, a_msg_id: int, b_id: int, b_msg_id: int):
     for owner, local_id, other, other_id in ((a_id, a_msg_id, b_id, b_msg_id), (b_id, b_msg_id, a_id, a_msg_id)):
         bucket = init.message_map.setdefault(owner, {})
         bucket[local_id] = (other, other_id)
         if len(bucket) > MAX_MAP_ENTRIES:
+            # Drop oldest keys
             for stale_key in list(bucket.keys())[:len(bucket) - MAX_MAP_ENTRIES]:
                 bucket.pop(stale_key, None)
 
 
-def _resolve_reply(user_id, partner_id, msg):
+def _resolve_reply(user_id: int, partner_id: int, msg):
     if not msg.reply_to_message:
         return None
     mapped = init.message_map.get(user_id, {}).get(msg.reply_to_message.message_id)
@@ -34,12 +42,32 @@ def _resolve_reply(user_id, partner_id, msg):
 
 async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+
+    if not check_rate_limit(user_id):
+        return  # Silently throttle spam
+
     if user_id in init.user_input_stage or user_id in init.edit_stage:
         await handle_user_setup(update, context)
         return
+
     if user_id in init.active_pairs:
         partner_id = init.active_pairs[user_id]
         msg = update.message
+        if not msg:
+            return
+
+        # Intercept In-Chat Button taps from keyboard
+        if msg.text == "👋 Nudge":
+            from commands.nudge import handle_nudge
+            await handle_nudge(update, context)
+            return
+
+        if msg.text in ("⏱️ /status", "⏱️ Status"):
+            from commands.nudge import status_command
+            await status_command(update, context)
+            return
+
+        init.last_activity[user_id] = time.time()
 
         kind, file_id, caption, duration = extract_media(msg)
         if kind in SUPPORTED_KINDS:
@@ -56,42 +84,62 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
+        # Dispatch partner typing/upload chat action
+        if kind == "photo":
+            await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.UPLOAD_PHOTO)
+        elif kind == "video":
+            await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.UPLOAD_VIDEO)
+        elif kind == "voice":
+            await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.RECORD_VOICE)
+        elif kind == "video_note":
+            await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.RECORD_VIDEO_NOTE)
+        elif msg.document:
+            await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.UPLOAD_DOCUMENT)
+        elif msg.text:
+            await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.TYPING)
+
         reply_to = _resolve_reply(user_id, partner_id, msg)
 
         try:
             sent = None
             if msg.text:
-                sent = await safe_tele_func_call(context.bot.send_message, chat_id=partner_id, text=msg.text, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_message, chat_id=partner_id, text=msg.text, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
             elif kind == "photo":
-                sent = await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
                 if sent and not is_subscribed(user_id):
                     consume_daily_credit(user_id)
             elif kind == "video":
-                sent = await safe_tele_func_call(context.bot.send_video, chat_id=partner_id, video=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_video, chat_id=partner_id, video=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
                 if sent and not is_subscribed(user_id):
                     consume_daily_credit(user_id)
             elif kind == "voice":
-                sent = await safe_tele_func_call(context.bot.send_voice, chat_id=partner_id, voice=file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_voice, chat_id=partner_id, voice=file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
                 if sent and not is_subscribed(user_id):
                     consume_daily_credit(user_id)
             elif kind == "video_note":
-                sent = await safe_tele_func_call(context.bot.send_video_note, chat_id=partner_id, video_note=file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_video_note, chat_id=partner_id, video_note=file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
                 if sent and not is_subscribed(user_id):
                     consume_daily_credit(user_id)
             elif msg.sticker:
-                sent = await safe_tele_func_call(context.bot.send_sticker, chat_id=partner_id, sticker=msg.sticker.file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_sticker, chat_id=partner_id, sticker=msg.sticker.file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
             elif msg.audio:
-                sent = await safe_tele_func_call(context.bot.send_audio, chat_id=partner_id, audio=msg.audio.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_audio, chat_id=partner_id, audio=msg.audio.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
             elif msg.document:
-                sent = await safe_tele_func_call(context.bot.send_document, chat_id=partner_id, document=msg.document.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_document, chat_id=partner_id, document=msg.document.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
             elif msg.animation:
-                sent = await safe_tele_func_call(context.bot.send_animation, chat_id=partner_id, animation=msg.animation.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True)
+                sent = await safe_tele_func_call(context.bot.send_animation, chat_id=partner_id, animation=msg.animation.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
+            elif msg.dice:
+                sent = await safe_tele_func_call(context.bot.send_dice, chat_id=partner_id, emoji=msg.dice.emoji, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
 
             if sent is not None:
                 _remember(user_id, msg.message_id, partner_id, sent.message_id)
+        except Forbidden:
+            # Partner blocked the bot! Cleanly disconnect transport session immediately
+            logger.info(f"Relay detected partner {partner_id} blocked bot. Terminating session.")
+            await handle_transport_disconnect(context, partner_id)
         except Exception as e:
+            logger.error(f"Error relaying message from {user_id} to {partner_id}: {e}")
             await safe_tele_func_call(update.message.reply_text, text=FAILED_TO_SEND_MESSAGE_TEXT, parse_mode="HTML")
-            print(e)
     else:
         await safe_tele_func_call(update.message.reply_text, text=NOT_IN_CHAT_USE_FIND_INLINE_TEXT, parse_mode="HTML")
 

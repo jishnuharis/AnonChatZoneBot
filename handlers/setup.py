@@ -22,6 +22,7 @@ def check_user_profile(handler_func):
             init.user_details[user_id] = init._default_user()
             referral.capture_referral(context, user_id)
             init.user_input_stage[user_id] = "gender"
+            init.dirty_users.add(user_id)
             keyboard = [[
                 InlineKeyboardButton("♂️ Male", callback_data="gender|M"),
                 InlineKeyboardButton("♀️ Female", callback_data="gender|F")

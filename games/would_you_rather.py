@@ -13,75 +13,22 @@ import init
 games = {}
 user_to_session = {}
 
+from games.content.content_manager import get_wyr_prompts
+
 TIMEOUT = 180
 GAME_TYPE = "wyr"
 TOTAL_ROUNDS = 5
 
-PROMPTS = {
-    "Gaming": [
-        ("Only ever play mobile games", "Only ever play console games"),
-        ("Never play multiplayer again", "Never play singleplayer again"),
-    ],
-    "Anime": [
-        ("Only watch subbed anime forever", "Only watch dubbed anime forever"),
-        ("Live in a shonen world", "Live in a slice-of-life world"),
-    ],
-    "Music": [
-        ("Only listen to one artist forever", "Never listen to your favorite genre again"),
-        ("Go to a concert every week", "Never go to a concert again"),
-    ],
-    "Movies": [
-        ("Only watch sequels forever", "Only watch original movies forever"),
-        ("Watch every movie 30 mins shorter", "Watch every movie 30 mins longer"),
-    ],
-    "Sports": [
-        ("Only ever watch sports, never play", "Only ever play sports, never watch"),
-    ],
-    "Memes": [
-        ("Speak only in memes for a day", "Never send a meme again"),
-    ],
-    "Relationships": [
-        ("Always know when someone's lying to you", "Always be able to hide your own feelings perfectly"),
-    ],
-    "Study": [
-        ("Never take a test again", "Never get a summer break again"),
-    ],
-    "Politics": [
-        ("Have to debate politics every day", "Never be allowed to discuss politics again"),
-    ],
-    "Flirting": [
-        ("Only be able to flirt in text, never voice", "Only be able to flirt in voice, never text"),
-    ],
-}
-
-GENERIC_PROMPTS = [
-    ("Be able to fly", "Be able to turn invisible"),
-    ("Always be 10 minutes late", "Always be 20 minutes early"),
-    ("Have unlimited money but no free time", "Have unlimited free time but no money"),
-    ("Live without music", "Live without movies"),
-    ("Know how you'll die", "Know when you'll die"),
-    ("Always say what's on your mind", "Never speak again unless spoken to"),
-    ("Relive your best day forever", "Never remember your best day at all"),
-]
-
-
-def _prompt_pool(u1, u2):
-    p1 = init.user_details.get(u1, {}).get("preferences", 0)
-    p2 = init.user_details.get(u2, {}).get("preferences", 0)
-    shared_tags = [label for i, (label, _) in enumerate(init.PREFERENCE_TAGS) if (p1 & p2) & (1 << i)]
-    pool = list(GENERIC_PROMPTS)
-    for tag in shared_tags:
-        pool.extend(PROMPTS.get(tag, []))
-    return pool
-
 
 def create_session(user1, user2):
     session_id = str(uuid.uuid4())
-    pool = _prompt_pool(user1, user2)
-    random.shuffle(pool)
+    p1 = init.user_details.get(user1, {}).get("preferences", 0)
+    p2 = init.user_details.get(user2, {}).get("preferences", 0)
+    prompts = get_wyr_prompts(p1, p2, limit=TOTAL_ROUNDS)
+
     games[session_id] = {
         "players": [user1, user2],
-        "prompts": pool[:TOTAL_ROUNDS] if len(pool) >= TOTAL_ROUNDS else (pool * 2)[:TOTAL_ROUNDS],
+        "prompts": prompts,
         "round": 0,
         "matches": 0,
         "choices": {},
@@ -89,6 +36,7 @@ def create_session(user1, user2):
         "active": True,
         "timeout_job": None,
     }
+
     user_to_session[user1] = session_id
     user_to_session[user2] = session_id
     registry.register(user1, GAME_TYPE)

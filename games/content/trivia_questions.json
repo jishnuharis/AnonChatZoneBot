@@ -1,0 +1,126 @@
+[
+  {
+    "category": "Science",
+    "question": "What is the most abundant gas in Earth's atmosphere?",
+    "options": ["Oxygen", "Nitrogen", "Carbon Dioxide", "Argon"],
+    "correct_index": 1
+  },
+  {
+    "category": "Science",
+    "question": "Which planet in our solar system has the most moons?",
+    "options": ["Jupiter", "Saturn", "Uranus", "Neptune"],
+    "correct_index": 1
+  },
+  {
+    "category": "Science",
+    "question": "What is the hardest natural substance on Earth?",
+    "options": ["Titanium", "Graphene", "Diamond", "Tungsten"],
+    "correct_index": 2
+  },
+  {
+    "category": "Science",
+    "question": "How many bones are there in the adult human body?",
+    "options": ["196", "206", "216", "226"],
+    "correct_index": 1
+  },
+  {
+    "category": "Science",
+    "question": "What part of the cell is known as the powerhouse?",
+    "options": ["Nucleus", "Ribosome", "Mitochondria", "Golgi apparatus"],
+    "correct_index": 2
+  },
+
+  {
+    "category": "Pop Culture",
+    "question": "Which studio created the classic anime movie 'Spirited Away'?",
+    "options": ["Toei Animation", "Studio Ghibli", "MAPPA", "Madhouse"],
+    "correct_index": 1
+  },
+  {
+    "category": "Pop Culture",
+    "question": "In 'The Matrix', what color pill does Neo choose?",
+    "options": ["Blue", "Red", "Green", "Yellow"],
+    "correct_index": 1
+  },
+  {
+    "category": "Pop Culture",
+    "question": "Who played Iron Man in the Marvel Cinematic Universe?",
+    "options": ["Chris Evans", "Robert Downey Jr.", "Chris Pratt", "Mark Ruffalo"],
+    "correct_index": 1
+  },
+  {
+    "category": "Pop Culture",
+    "question": "Which musical artist holds the record for most Grammy awards won in history?",
+    "options": ["Beyoncé", "Michael Jackson", "Stevie Wonder", "Taylor Swift"],
+    "correct_index": 0
+  },
+
+  {
+    "category": "Gaming",
+    "question": "What year was the original Nintendo Entertainment System (NES) released in North America?",
+    "options": ["1983", "1985", "1987", "1989"],
+    "correct_index": 1
+  },
+  {
+    "category": "Gaming",
+    "question": "In 'Minecraft', which material is required to build a Nether Portal frame?",
+    "options": ["Bedrock", "Crying Obsidian", "Obsidian", "Netherrack"],
+    "correct_index": 2
+  },
+  {
+    "category": "Gaming",
+    "question": "What is the name of the protagonist in 'The Legend of Zelda' series?",
+    "options": ["Zelda", "Link", "Ganon", "Sheik"],
+    "correct_index": 1
+  },
+  {
+    "category": "Gaming",
+    "question": "Which game won Game of the Year at The Game Awards in 2022?",
+    "options": ["God of War Ragnarök", "Elden Ring", "Horizon Forbidden West", "Stray"],
+    "correct_index": 1
+  },
+
+  {
+    "category": "Geography",
+    "question": "What is the capital city of Australia?",
+    "options": ["Sydney", "Melbourne", "Canberra", "Brisbane"],
+    "correct_index": 2
+  },
+  {
+    "category": "Geography",
+    "question": "Which is the longest river in the world?",
+    "options": ["Amazon River", "Nile River", "Yangtze River", "Mississippi River"],
+    "correct_index": 1
+  },
+  {
+    "category": "Geography",
+    "question": "Which country has the most natural lakes in the world?",
+    "options": ["USA", "Russia", "Canada", "Finland"],
+    "correct_index": 2
+  },
+  {
+    "category": "Geography",
+    "question": "Mount Everest is located on the border between Nepal and which territory?",
+    "options": ["India", "Bhutan", "China (Tibet)", "Pakistan"],
+    "correct_index": 2
+  },
+
+  {
+    "category": "History",
+    "question": "In what year did the Apollo 11 mission land the first humans on the Moon?",
+    "options": ["1965", "1969", "1971", "1975"],
+    "correct_index": 1
+  },
+  {
+    "category": "History",
+    "question": "Who was the first Emperor of a unified China (Qin Dynasty)?",
+    "options": ["Sun Tzu", "Qin Shi Huang", "Kublai Khan", "Han Wudi"],
+    "correct_index": 1
+  },
+  {
+    "category": "History",
+    "question": "Which ancient civilization constructed Machu Picchu?",
+    "options": ["Aztecs", "Mayans", "Incas", "Olmecs"],
+    "correct_index": 2
+  }
+]

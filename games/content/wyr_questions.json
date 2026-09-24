@@ -1,0 +1,46 @@
+[
+  {"category": "Life", "prompt_a": "Be able to fly at 20 mph", "prompt_b": "Be able to teleport once per day"},
+  {"category": "Life", "prompt_a": "Always be 15 minutes early", "prompt_b": "Always be 10 minutes late"},
+  {"category": "Life", "prompt_a": "Have unlimited money but only 4 hours of free time a week", "prompt_b": "Have total free time but just enough money for basics"},
+  {"category": "Life", "prompt_a": "Live without music for the rest of your life", "prompt_b": "Live without movies/shows for the rest of your life"},
+  {"category": "Life", "prompt_a": "Know how you will die", "prompt_b": "Know when you will die"},
+  {"category": "Life", "prompt_a": "Always say whatever is on your mind", "prompt_b": "Never speak unless someone speaks to you first"},
+  {"category": "Life", "prompt_a": "Relive your best day on repeat forever", "prompt_b": "Live a completely unpredictable life every day"},
+  {"category": "Life", "prompt_a": "Have the power to pause time", "prompt_b": "Have the power to rewind time by 10 seconds"},
+  {"category": "Life", "prompt_a": "Be famous in history books for something weird", "prompt_b": "Be completely forgotten by history"},
+  {"category": "Life", "prompt_a": "Only be able to whisper", "prompt_b": "Only be able to shout"},
+
+  {"category": "Gaming", "prompt_a": "Only play singleplayer RPGs forever", "prompt_b": "Only play competitive multiplayer games forever"},
+  {"category": "Gaming", "prompt_a": "Play at 30 FPS in 4K resolution", "prompt_b": "Play at 144 FPS in 720p resolution"},
+  {"category": "Gaming", "prompt_a": "Live inside the GTA universe", "prompt_b": "Live inside the Cyberpunk 2077 universe"},
+  {"category": "Gaming", "prompt_a": "Only play retro 90s games forever", "prompt_b": "Only play modern mobile games forever"},
+  {"category": "Gaming", "prompt_a": "Never be able to invert Y-axis again", "prompt_b": "Have to play every game on maximum difficulty"},
+  {"category": "Gaming", "prompt_a": "Have unlimited game library but mediocre hardware", "prompt_b": "Have an absolute top-tier PC but only 3 games"},
+  {"category": "Gaming", "prompt_a": "Be a legendary esports champion for 2 years", "prompt_b": "Be a beloved casual variety streamer for 10 years"},
+  {"category": "Gaming", "prompt_a": "Never experience a game bug again", "prompt_b": "Get all future game releases 1 month early"},
+
+  {"category": "Anime", "prompt_a": "Only watch subbed anime forever", "prompt_b": "Only watch dubbed anime forever"},
+  {"category": "Anime", "prompt_a": "Live in a peaceful slice-of-life anime", "prompt_b": "Live in a high-stakes shonen action anime"},
+  {"category": "Anime", "prompt_a": "Have a Death Note with only 3 names allowed", "prompt_b": "Have a Geass power that works on only 1 person total"},
+  {"category": "Anime", "prompt_a": "Possess the One Piece", "prompt_b": "Master all seven Dragon Balls once"},
+  {"category": "Anime", "prompt_a": "Be trained by Saitama", "prompt_b": "Be trained by Master Roshi"},
+  {"category": "Anime", "prompt_a": "Wield the ODM gear from Attack on Titan", "prompt_b": "Have a Stand from JoJo's Bizarre Adventure"},
+
+  {"category": "Relationships", "prompt_a": "Always know when someone is lying to you", "prompt_b": "Always be able to hide your own emotions perfectly"},
+  {"category": "Relationships", "prompt_a": "Find true love at age 45", "prompt_b": "Have 5 fun relationships in your 20s and 30s that end peacefully"},
+  {"category": "Relationships", "prompt_a": "Your partner reads all your chat messages", "prompt_b": "Your partner reads your complete browser search history"},
+  {"category": "Relationships", "prompt_a": "Be with someone who talks too much", "prompt_b": "Be with someone who rarely talks at all"},
+  {"category": "Relationships", "prompt_a": "Receive a deeply thoughtful gift on birthdays only", "prompt_b": "Receive small surprise gestures every week"},
+  {"category": "Relationships", "prompt_a": "Never argue but have low passion", "prompt_b": "Argue occasionally but have undeniable chemistry"},
+
+  {"category": "Philosophy", "prompt_a": "Discover human life is a simulation", "prompt_b": "Discover humans are the only intelligent species in the universe"},
+  {"category": "Philosophy", "prompt_a": "Know all mysteries of deep space", "prompt_b": "Know all secrets of deep oceans"},
+  {"category": "Philosophy", "prompt_a": "Be immortal while everyone else ages", "prompt_b": "Live a regular 80-year life with zero physical pain"},
+  {"category": "Philosophy", "prompt_a": "Have the ability to speak every human language", "prompt_b": "Have the ability to communicate fluently with all animals"},
+  {"category": "Philosophy", "prompt_a": "Eliminate all greed in the world", "prompt_b": "Eliminate all dishonesty in the world"},
+
+  {"category": "Tech", "prompt_a": "Give up smartphone for 1 year for $100,000", "prompt_b": "Keep smartphone but forfeit all video streaming for 3 years"},
+  {"category": "Tech", "prompt_a": "AI takes over all human manual labor", "prompt_b": "AI takes over all human creative and artistic pursuits"},
+  {"category": "Tech", "prompt_a": "Have 100 Gbps internet anywhere on Earth", "prompt_b": "Have an unbreakable battery on all devices that never dies"},
+  {"category": "Tech", "prompt_a": "Never have to remember a password again", "prompt_b": "Never have to sit through an ad ever again"}
+]

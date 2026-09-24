@@ -11,7 +11,6 @@ import subscription
 import init
 
 REWARD_TIER = "weekly"
-
 ANNOUNCE_CHANCE = 1 / 20
 
 
@@ -46,9 +45,16 @@ def capture_referral(context, user_id: int):
         inviter_id = int(args[0][len("ref_"):])
     except ValueError:
         return
-    if inviter_id == user_id or inviter_id not in init.user_details:
+
+    # Check that user cannot refer self and user was not already referred
+    if inviter_id == user_id:
         return
-    init.user_details[user_id]["referred_by"] = inviter_id
+
+    details = init.user_details.setdefault(user_id, init._default_user())
+    if details.get("referred_by") is not None:
+        return  # Already referred, do not overwrite!
+
+    details["referred_by"] = inviter_id
     init.dirty_users.add(user_id)
 
 
@@ -70,28 +76,35 @@ async def credit_referral(context, user_id: int):
         return
 
     required = init.referral_scheme["required_referrals"]
-    unrewarded = inviter["referral_count"] - inviter.get("referral_rewarded_count", 0)
-    if unrewarded < required:
+    if required <= 0:
         return
 
-    inviter["referral_rewarded_count"] = inviter.get("referral_rewarded_count", 0) + required
-    init.dirty_users.add(inviter_id)
+    # Reward all accumulated full multiples
+    rewards_granted = 0
+    while True:
+        unrewarded = inviter["referral_count"] - inviter.get("referral_rewarded_count", 0)
+        if unrewarded < required:
+            break
+        inviter["referral_rewarded_count"] = inviter.get("referral_rewarded_count", 0) + required
+        rewards_granted += 1
+        new_expiry = subscription.grant_subscription(inviter_id, REWARD_TIER, source="referral")
 
-    tier = subscription.TIERS[REWARD_TIER]
-    new_expiry = subscription.grant_subscription(inviter_id, REWARD_TIER, source="referral")
-    expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(new_expiry))
+    if rewards_granted > 0:
+        init.dirty_users.add(inviter_id)
+        tier = subscription.TIERS[REWARD_TIER]
+        expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(new_expiry))
 
-    await safe_tele_func_call(
-        context.bot.send_message,
-        chat_id=inviter_id,
-        text=(
-            f"🎉 <b>Referral reward unlocked!</b>\n"
-            f"<i>You've referred {required} more friends who joined and finished setting up their profile.</i>\n"
-            f"<i>+{tier['label']} subscription granted, active until</i> <code>{expires_str}</code> "
-            f"<i>(+{tier['bonus_points']} points too) 🎁</i>"
-        ),
-        parse_mode="HTML",
-    )
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=inviter_id,
+            text=(
+                f"🎉 <b>Referral reward unlocked!</b>\n"
+                f"<i>You've referred {required * rewards_granted} friends who joined and finished setting up their profile.</i>\n"
+                f"<i>+{tier['label']} subscription granted, active until</i> <code>{expires_str}</code> "
+                f"<i>(+{tier['bonus_points'] * rewards_granted} points too) 🎁</i>"
+            ),
+            parse_mode="HTML",
+        )
 
 
 def _link_keyboard():

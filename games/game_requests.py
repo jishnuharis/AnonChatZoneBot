@@ -1,3 +1,4 @@
+import time
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
@@ -17,13 +18,17 @@ from message import (
 
 import init
 
+import games.trivia as trivia
+
 GAME_MODULES = {
     "coinsteal": ("Coin Steal 🪙", coin_steal),
     "tictactoe": ("Tic Tac Toe ⭕❌", tictactoe),
     "rps": ("Rock Paper Scissors 🪨📄✂️", rps),
     "guessit": ("Guess It 🔢", guess_it),
     "wyr": ("Would You Rather 🤔", would_you_rather),
+    "trivia": ("Trivia Duel 🧠", trivia),
 }
+
 
 for _game_type, (_label, _module) in GAME_MODULES.items():
     registry.set_force_end_handler(_game_type, _module.force_end_game)
@@ -54,9 +59,14 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE, game_
         await safe_tele_func_call(update.effective_message.reply_text, text=PARTNER_ALREADY_IN_GAME_TEXT, parse_mode="HTML")
         return
 
-    if partner_id in init.game_requests:
-        await safe_tele_func_call(update.effective_message.reply_text, text=CANT_SPAM_GAME_REQUESTS_TEXT, parse_mode="HTML")
-        return
+    # Check TTL on existing request
+    existing = init.game_requests.get(partner_id)
+    if existing:
+        if time.time() - existing.get("timestamp", 0) > 60:
+            init.game_requests.pop(partner_id, None)
+        else:
+            await safe_tele_func_call(update.effective_message.reply_text, text=CANT_SPAM_GAME_REQUESTS_TEXT, parse_mode="HTML")
+            return
 
     keyboard = [[
         InlineKeyboardButton("✅ Accept", callback_data="gamereq|accept"),
@@ -72,7 +82,7 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE, game_
     )
 
     await safe_tele_func_call(update.effective_message.reply_text, text=WAITING_FOR_PARTNER_ACCEPT_TEXT, parse_mode="HTML")
-    init.game_requests[partner_id] = {"from": user_id, "game": game_type}
+    init.game_requests[partner_id] = {"from": user_id, "game": game_type, "timestamp": time.time()}
 
 
 async def handle_game_request_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -82,8 +92,9 @@ async def handle_game_request_response(update: Update, context: ContextTypes.DEF
     user_id = query.from_user.id
     action = query.data.split("|")[1]
 
-    request = init.game_requests.get(user_id)
-    if not request:
+    # Atomically pop request immediately to eliminate double-accept race condition
+    request = init.game_requests.pop(user_id, None)
+    if not request or (time.time() - request.get("timestamp", 0) > 90):
         await safe_tele_func_call(query.edit_message_text, text=GAME_REQUEST_EXPIRED_TEXT, parse_mode="HTML")
         return
 
@@ -94,14 +105,12 @@ async def handle_game_request_response(update: Update, context: ContextTypes.DEF
     if action == "decline":
         await safe_tele_func_call(query.edit_message_text, text=YOU_DECLINED_REQUEST_TEXT, parse_mode="HTML")
         await safe_tele_func_call(context.bot.send_message, chat_id=requester_id, text=PARTNER_DECLINED_REQUEST_TEXT, parse_mode="HTML")
-        init.game_requests.pop(user_id, None)
         return
 
     still_partnered = init.user_details.get(requester_id, {}).get("partner_id") == user_id
     either_already_in_game = registry.get_active(requester_id) or registry.get_active(user_id)
 
     if not still_partnered or either_already_in_game:
-        init.game_requests.pop(user_id, None)
         await safe_tele_func_call(query.edit_message_text, text=GAME_REQUEST_EXPIRED_TEXT, parse_mode="HTML")
         await safe_tele_func_call(context.bot.send_message, chat_id=requester_id, text=GAME_REQUEST_EXPIRED_TEXT, parse_mode="HTML")
         return
@@ -111,5 +120,3 @@ async def handle_game_request_response(update: Update, context: ContextTypes.DEF
 
     session_id = module.create_session(requester_id, user_id)
     await module.send_round(context, session_id)
-
-    init.game_requests.pop(user_id, None)

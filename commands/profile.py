@@ -17,6 +17,7 @@ def _profile_keyboard():
          InlineKeyboardButton("✏️ Edit Age", callback_data="edit|age")],
         [InlineKeyboardButton("✏️ Edit Country", callback_data="edit|country"),
          InlineKeyboardButton("🏷️ Edit Interests", callback_data="edit|preferences")],
+        [InlineKeyboardButton("⭐ Match Filters (Gender/Country)", callback_data="edit|match_filters")],
         [InlineKeyboardButton("🔗 My Referral Link", callback_data="refgen")],
     ])
 
@@ -38,6 +39,12 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
     votes = user.get("votes", {"up": 0, "down": 0})
     prefs_text = esc(describe_preferences(user.get("preferences", 0)))
 
+    pref_g = user.get("pref_gender", "ANY")
+    pref_c = user.get("pref_country", "ANY")
+    g_map = {"ANY": "Any", "M": "Male Only", "F": "Female Only"}
+    c_map = {"ANY": "Any", "SAME": f"Same Country ({user.get('country')})"}
+    filter_line = f"<b>Match Filters:</b> {g_map.get(pref_g, pref_g)} | {c_map.get(pref_c, pref_c)}\n" if subscription.is_subscribed(user_id) else ""
+
     return (
         "<b>👤 Your Profile</b>\n\n"
         f"<b>Name:</b> {full_name}{username_line}\n"
@@ -48,6 +55,7 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
         f"<b>Interests:</b> {prefs_text}\n"
         f"<b>Rating:</b> {votes['up']} 👍 {votes['down']} 👎\n"
         f"<b>Points:</b> {user['points']}\n\n"
+        f"{filter_line}"
         f"{subscription.status_text(user_id)}"
     )
 

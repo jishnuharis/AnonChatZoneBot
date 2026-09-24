@@ -1,3 +1,5 @@
+import os
+import logging
 from telegram import BotCommand, Update
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler,
@@ -12,11 +14,16 @@ from commands.start import start
 from commands.find import find
 from commands.next import skip_partner
 from commands.stop import stop
+from commands.block import block_command
+from commands.nudge import handle_nudge, status_command
 from commands.cancel import cancel
 from commands.help import help_command
 from commands.profile import show_profile
 from commands.games import games_menu, handle_games_menu_selection
-from commands.admin_commands import broadcast, connect, ban_user, unban_user, check_user, giveaway_subscription, referral_scheme_command
+from commands.admin_commands import (
+    broadcast, connect, ban_user, unban_user, check_user,
+    giveaway_subscription, referral_scheme_command, admin_stats, queue_stats, campaign_command
+)
 from commands.subscribe import show_subscribe_menu, handle_tier_selection
 from handlers.payments import handle_pre_checkout, handle_successful_payment
 from referral import handle_referral_link_button
@@ -33,6 +40,7 @@ import games.tictactoe as tictactoe
 import games.rps as rps
 import games.guess_it as guess_it
 import games.would_you_rather as would_you_rather
+import games.trivia as trivia
 
 from media_privacy import handle_private_command, handle_view_once, sweep_expired_media
 
@@ -41,6 +49,12 @@ from moderation import decay_severity_scores
 
 import init
 
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
 
 async def set_commands(application):
     commands = [
@@ -48,12 +62,13 @@ async def set_commands(application):
         BotCommand("find", "Find a new chat partner"),
         BotCommand("next", "Skip your current partner"),
         BotCommand("stop", "Stop the current chat"),
-        BotCommand("cancel", "Cancel your ongoing game"),
+        BotCommand("block", "Block current partner"),
+        BotCommand("cancel", "Cancel ongoing game or request"),
         BotCommand("help", "Show help"),
         BotCommand("profile", "Show user profile"),
-        BotCommand("games", "Play a mini-game with your partner"),
-        BotCommand("private", "Arm Privacy Mode for your next media"),
-        BotCommand("subscribe", "View/purchase a subscription plan"),
+        BotCommand("games", "Play a mini-game with partner"),
+        BotCommand("private", "Arm Privacy Mode for next media"),
+        BotCommand("subscribe", "View/purchase subscription"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -63,14 +78,15 @@ async def periodic_save(context):
 
 
 async def periodic_feedback_clear(context):
-    for user_id, details in init.user_details.items():
-        if details.get("feedback_track"):
+    # Safely clear ephemeral feedback tracking from working memory
+    for user_id in list(init.user_details.keys()):
+        details = init.user_details.get(user_id)
+        if details and details.get("feedback_track"):
             details["feedback_track"] = {}
-            init.dirty_users.add(user_id)
 
 
 async def periodic_severity_decay(context):
-    decay_severity_scores()
+    await decay_severity_scores()
 
 
 async def periodic_queue_sweep(context):
@@ -93,7 +109,7 @@ async def on_shutdown(application):
 
 
 async def on_startup(application):
-    # Open the DB pool and load persisted data before anything else runs.
+    # Open the DB pool and load persisted data before polling starts.
     await init_pool()
     await init.load_all()
 
@@ -112,13 +128,22 @@ async def post_init_tasks(application):
 def main():
     keep_alive()
 
-    app = (
+    builder = (
         ApplicationBuilder()
         .token(init.BOT_TOKEN)
         .post_init(post_init_tasks)
         .post_shutdown(on_shutdown)
-        .build()
     )
+
+    # Media Outbound Throughput Upgrade:
+    # If a self-hosted local Bot API server is configured (e.g. http://localhost:8081/bot),
+    # configure local base_url to enable 2,000 MB file sizes, local network speed, and higher rate limits!
+    local_api_url = os.getenv("LOCAL_BOT_API_URL")
+    if local_api_url:
+        builder = builder.base_url(local_api_url)
+        logging.getLogger(__name__).info(f"Using Local Telegram Bot API Server: {local_api_url}")
+
+    app = builder.build()
 
     app.add_handler(TypeHandler(Update, restriction_gate), group=-2)
 
@@ -126,6 +151,9 @@ def main():
     app.add_handler(CommandHandler("find", find))
     app.add_handler(CommandHandler("next", skip_partner))
     app.add_handler(CommandHandler("stop", stop))
+    app.add_handler(CommandHandler("block", block_command))
+    app.add_handler(CommandHandler("nudge", handle_nudge))
+    app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("cancel", cancel))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("profile", show_profile))
@@ -139,12 +167,16 @@ def main():
     app.add_handler(CommandHandler("subscribe", show_subscribe_menu))
     app.add_handler(CommandHandler("giveaway", giveaway_subscription))
     app.add_handler(CommandHandler("referral", referral_scheme_command))
+    app.add_handler(CommandHandler("stats", admin_stats))
+    app.add_handler(CommandHandler("queue", queue_stats))
+    app.add_handler(CommandHandler("campaign", campaign_command))
 
     app.add_handler(CallbackQueryHandler(handle_tier_selection, pattern=r"^sub\|\w+$"))
     app.add_handler(PreCheckoutQueryHandler(handle_pre_checkout))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
 
     app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^rate\|\d+\|(up|down)$"))
+    app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^rateblock\|\d+$"))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^report\|\d+$"))
     app.add_handler(CallbackQueryHandler(handle_report_reason, pattern=r"^reportreason\|\d+\|\w+$"))
     app.add_handler(CallbackQueryHandler(handle_report_back, pattern=r"^reportback\|\d+$"))
@@ -162,12 +194,13 @@ def main():
     app.add_handler(CallbackQueryHandler(rps.handle_callback, pattern=r"^rps\|(rock|paper|scissors)$"))
     app.add_handler(CallbackQueryHandler(guess_it.handle_callback, pattern=r"^gi\|.+$"))
     app.add_handler(CallbackQueryHandler(would_you_rather.handle_callback, pattern=r"^wyr\|[AB]$"))
+    app.add_handler(CallbackQueryHandler(trivia.handle_callback, pattern=r"^trivia\|\d+$"))
 
     app.add_handler(CallbackQueryHandler(handle_view_once, pattern=r"^viewonce\|.+$"))
 
     app.add_handler(MessageHandler(
         (filters.TEXT | filters.Sticker.ALL | filters.PHOTO | filters.VIDEO |
-         filters.VIDEO_NOTE | filters.AUDIO | filters.Document.ALL | filters.VOICE | filters.ANIMATION) & ~filters.COMMAND,
+         filters.VIDEO_NOTE | filters.AUDIO | filters.Document.ALL | filters.VOICE | filters.ANIMATION | filters.Dice.ALL) & ~filters.COMMAND,
         relay_message
     ))
 
