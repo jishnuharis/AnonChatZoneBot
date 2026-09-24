@@ -122,3 +122,44 @@ def test_noisy_loggers_silenced():
         assert logging.getLogger(name).level >= logging.WARNING
 
 
+@pytest.mark.asyncio
+async def test_database_heartbeat_ping(monkeypatch):
+    """Verify ping_db issues SELECT 1 query to keep cloud database awake."""
+    from saveNload import ping_db
+    from unittest.mock import AsyncMock, MagicMock
+
+    monkeypatch.setattr("saveNload.is_pool_ready", lambda: True)
+
+    mock_conn = MagicMock()
+    mock_conn.execute = AsyncMock()
+
+    class MockAsyncContextManager:
+        async def __aenter__(self):
+            return mock_conn
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    mock_pool = MagicMock()
+    mock_pool.connection.return_value = MockAsyncContextManager()
+    monkeypatch.setattr("saveNload.get_pool", lambda: mock_pool)
+
+    res = await ping_db()
+    assert res is True
+    mock_conn.execute.assert_awaited_once_with("SELECT 1;")
+
+
+@pytest.mark.asyncio
+async def test_save_user_data_triggers_heartbeat_when_idle(monkeypatch):
+    """When dirty_user is empty, save_user_data should trigger ping_db heartbeat."""
+    from saveNload import save_user_data
+    from unittest.mock import AsyncMock
+
+    mock_ping = AsyncMock(return_value=True)
+    monkeypatch.setattr("saveNload.ping_db", mock_ping)
+
+    await save_user_data({}, set())
+    mock_ping.assert_awaited_once()
+
+
+

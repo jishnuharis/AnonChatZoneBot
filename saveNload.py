@@ -28,6 +28,13 @@ def get_pool() -> AsyncConnectionPool:
             min_size=POOL_MIN_SIZE,
             max_size=POOL_MAX_SIZE,
             timeout=30.0,
+            kwargs={
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 5,
+            },
+            check=AsyncConnectionPool.check_connection,
             open=False
         )
     return pool
@@ -73,6 +80,24 @@ async def ensure_db():
     except Exception as e:
         logger.error(f"Error during ensure_db / migration: {e}", exc_info=True)
         raise
+
+
+async def ping_db() -> bool:
+    """
+    Heartbeat ping query (SELECT 1) to keep the database and connection pool active.
+    Prevents cloud-hosted databases (e.g. Railway, Neon, Supabase) from sleeping during inactivity.
+    """
+    if not is_pool_ready():
+        return False
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("SELECT 1;")
+            logger.debug("Database heartbeat ping sent successfully.")
+            return True
+    except Exception as e:
+        logger.warning(f"Database heartbeat ping failed: {e}")
+        return False
 
 
 # ============================================================================
@@ -803,8 +828,10 @@ async def save_user_data(data: dict, dirty_user: set):
     """
     Backward-compatible save routine.
     Flushes all dirty users using transactional upserts without dropping in-flight modifications.
+    If no users are dirty, sends a heartbeat query (SELECT 1) to keep the cloud DB awake.
     """
     if not dirty_user:
+        await ping_db()
         return
 
     to_flush = list(dirty_user)
