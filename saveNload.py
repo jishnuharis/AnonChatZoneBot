@@ -42,27 +42,31 @@ def is_pool_ready() -> bool:
 async def init_pool():
     """Initializes the database connection pool and runs schema migrations."""
     p = get_pool()
-    if not p.closed:
-        try:
+    try:
+        if not getattr(p, "_opened", False):
             await p.open()
-            await ensure_db()
-        except Exception as e:
-            logger.warning(f"Database connection pool open / ensure_db notice: {e}")
+        logger.info("Database connection pool opened successfully.")
+        await ensure_db()
+    except Exception as e:
+        logger.error(f"Database connection pool open / ensure_db notice: {e}", exc_info=True)
 
 
 async def close_pool():
     """Gracefully closes all database connections in the pool."""
     global pool
-    if pool is not None and not pool.closed:
+    if pool is not None and getattr(pool, "_opened", False):
         await pool.close()
         logger.info("Database connection pool closed.")
 
 
 async def ensure_db():
     """Applies schema migrations and table initializations."""
-    if not is_pool_ready():
-        return
     p = get_pool()
+    if not getattr(p, "_opened", False):
+        try:
+            await p.open()
+        except Exception:
+            pass
     try:
         async with p.connection() as conn:
             await run_migrations(conn)
@@ -132,6 +136,9 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                 await cur.execute(query, (user_id,))
                 row = await cur.fetchone()
                 if not row:
+                    legacy_user = await _get_legacy_user(conn, user_id)
+                    if legacy_user:
+                        return legacy_user
                     return None
                 
                 # Map into application-friendly dict structure
@@ -733,42 +740,126 @@ async def save_user_data(data: dict, dirty_user: set):
                 dirty_user.add(uid)
 
 
+async def _get_legacy_user(conn, user_id: int) -> Optional[Dict[str, Any]]:
+    try:
+        cur = await conn.execute("""
+            SELECT CASE 
+                WHEN (to_regclass('user_details') IS NOT NULL) THEN 'user_details'
+                WHEN (to_regclass('legacy_user_details_backup') IS NOT NULL) THEN 'legacy_user_details_backup'
+                ELSE NULL
+            END;
+        """)
+        tbl = (await cur.fetchone())[0]
+        if not tbl:
+            return None
+        cur = await conn.execute(f"""
+            SELECT user_id, gender, age, country, preferences, points,
+                   subscription_tier, subscription_expires
+            FROM {tbl} WHERE user_id = %s;
+        """, (user_id,))
+        r = await cur.fetchone()
+        if r:
+            return {
+                "user_id": r[0],
+                "gender": r[1],
+                "age": r[2],
+                "country": r[3],
+                "preferences": r[4] or 0,
+                "points": r[5] or 0,
+                "subscription_tier": r[6],
+                "subscription_expires": r[7],
+                "pref_gender": "ANY",
+                "pref_country": "ANY",
+                "partner_id": None,
+                "blocked_users": {}
+            }
+    except Exception as e:
+        logger.warning(f"_get_legacy_user error: {e}")
+    return None
+
+
+async def _load_legacy_user_data(conn) -> dict:
+    data = {}
+    try:
+        cur = await conn.execute("""
+            SELECT CASE 
+                WHEN (to_regclass('user_details') IS NOT NULL) THEN 'user_details'
+                WHEN (to_regclass('legacy_user_details_backup') IS NOT NULL) THEN 'legacy_user_details_backup'
+                ELSE NULL
+            END;
+        """)
+        tbl = (await cur.fetchone())[0]
+        if not tbl:
+            return {}
+        cur = await conn.execute(f"SELECT user_id, gender, age, country, preferences, points FROM {tbl};")
+        rows = await cur.fetchall()
+        for r in rows:
+            uid = r[0]
+            data[uid] = {
+                "gender": r[1],
+                "age": r[2],
+                "country": r[3],
+                "preferences": r[4] or 0,
+                "points": r[5] or 0,
+                "pref_gender": "ANY",
+                "pref_country": "ANY",
+                "partner_id": None,
+                "blocked_users": {}
+            }
+        logger.info(f"Loaded {len(data)} legacy user records from {tbl} as fallback.")
+    except Exception as e:
+        logger.warning(f"_load_legacy_user_data error: {e}")
+    return data
+
+
 async def load_user_data() -> dict:
     """
     Backward-compatible load routine.
-    Only loads active or recent users on demand, rather than choking memory on 500k rows.
+    Loads active users into memory with automatic fallback to legacy tables.
     """
     if not is_pool_ready():
         return {}
     p = get_pool()
-    query = """
-        SELECT u.user_id, u.gender, u.age, u.country, u.preferences_bitmask as preferences, u.points,
-               COALESCE(p.preferred_gender, 'ANY') as pref_gender,
-               COALESCE(p.preferred_country, 'ANY') as pref_country
-        FROM users u
-        LEFT JOIN user_profiles p ON u.user_id = p.user_id
-        ORDER BY u.updated_at DESC
-        LIMIT 1000;
-    """
     data = {}
     try:
         async with p.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query)
-                rows = await cur.fetchall()
-                for r in rows:
-                    uid = r["user_id"]
-                    data[uid] = {
-                        "gender": r["gender"],
-                        "age": r["age"],
-                        "country": r["country"],
-                        "preferences": r["preferences"] or 0,
-                        "points": r["points"] or 0,
-                        "pref_gender": r.get("pref_gender", "ANY"),
-                        "pref_country": r.get("pref_country", "ANY"),
-                        "partner_id": None,
-                        "blocked_users": {}
-                    }
+            cur = await conn.execute("SELECT (to_regclass('users') IS NOT NULL);")
+            users_tbl_exists = (await cur.fetchone())[0]
+
+            if users_tbl_exists:
+                cur = await conn.execute("SELECT COUNT(*) FROM users;")
+                users_count = (await cur.fetchone())[0]
+            else:
+                users_count = 0
+
+            if users_count > 0:
+                query = """
+                    SELECT u.user_id, u.gender, u.age, u.country, u.preferences_bitmask as preferences, u.points,
+                           COALESCE(p.preferred_gender, 'ANY') as pref_gender,
+                           COALESCE(p.preferred_country, 'ANY') as pref_country
+                    FROM users u
+                    LEFT JOIN user_profiles p ON u.user_id = p.user_id
+                    ORDER BY u.updated_at DESC
+                    LIMIT 50000;
+                """
+                async with conn.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query)
+                    rows = await cur.fetchall()
+                    for r in rows:
+                        uid = r["user_id"]
+                        data[uid] = {
+                            "gender": r["gender"],
+                            "age": r["age"],
+                            "country": r["country"],
+                            "preferences": r["preferences"] or 0,
+                            "points": r["points"] or 0,
+                            "pref_gender": r.get("pref_gender", "ANY"),
+                            "pref_country": r.get("pref_country", "ANY"),
+                            "partner_id": None,
+                            "blocked_users": {}
+                        }
+            else:
+                data = await _load_legacy_user_data(conn)
     except Exception as e:
         logger.warning(f"Failed to load user data from database: {e}")
     return data
