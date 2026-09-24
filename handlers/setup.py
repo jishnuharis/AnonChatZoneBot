@@ -19,20 +19,25 @@ def check_user_profile(handler_func):
         user_id = update.effective_user.id
 
         if user_id not in init.user_details:
-            init.user_details[user_id] = init._default_user()
-            referral.capture_referral(context, user_id)
-            init.user_input_stage[user_id] = "gender"
-            init.dirty_users.add(user_id)
-            keyboard = [[
-                InlineKeyboardButton("♂️ Male", callback_data="gender|M"),
-                InlineKeyboardButton("♀️ Female", callback_data="gender|F")
-            ]]
-            markup = InlineKeyboardMarkup(keyboard)
-            await safe_tele_func_call(update.message.reply_text, text=WELCOME_NEW_USER_TEXT, parse_mode="HTML")
-            await safe_tele_func_call(update.message.reply_text, text=SETUP_PROFILE_GENDER_PROMPT_TEXT, reply_markup=markup, parse_mode="HTML")
-            return
+            await init.ensure_user_loaded(user_id)
 
-        if not all([init.user_details[user_id].get("gender"), init.user_details[user_id].get("age"), init.user_details[user_id].get("country")]):
+        user = init.user_details.get(user_id)
+        if not user or not all([user.get("gender"), user.get("age"), user.get("country")]):
+            if not user or not user.get("gender"):
+                if not user:
+                    init.user_details[user_id] = init._default_user()
+                referral.capture_referral(context, user_id)
+                init.user_input_stage[user_id] = "gender"
+                init.dirty_users.add(user_id)
+                keyboard = [[
+                    InlineKeyboardButton("♂️ Male", callback_data="gender|M"),
+                    InlineKeyboardButton("♀️ Female", callback_data="gender|F")
+                ]]
+                markup = InlineKeyboardMarkup(keyboard)
+                await safe_tele_func_call(update.message.reply_text, text=WELCOME_NEW_USER_TEXT, parse_mode="HTML")
+                await safe_tele_func_call(update.message.reply_text, text=SETUP_PROFILE_GENDER_PROMPT_TEXT, reply_markup=markup, parse_mode="HTML")
+                return
+
             stage = init.user_input_stage.get(user_id, "gender")
             if stage == "gender":
                 keyboard = [[
@@ -43,6 +48,9 @@ def check_user_profile(handler_func):
                 await safe_tele_func_call(update.message.reply_text, text=SELECT_GENDER_TEXT, reply_markup=markup, parse_mode="HTML")
             elif stage == "age":
                 await safe_tele_func_call(update.message.reply_text, text=ENTER_AGE_TEXT, parse_mode="HTML")
+            elif stage == "country":
+                from handlers.country import send_country_selection
+                await send_country_selection(update)
             return
 
         init.dirty_users.add(user_id)

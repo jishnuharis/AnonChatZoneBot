@@ -177,86 +177,98 @@ async def run_migrations(conn: AsyncConnection):
     Executes DDL and migrates existing ~1,000 rows from legacy `user_details`
     table into normalized 3NF tables without data loss.
     """
-    async with conn.transaction():
-        # 1. Ensure target tables exist
-        await conn.execute(CREATE_TABLES_SQL)
+    # 1. Ensure target tables exist
+    await conn.execute(CREATE_TABLES_SQL)
 
-        # Ensure preferred_gender and preferred_country exist on user_profiles (for existing installs)
-        await conn.execute("""
-            ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_gender VARCHAR(8) DEFAULT 'ANY';
-            ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_country VARCHAR(64) DEFAULT 'ANY';
-        """)
+    # Ensure preferred_gender and preferred_country exist on user_profiles (for existing installs)
+    await conn.execute("""
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_gender VARCHAR(8) DEFAULT 'ANY';
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_country VARCHAR(64) DEFAULT 'ANY';
+    """)
 
-        # 2. Check if legacy user_details table exists
+    # 2. Check if legacy user_details table exists (either user_details or legacy_user_details_backup)
+    cur = await conn.execute("""
+        SELECT 
+            (to_regclass('user_details') IS NOT NULL) OR 
+            (to_regclass('public.user_details') IS NOT NULL) OR 
+            EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'user_details');
+    """)
+    legacy_exists = (await cur.fetchone())[0]
+    legacy_tbl = "user_details"
+
+    if not legacy_exists:
         cur = await conn.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'user_details'
-            );
+            SELECT 
+                (to_regclass('legacy_user_details_backup') IS NOT NULL) OR 
+                (to_regclass('public.legacy_user_details_backup') IS NOT NULL) OR 
+                EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'legacy_user_details_backup');
         """)
-        legacy_exists = (await cur.fetchone())[0]
+        if (await cur.fetchone())[0]:
+            legacy_exists = True
+            legacy_tbl = "legacy_user_details_backup"
 
-        if not legacy_exists:
-            logger.info("No legacy user_details table found. Schema is clean.")
-            return
+    if not legacy_exists:
+        logger.info("No legacy user_details table found. Schema is clean.")
+        return
 
-        # Check if legacy table has records
-        cur = await conn.execute("SELECT COUNT(*) FROM user_details;")
-        row_count = (await cur.fetchone())[0]
-        logger.info(f"Found legacy user_details table with {row_count} records. Starting migration...")
+    # Check if legacy table has records
+    cur = await conn.execute(f"SELECT COUNT(*) FROM {legacy_tbl};")
+    row_count = (await cur.fetchone())[0]
+    logger.info(f"Found legacy {legacy_tbl} table with {row_count} records. Starting migration...")
 
-        if row_count > 0:
-            # 3. Migrate users core data
-            await conn.execute("""
-                INSERT INTO users (user_id, gender, age, country, preferences_bitmask, points)
-                SELECT 
-                    user_id,
-                    CASE WHEN gender IN ('M', 'F') THEN gender ELSE NULL END,
-                    CASE WHEN age >= 13 AND age <= 100 THEN age ELSE NULL END,
-                    country,
-                    COALESCE(preferences, 0),
-                    COALESCE(points, 0)
-                FROM user_details
-                ON CONFLICT (user_id) DO UPDATE SET
-                    gender = EXCLUDED.gender,
-                    age = EXCLUDED.age,
-                    country = EXCLUDED.country,
-                    preferences_bitmask = EXCLUDED.preferences_bitmask,
-                    points = EXCLUDED.points;
-            """)
+    if row_count > 0:
+        # 3. Migrate users core data
+        await conn.execute(f"""
+            INSERT INTO users (user_id, gender, age, country, preferences_bitmask, points)
+            SELECT 
+                user_id,
+                CASE WHEN gender IN ('M', 'F') THEN gender ELSE NULL END,
+                CASE WHEN age >= 13 AND age <= 100 THEN age ELSE NULL END,
+                country,
+                COALESCE(preferences, 0),
+                COALESCE(points, 0)
+            FROM {legacy_tbl}
+            ON CONFLICT (user_id) DO UPDATE SET
+                gender = COALESCE(EXCLUDED.gender, users.gender),
+                age = COALESCE(EXCLUDED.age, users.age),
+                country = COALESCE(EXCLUDED.country, users.country),
+                preferences_bitmask = COALESCE(EXCLUDED.preferences_bitmask, users.preferences_bitmask),
+                points = COALESCE(EXCLUDED.points, users.points);
+        """)
 
-            # 4. Migrate user profiles & moderation
-            await conn.execute("""
-                INSERT INTO user_profiles (
-                    user_id, severity_score, restricted_until, restriction_reason,
-                    last_severity_decay, daily_credits_used, daily_credits_reset_day, is_banned
-                )
-                SELECT 
-                    user_id,
-                    COALESCE(severity_score, 0),
-                    CASE WHEN restricted_until IS NOT NULL AND restricted_until > 0 
-                         THEN to_timestamp(restricted_until) ELSE NULL END,
-                    restriction_reason,
-                    CASE WHEN last_severity_decay IS NOT NULL AND last_severity_decay > 0 
-                         THEN to_timestamp(last_severity_decay) ELSE NOW() END,
-                    COALESCE(daily_credits_used, 0),
-                    CASE WHEN daily_credits_reset_day ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' 
-                         THEN daily_credits_reset_day::DATE ELSE CURRENT_DATE END,
-                    CASE WHEN restricted_until IS NOT NULL AND restricted_until > 2000000000 
-                         THEN TRUE ELSE FALSE END
-                FROM user_details
-                ON CONFLICT (user_id) DO UPDATE SET
-                    severity_score = EXCLUDED.severity_score,
-                    restricted_until = EXCLUDED.restricted_until,
-                    restriction_reason = EXCLUDED.restriction_reason,
-                    last_severity_decay = EXCLUDED.last_severity_decay,
-                    daily_credits_used = EXCLUDED.daily_credits_used,
-                    daily_credits_reset_day = EXCLUDED.daily_credits_reset_day,
-                    is_banned = EXCLUDED.is_banned;
-            """)
+        # 4. Migrate user profiles & moderation
+        await conn.execute(f"""
+            INSERT INTO user_profiles (
+                user_id, severity_score, restricted_until, restriction_reason,
+                last_severity_decay, daily_credits_used, daily_credits_reset_day, is_banned
+            )
+            SELECT 
+                user_id,
+                COALESCE(severity_score, 0),
+                CASE WHEN restricted_until IS NOT NULL AND restricted_until > 0 
+                     THEN to_timestamp(restricted_until) ELSE NULL END,
+                restriction_reason,
+                CASE WHEN last_severity_decay IS NOT NULL AND last_severity_decay > 0 
+                     THEN to_timestamp(last_severity_decay) ELSE NOW() END,
+                COALESCE(daily_credits_used, 0),
+                CASE WHEN daily_credits_reset_day ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}$' 
+                     THEN daily_credits_reset_day::DATE ELSE CURRENT_DATE END,
+                CASE WHEN restricted_until IS NOT NULL AND restricted_until > 2000000000 
+                     THEN TRUE ELSE FALSE END
+            FROM {legacy_tbl}
+            ON CONFLICT (user_id) DO UPDATE SET
+                severity_score = EXCLUDED.severity_score,
+                restricted_until = EXCLUDED.restricted_until,
+                restriction_reason = EXCLUDED.restriction_reason,
+                last_severity_decay = EXCLUDED.last_severity_decay,
+                daily_credits_used = EXCLUDED.daily_credits_used,
+                daily_credits_reset_day = EXCLUDED.daily_credits_reset_day,
+                is_banned = EXCLUDED.is_banned;
+        """)
 
-            # 5. Migrate subscriptions
-            await conn.execute("""
+        # 5. Migrate subscriptions (isolated try/except so optional fields don't block user profile)
+        try:
+            await conn.execute(f"""
                 INSERT INTO subscriptions (user_id, tier, starts_at, expires_at, source, is_active)
                 SELECT 
                     user_id,
@@ -265,29 +277,34 @@ async def run_migrations(conn: AsyncConnection):
                     to_timestamp(subscription_expires),
                     'legacy_migration',
                     to_timestamp(subscription_expires) > NOW()
-                FROM user_details
+                FROM {legacy_tbl}
                 WHERE subscription_tier IS NOT NULL 
                   AND subscription_expires IS NOT NULL 
-                  AND subscription_expires > 0
-                ON CONFLICT DO NOTHING;
+                  AND subscription_expires > 0;
             """)
+        except Exception as e:
+            logger.warning(f"Subscriptions legacy migration notice: {e}")
 
-            # 6. Migrate referrals
-            await conn.execute("""
+        # 6. Migrate referrals
+        try:
+            await conn.execute(f"""
                 INSERT INTO referrals (referred_id, referrer_id, credited)
                 SELECT 
                     user_id,
                     referred_by,
                     COALESCE(referral_credited, FALSE)
-                FROM user_details
+                FROM {legacy_tbl}
                 WHERE referred_by IS NOT NULL 
                   AND referred_by != user_id
                   AND referred_by IN (SELECT user_id FROM users)
                 ON CONFLICT (referred_id) DO NOTHING;
             """)
+        except Exception as e:
+            logger.warning(f"Referrals legacy migration notice: {e}")
 
-            # 7. Migrate report logs from JSONB
-            await conn.execute("""
+        # 7. Migrate report logs from JSONB
+        try:
+            await conn.execute(f"""
                 INSERT INTO user_reports (reporter_id, target_id, reason_code, weight, created_at)
                 SELECT 
                     (elem->>'reporter')::BIGINT,
@@ -295,18 +312,25 @@ async def run_migrations(conn: AsyncConnection):
                     COALESCE(elem->>'reason', 'unspecified'),
                     COALESCE((elem->>'weight')::INTEGER, 1),
                     to_timestamp(COALESCE((elem->>'timestamp')::DOUBLE PRECISION, EXTRACT(EPOCH FROM NOW())))
-                FROM user_details u,
+                FROM {legacy_tbl} u,
                      jsonb_array_elements(u.report_log) AS elem
                 WHERE u.report_log IS NOT NULL 
                   AND jsonb_typeof(u.report_log) = 'array'
                   AND (elem->>'reporter') IS NOT NULL
                   AND (elem->>'reporter')::BIGINT IN (SELECT user_id FROM users);
             """)
+        except Exception as e:
+            logger.warning(f"Report logs legacy migration notice: {e}")
 
-            logger.info("Successfully migrated all legacy data into normalized tables.")
+        logger.info("Successfully migrated all legacy data into normalized tables.")
 
-        # 8. Safely rename old table to preserve as backup
-        await conn.execute("""
-            ALTER TABLE user_details RENAME TO legacy_user_details_backup;
-        """)
-        logger.info("Renamed user_details to legacy_user_details_backup.")
+    # 8. Safely rename old table to preserve as backup if still named user_details
+    if legacy_tbl == "user_details":
+        try:
+            cur = await conn.execute("SELECT (to_regclass('legacy_user_details_backup') IS NOT NULL);")
+            backup_exists = (await cur.fetchone())[0]
+            if not backup_exists:
+                await conn.execute("ALTER TABLE IF EXISTS user_details RENAME TO legacy_user_details_backup;")
+                logger.info("Renamed user_details to legacy_user_details_backup.")
+        except Exception as e:
+            logger.warning(f"Table rename notice: {e}")
