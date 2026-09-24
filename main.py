@@ -1,6 +1,6 @@
 import os
 import logging
-from telegram import BotCommand, Update
+from telegram import BotCommand, Update, BotCommandScopeChat
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler,
     TypeHandler, MessageReactionHandler, PreCheckoutQueryHandler,
@@ -71,6 +71,8 @@ async def set_commands(application):
         BotCommand("next", "Skip your current partner"),
         BotCommand("stop", "Stop the current chat"),
         BotCommand("block", "Block current partner"),
+        BotCommand("nudge", "Nudge your chat partner"),
+        BotCommand("status", "Check partner connection & activity status"),
         BotCommand("cancel", "Cancel ongoing game or request"),
         BotCommand("help", "Show help"),
         BotCommand("profile", "Show user profile"),
@@ -79,6 +81,27 @@ async def set_commands(application):
         BotCommand("subscribe", "View/purchase subscription"),
     ]
     await application.bot.set_my_commands(commands)
+
+    admin_commands = commands + [
+        BotCommand("stats", "Bot user and performance statistics"),
+        BotCommand("queue", "Queue and matchmaking status"),
+        BotCommand("checkuser", "Check user status and reports"),
+        BotCommand("ban", "Ban or restrict a user"),
+        BotCommand("unban", "Lift restriction on a user"),
+        BotCommand("giveaway", "Give free subscription to user"),
+        BotCommand("referral", "Configure referral promo"),
+        BotCommand("broadcast", "Send message to users"),
+        BotCommand("campaign", "Manage sponsor campaigns"),
+    ]
+    admin_ids = set(init.ADMIN_IDS)
+    if init.OWNER and str(init.OWNER).isdigit():
+        admin_ids.add(int(init.OWNER))
+
+    for admin_id in admin_ids:
+        try:
+            await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+        except Exception as e:
+            logger.debug(f"Notice setting admin commands for {admin_id}: {e}")
 
 
 async def periodic_save(context):
