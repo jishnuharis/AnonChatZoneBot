@@ -210,9 +210,16 @@ async def run_migrations(conn: AsyncConnection):
     try:
         cur = await conn.execute("SELECT value FROM bot_config WHERE key = 'legacy_migration_completed';")
         cfg_row = await cur.fetchone()
-        if cfg_row and isinstance(cfg_row[0], dict) and cfg_row[0].get("completed"):
-            logger.info("Legacy migration was already completed. Schema is clean and up to date.")
-            return
+        if cfg_row:
+            cfg_val = cfg_row[0]
+            if isinstance(cfg_val, str):
+                try:
+                    cfg_val = json.loads(cfg_val)
+                except Exception:
+                    cfg_val = {}
+            if isinstance(cfg_val, dict) and cfg_val.get("completed"):
+                logger.info("Legacy migration was already completed. Schema is clean and up to date.")
+                return
     except Exception as e:
         logger.warning(f"Notice while checking legacy_migration_completed: {e}")
 

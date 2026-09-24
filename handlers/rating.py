@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 
 from security import safe_tele_func_call
 from moderation import REPORT_REASONS, file_report
-from saveNload import record_user_rating, add_user_block
+from saveNload import record_user_rating, add_user_block, get_user_votes
 from message import RATE_PROMPT_TEXT, REPORT_REASON_PROMPT_TEXT, REPORT_LOGGED_TEXT
 
 import init
@@ -54,11 +54,15 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         emoji = "👍" if vote_type == "up" else "👎"
         await safe_tele_func_call(query.answer, f"Thanks for your feedback! {emoji}")
 
-        # Update votes in memory and record in DB
-        votes = init.user_details.setdefault(target_id, init._default_user()).setdefault("votes", {"up": 0, "down": 0})
-        votes[vote_type] = votes.get(vote_type, 0) + 1
-        init.dirty_users.add(target_id)
+        # Ensure target user data is loaded without inserting blank stubs
+        if target_id not in init.user_details:
+            await init.ensure_user_loaded(target_id)
+
+        # Record in DB and refresh live vote counts
         await record_user_rating(user_id, target_id, vote_type)
+        updated_votes = await get_user_votes(target_id)
+        if target_id in init.user_details:
+            init.user_details[target_id]["votes"] = updated_votes
 
         # Update keyboard on message to remove vote buttons, allowing report or block
         markup = _feedback_keyboard(target_id, can_vote=False, can_block=True)

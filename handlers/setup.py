@@ -50,7 +50,7 @@ def check_user_profile(handler_func):
                 await safe_tele_func_call(update.message.reply_text, text=ENTER_AGE_TEXT, parse_mode="HTML")
             elif stage == "country":
                 from handlers.country import send_country_selection
-                await send_country_selection(update)
+                await send_country_selection(user_id, context)
             return
 
         init.dirty_users.add(user_id)

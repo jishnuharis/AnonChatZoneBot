@@ -4,7 +4,7 @@ import logging
 import uuid
 import time
 from typing import Dict, Any, Optional, List, Set, Tuple
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import dict_row
 from migrations import run_migrations
@@ -293,6 +293,18 @@ async def upsert_user(user_id: int, **kwargs):
                     kwargs.get("pref_gender", "ANY"),
                     kwargs.get("pref_country", "ANY"),
                 ))
+
+                # 3. Upsert referrals if referred_by is set
+                ref_id = kwargs.get("referred_by")
+                if ref_id and ref_id != user_id:
+                    is_cred = bool(kwargs.get("referral_credited", False))
+                    await conn.execute("INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING;", (ref_id,))
+                    await conn.execute("""
+                        INSERT INTO referrals (referred_id, referrer_id, credited)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (referred_id) DO UPDATE SET
+                            credited = EXCLUDED.credited;
+                    """, (user_id, ref_id, is_cred))
     except Exception as e:
         logger.warning(f"upsert_user({user_id}) error: {e}")
 
@@ -336,6 +348,7 @@ async def add_user_block(blocker_id: int, blocked_id: int) -> bool:
     try:
         p = get_pool()
         async with p.connection() as conn:
+            await conn.execute("INSERT INTO users (user_id) VALUES (%s), (%s) ON CONFLICT (user_id) DO NOTHING;", (blocker_id, blocked_id))
             cur = await conn.execute("""
                 INSERT INTO user_blocks (blocker_id, blocked_id, created_at)
                 VALUES (%s, %s, NOW())
@@ -410,6 +423,7 @@ async def record_user_report(reporter_id: int, target_id: int, reason_code: str,
     try:
         p = get_pool()
         async with p.connection() as conn:
+            await conn.execute("INSERT INTO users (user_id) VALUES (%s), (%s) ON CONFLICT (user_id) DO NOTHING;", (reporter_id, target_id))
             await conn.execute("""
                 INSERT INTO user_reports (reporter_id, target_id, reason_code, weight)
                 VALUES (%s, %s, %s, %s);
@@ -425,6 +439,7 @@ async def record_user_rating(voter_id: int, target_id: int, vote_type: str) -> b
     try:
         p = get_pool()
         async with p.connection() as conn:
+            await conn.execute("INSERT INTO users (user_id) VALUES (%s), (%s) ON CONFLICT (user_id) DO NOTHING;", (voter_id, target_id))
             cur = await conn.execute("""
                 INSERT INTO user_ratings (voter_id, target_id, vote_type)
                 VALUES (%s, %s, %s)
@@ -436,6 +451,37 @@ async def record_user_rating(voter_id: int, target_id: int, vote_type: str) -> b
     except Exception as e:
         logger.warning(f"record_user_rating error: {e}")
         return True
+
+
+async def get_user_votes(user_id: int) -> Dict[str, int]:
+    """Returns {'up': count, 'down': count} for a user directly from user_ratings table."""
+    if not is_pool_ready():
+        user = init.user_details.get(user_id, {})
+        v = user.get("votes")
+        if isinstance(v, dict):
+            return {"up": int(v.get("up", 0) or 0), "down": int(v.get("down", 0) or 0)}
+        return {"up": 0, "down": 0}
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            cur = await conn.execute("""
+                SELECT 
+                    COUNT(*) FILTER (WHERE vote_type = 'up') as votes_up,
+                    COUNT(*) FILTER (WHERE vote_type = 'down') as votes_down
+                FROM user_ratings 
+                WHERE target_id = %s;
+            """, (user_id,))
+            row = await cur.fetchone()
+            if row:
+                return {"up": int(row[0] or 0), "down": int(row[1] or 0)}
+    except Exception as e:
+        logger.warning(f"get_user_votes({user_id}) error: {e}")
+
+    user = init.user_details.get(user_id, {})
+    v = user.get("votes")
+    if isinstance(v, dict):
+        return {"up": int(v.get("up", 0) or 0), "down": int(v.get("down", 0) or 0)}
+    return {"up": 0, "down": 0}
 
 
 async def apply_user_restriction_db(user_id: int, until_dt: Optional[datetime], reason: str, is_banned: bool = False):
@@ -511,6 +557,7 @@ async def create_chat_session_db(user1_id: int, user2_id: int) -> str:
     try:
         p = get_pool()
         async with p.connection() as conn:
+            await conn.execute("INSERT INTO users (user_id) VALUES (%s), (%s) ON CONFLICT (user_id) DO NOTHING;", (user1_id, user2_id))
             await conn.execute("""
                 INSERT INTO chat_sessions (id, user1_id, user2_id, status, started_at)
                 VALUES (%s, %s, %s, 'active', NOW());
@@ -603,13 +650,14 @@ async def update_session_activity_db(session_id: str):
 async def add_subscription_db(user_id: int, tier: str, duration_days: int, source: str = "purchase") -> datetime:
     """Grants or extends an active subscription, preventing tier downgrades."""
     now = datetime.now(timezone.utc)
-    new_expires = now + duration_days * 86400
+    new_expires = now + timedelta(days=duration_days)
     if not is_pool_ready():
         return new_expires
     try:
         p = get_pool()
         async with p.connection() as conn:
             async with conn.transaction():
+                await conn.execute("INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING;", (user_id,))
                 # Check current active subscription expiry
                 cur = await conn.execute("""
                     SELECT expires_at FROM subscriptions
@@ -618,7 +666,7 @@ async def add_subscription_db(user_id: int, tier: str, duration_days: int, sourc
                 """, (user_id,))
                 row = await cur.fetchone()
                 base_time = row[0] if (row and row[0] > now) else now
-                new_expires = base_time + duration_days * 86400
+                new_expires = base_time + timedelta(days=duration_days)
 
                 await conn.execute("""
                     INSERT INTO subscriptions (user_id, tier, starts_at, expires_at, source, is_active)
@@ -637,6 +685,7 @@ async def record_payment_transaction_db(user_id: int, tier: str, stars: int, cha
     try:
         p = get_pool()
         async with p.connection() as conn:
+            await conn.execute("INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING;", (user_id,))
             cur = await conn.execute("""
                 INSERT INTO payment_transactions (user_id, tier, stars, currency, telegram_payment_charge_id)
                 VALUES (%s, %s, %s, 'XTR', %s)
@@ -646,6 +695,72 @@ async def record_payment_transaction_db(user_id: int, tier: str, stars: int, cha
     except Exception as e:
         logger.warning(f"record_payment_transaction_db error: {e}")
         return True
+
+
+# ============================================================================
+# Referrals Database Operations
+# ============================================================================
+
+async def record_referral_db(referred_id: int, referrer_id: int) -> bool:
+    """Records a referral link between two users in PostgreSQL."""
+    if referred_id == referrer_id:
+        return False
+    if not is_pool_ready():
+        return True
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("INSERT INTO users (user_id) VALUES (%s), (%s) ON CONFLICT (user_id) DO NOTHING;", (referred_id, referrer_id))
+            await conn.execute("""
+                INSERT INTO referrals (referred_id, referrer_id, credited)
+                VALUES (%s, %s, FALSE)
+                ON CONFLICT (referred_id) DO NOTHING;
+            """, (referred_id, referrer_id))
+            return True
+    except Exception as e:
+        logger.warning(f"record_referral_db error: {e}")
+        return False
+
+
+async def credit_referral_db(referred_id: int) -> bool:
+    """Marks a referral as credited in PostgreSQL when the referred user finishes profile setup."""
+    if not is_pool_ready():
+        return True
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("""
+                UPDATE referrals
+                SET credited = TRUE
+                WHERE referred_id = %s;
+            """, (referred_id,))
+            return True
+    except Exception as e:
+        logger.warning(f"credit_referral_db error: {e}")
+        return False
+
+
+async def reward_referrals_db(referrer_id: int, count: int) -> bool:
+    """Marks 'count' unrewarded credited referrals as rewarded in PostgreSQL."""
+    if count <= 0 or not is_pool_ready():
+        return True
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("""
+                UPDATE referrals
+                SET rewarded = TRUE, rewarded_at = NOW()
+                WHERE referred_id IN (
+                    SELECT referred_id FROM referrals
+                    WHERE referrer_id = %s AND credited = TRUE AND rewarded = FALSE
+                    ORDER BY created_at ASC
+                    LIMIT %s
+                );
+            """, (referrer_id, count))
+            return True
+    except Exception as e:
+        logger.warning(f"reward_referrals_db error: {e}")
+        return False
 
 
 # ============================================================================
@@ -961,12 +1076,34 @@ async def load_user_data() -> dict:
                     SELECT u.user_id, u.gender, u.age, u.country, u.preferences_bitmask as preferences, u.points,
                            COALESCE(p.preferred_gender, 'ANY') as pref_gender,
                            COALESCE(p.preferred_country, 'ANY') as pref_country,
+                           p.severity_score, p.restricted_until, p.restriction_reason, p.last_severity_decay,
+                           p.daily_credits_used, p.daily_credits_reset_day, p.is_banned,
+                           s.tier as subscription_tier, s.expires_at as subscription_expires,
+                           ref.referrer_id as referred_by,
+                           ref.credited as referral_credited,
+                           COALESCE(ref_count.total_referrals, 0) as referral_count,
+                           COALESCE(ref_rewarded.rewarded_referrals, 0) as referral_rewarded_count,
                            COALESCE(r_up.votes_up, 0) as votes_up,
                            COALESCE(r_down.votes_down, 0) as votes_down,
                            COALESCE(rep.reports_count, 0) as reports_count,
                            COALESCE(rep_data.report_log, '[]'::jsonb) as report_log
                     FROM users u
                     LEFT JOIN user_profiles p ON u.user_id = p.user_id
+                    LEFT JOIN (
+                        SELECT user_id, tier, expires_at 
+                        FROM subscriptions 
+                        WHERE is_active = TRUE AND expires_at > NOW() 
+                        ORDER BY expires_at DESC LIMIT 1
+                    ) s ON u.user_id = s.user_id
+                    LEFT JOIN referrals ref ON u.user_id = ref.referred_id
+                    LEFT JOIN (
+                        SELECT referrer_id, COUNT(*) as total_referrals 
+                        FROM referrals WHERE credited = TRUE GROUP BY referrer_id
+                    ) ref_count ON u.user_id = ref_count.referrer_id
+                    LEFT JOIN (
+                        SELECT referrer_id, COUNT(*) as rewarded_referrals 
+                        FROM referrals WHERE rewarded = TRUE GROUP BY referrer_id
+                    ) ref_rewarded ON u.user_id = ref_rewarded.referrer_id
                     LEFT JOIN (
                         SELECT target_id, COUNT(*) as votes_up 
                         FROM user_ratings WHERE vote_type = 'up' GROUP BY target_id
@@ -1005,7 +1142,12 @@ async def load_user_data() -> dict:
                         elif not isinstance(rep_log, list):
                             rep_log = []
 
+                        sub_epoch = r["subscription_expires"].timestamp() if r.get("subscription_expires") else None
+                        restricted_epoch = r["restricted_until"].timestamp() if r.get("restricted_until") else None
+                        decay_epoch = r["last_severity_decay"].timestamp() if r.get("last_severity_decay") else None
+
                         data[uid] = {
+                            "user_id": uid,
                             "gender": r["gender"],
                             "age": r["age"],
                             "country": r["country"],
@@ -1013,6 +1155,19 @@ async def load_user_data() -> dict:
                             "points": r["points"] or 0,
                             "pref_gender": r.get("pref_gender", "ANY"),
                             "pref_country": r.get("pref_country", "ANY"),
+                            "subscription_tier": r.get("subscription_tier"),
+                            "subscription_expires": sub_epoch,
+                            "severity_score": r.get("severity_score") or 0,
+                            "restricted_until": restricted_epoch,
+                            "restriction_reason": r.get("restriction_reason"),
+                            "is_banned": bool(r.get("is_banned")),
+                            "last_severity_decay": decay_epoch,
+                            "daily_credits_used": r.get("daily_credits_used") or 0,
+                            "daily_credits_reset_day": str(r.get("daily_credits_reset_day")) if r.get("daily_credits_reset_day") else None,
+                            "referred_by": r.get("referred_by"),
+                            "referral_credited": bool(r.get("referral_credited")),
+                            "referral_count": r.get("referral_count") or 0,
+                            "referral_rewarded_count": r.get("referral_rewarded_count") or 0,
                             "partner_id": None,
                             "blocked_users": {},
                             "votes": {"up": r.get("votes_up", 0), "down": r.get("votes_down", 0)},

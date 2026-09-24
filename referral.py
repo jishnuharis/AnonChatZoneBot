@@ -64,6 +64,8 @@ async def credit_referral(context, user_id: int):
         return
 
     inviter_id = details["referred_by"]
+    if inviter_id not in init.user_details:
+        await init.ensure_user_loaded(inviter_id)
     inviter = init.user_details.get(inviter_id)
     if not inviter:
         return
@@ -71,6 +73,9 @@ async def credit_referral(context, user_id: int):
     details["referral_credited"] = True
     inviter["referral_count"] = inviter.get("referral_count", 0) + 1
     init.dirty_users.update([user_id, inviter_id])
+
+    from saveNload import credit_referral_db, add_subscription_db, reward_referrals_db
+    await credit_referral_db(user_id)
 
     if not scheme_active():
         return
@@ -88,8 +93,11 @@ async def credit_referral(context, user_id: int):
         inviter["referral_rewarded_count"] = inviter.get("referral_rewarded_count", 0) + required
         rewards_granted += 1
         new_expiry = subscription.grant_subscription(inviter_id, REWARD_TIER, source="referral")
+        tier = subscription.TIERS[REWARD_TIER]
+        await add_subscription_db(inviter_id, REWARD_TIER, tier["duration_days"], source="referral")
 
     if rewards_granted > 0:
+        await reward_referrals_db(inviter_id, required * rewards_granted)
         init.dirty_users.add(inviter_id)
         tier = subscription.TIERS[REWARD_TIER]
         expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(new_expiry))

@@ -33,6 +33,10 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
     tier = subscription.TIERS[tier_key]
     new_expiry = subscription.grant_subscription(user_id, tier_key, source="purchase")
 
+    from saveNload import add_subscription_db, record_payment_transaction_db
+    await add_subscription_db(user_id, tier_key, tier["duration_days"], source="purchase")
+    await record_payment_transaction_db(user_id, tier_key, tier["stars"], charge_id=payment.telegram_payment_charge_id)
+
     await safe_tele_func_call(
         update.message.reply_text,
         text=SUBSCRIBE_PAYMENT_SUCCESS_TEXT.format(

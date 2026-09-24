@@ -6,6 +6,7 @@ from html import escape as esc
 from handlers.setup import check_user_profile
 from handlers.preferences import describe_preferences
 from security import safe_tele_func_call
+from saveNload import get_user_votes
 import subscription
 
 import init
@@ -23,6 +24,8 @@ def _profile_keyboard():
 
 
 async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallback_name=None, fallback_username=None):
+    if user_id not in init.user_details:
+        await init.ensure_user_loaded(user_id)
     user = init.user_details.get(user_id)
     if not user:
         return None
@@ -36,7 +39,13 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
         full_name = esc(full_name)
 
     username_line = f" | @{esc(username)}" if username else ""
-    votes = user.get("votes", {"up": 0, "down": 0})
+    
+    # Query fresh live votes from database / cache
+    votes = await get_user_votes(user_id)
+    user["votes"] = votes
+    up_votes = votes.get("up", 0) if isinstance(votes, dict) else 0
+    down_votes = votes.get("down", 0) if isinstance(votes, dict) else 0
+
     prefs_text = esc(describe_preferences(user.get("preferences", 0)))
 
     pref_g = user.get("pref_gender", "ANY")
@@ -49,12 +58,12 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
         "<b>👤 Your Profile</b>\n\n"
         f"<b>Name:</b> {full_name}{username_line}\n"
         f"<b>ID:</b> <code>{user_id}</code>\n"
-        f"<b>Gender:</b> {'Male' if user['gender'] == 'M' else 'Female'}\n"
-        f"<b>Age:</b> {user['age']}\n"
-        f"<b>Country:</b> {esc(str(user['country']))}\n"
+        f"<b>Gender:</b> {'Male' if user.get('gender') == 'M' else 'Female'}\n"
+        f"<b>Age:</b> {user.get('age')}\n"
+        f"<b>Country:</b> {esc(str(user.get('country')))}\n"
         f"<b>Interests:</b> {prefs_text}\n"
-        f"<b>Rating:</b> {votes['up']} 👍 {votes['down']} 👎\n"
-        f"<b>Points:</b> {user['points']}\n\n"
+        f"<b>Rating:</b> {up_votes} 👍 {down_votes} 👎\n"
+        f"<b>Points:</b> {user.get('points', 0)}\n\n"
         f"{filter_line}"
         f"{subscription.status_text(user_id)}"
     )
@@ -72,6 +81,8 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def send_profile_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    if user_id not in init.user_details:
+        await init.ensure_user_loaded(user_id)
     text = await _build_profile_text(user_id, context)
     if not text:
         return

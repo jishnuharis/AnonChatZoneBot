@@ -162,7 +162,6 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     init.active_pairs[user_id] = target_id
     init.active_pairs[target_id] = user_id
-    uv1, uv2 = init.user_details[user_id]["votes"], init.user_details[target_id]["votes"]
     init.user_details[user_id]["partner_id"] = target_id
     init.user_details[target_id]["partner_id"] = user_id
     await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"🎯 <b>Connected to target user! Say hi!</b>\n/next <i>- Next</i>\n/stop <i>- Stop</i>", parse_mode="HTML")
@@ -286,7 +285,7 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         f"<b>User</b> <code>{target_id}</code>\n"
         f"Points: {details.get('points', 0)}\n"
-        f"Votes: {details.get('votes', {}).get('up', 0)} 👍 {details.get('votes', {}).get('down', 0)} 👎\n"
+        f"Votes: {(details.get('votes') or {}).get('up', 0)} 👍 {(details.get('votes') or {}).get('down', 0)} 👎\n"
         f"Subscription: {sub_line}\n"
         f"Status: {partner_line}\n"
         f"\n"
@@ -322,6 +321,8 @@ async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TY
 
     tier = subscription.TIERS[tier_key]
     new_expiry = subscription.grant_subscription(target_id, tier_key, source="admin_grant")
+    from saveNload import add_subscription_db
+    await add_subscription_db(target_id, tier_key, tier["duration_days"], source="admin_grant")
     expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(new_expiry))
 
     await update.message.reply_text(

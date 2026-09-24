@@ -179,4 +179,177 @@ async def test_save_user_data_triggers_heartbeat_when_idle(monkeypatch):
     mock_ping.assert_awaited_once()
 
 
+@pytest.mark.asyncio
+async def test_get_user_votes_queries_db_and_fallback(monkeypatch):
+    from saveNload import get_user_votes
+    from unittest.mock import AsyncMock, MagicMock
+    import init
+
+    # 1. Fallback when pool is not ready
+    monkeypatch.setattr("saveNload.is_pool_ready", lambda: False)
+    init.user_details[111] = {"votes": {"up": 5, "down": 2}}
+    votes = await get_user_votes(111)
+    assert votes == {"up": 5, "down": 2}
+
+    # 2. When pool is ready, query DB
+    monkeypatch.setattr("saveNload.is_pool_ready", lambda: True)
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_cur.fetchone = AsyncMock(return_value=(12, 3))
+    mock_conn.execute = AsyncMock(return_value=mock_cur)
+
+    class MockAsyncContextManager:
+        async def __aenter__(self):
+            return mock_conn
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    mock_pool = MagicMock()
+    mock_pool.connection.return_value = MockAsyncContextManager()
+    monkeypatch.setattr("saveNload.get_pool", lambda: mock_pool)
+
+    db_votes = await get_user_votes(222)
+    assert db_votes == {"up": 12, "down": 3}
+
+
+@pytest.mark.asyncio
+async def test_build_profile_text_wires_votes_accurately(monkeypatch):
+    from commands.profile import _build_profile_text
+    from unittest.mock import AsyncMock, MagicMock
+    import init
+
+    user_id = 555666
+    init.user_details[user_id] = {
+        "user_id": user_id,
+        "gender": "F",
+        "age": 24,
+        "country": "Japan",
+        "preferences": 0,
+        "points": 50,
+        "votes": {"up": 0, "down": 0},
+    }
+
+    # Mock get_user_votes to return 7 up and 1 down
+    monkeypatch.setattr("commands.profile.get_user_votes", AsyncMock(return_value={"up": 7, "down": 1}))
+
+    mock_context = MagicMock()
+    mock_chat = MagicMock()
+    mock_chat.full_name = "Sakura"
+    mock_chat.username = "sakura_jp"
+    mock_context.bot.get_chat = AsyncMock(return_value=mock_chat)
+
+    text = await _build_profile_text(user_id, mock_context)
+    assert text is not None
+    assert "<b>Rating:</b> 7 👍 1 👎" in text
+    assert init.user_details[user_id]["votes"] == {"up": 7, "down": 1}
+
+
+@pytest.mark.asyncio
+async def test_handle_vote_does_not_corrupt_target_user(monkeypatch):
+    from handlers.rating import handle_vote
+    from unittest.mock import AsyncMock, MagicMock
+    import init
+
+    voter_id = 100
+    target_id = 200
+
+    # Target user exists with full profile in DB
+    target_profile = {
+        "user_id": target_id,
+        "gender": "M",
+        "age": 28,
+        "country": "Spain",
+        "preferences": 2,
+        "points": 40,
+        "votes": {"up": 4, "down": 1},
+    }
+    init.user_details.clear()
+    init.dirty_users.clear()
+
+    # Mock get_user so ensure_user_loaded restores their full profile
+    monkeypatch.setattr("saveNload.get_user", AsyncMock(return_value=dict(target_profile)))
+    monkeypatch.setattr("handlers.rating.record_user_rating", AsyncMock(return_value=True))
+    monkeypatch.setattr("handlers.rating.get_user_votes", AsyncMock(return_value={"up": 5, "down": 1}))
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = voter_id
+    mock_query = MagicMock()
+    mock_query.data = f"rate|{target_id}|up"
+    mock_query.answer = AsyncMock()
+    mock_query.edit_message_reply_markup = AsyncMock()
+    mock_update.callback_query = mock_query
+
+    await handle_vote(mock_update, MagicMock())
+
+    # Target user must preserve gender, age, country, and have updated votes
+    assert target_id in init.user_details
+    assert init.user_details[target_id]["gender"] == "M"
+    assert init.user_details[target_id]["age"] == 28
+    assert init.user_details[target_id]["country"] == "Spain"
+    assert init.user_details[target_id]["votes"] == {"up": 5, "down": 1}
+    # Target user shouldn't be added to dirty_users just from a rating
+    assert target_id not in init.dirty_users
+
+
+@pytest.mark.asyncio
+async def test_add_subscription_db_uses_timedelta(monkeypatch):
+    from saveNload import add_subscription_db
+    from unittest.mock import AsyncMock, MagicMock
+    from datetime import datetime, timezone
+
+    monkeypatch.setattr("saveNload.is_pool_ready", lambda: True)
+
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_cur.fetchone = AsyncMock(return_value=None)
+    mock_conn.execute = AsyncMock(return_value=mock_cur)
+
+    class MockAsyncContextManager:
+        async def __aenter__(self):
+            return mock_conn
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    mock_pool = MagicMock()
+    mock_pool.connection.return_value = MockAsyncContextManager()
+    mock_conn.transaction.return_value = MockAsyncContextManager()
+    monkeypatch.setattr("saveNload.get_pool", lambda: mock_pool)
+
+    expiry = await add_subscription_db(777, "weekly", 7, source="purchase")
+    assert isinstance(expiry, datetime)
+    assert expiry > datetime.now(timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_check_user_profile_country_stage_signature(monkeypatch):
+    """Verify that when stage is 'country', send_country_selection is invoked with (user_id, context)."""
+    from handlers.setup import check_user_profile
+    from unittest.mock import AsyncMock, MagicMock
+    import init
+
+    user_id = 888999
+    init.user_details[user_id] = {
+        "user_id": user_id,
+        "gender": "M",
+        "age": None,
+        "country": None,
+    }
+    init.user_input_stage[user_id] = "country"
+
+    mock_send_country = AsyncMock()
+    monkeypatch.setattr("handlers.country.send_country_selection", mock_send_country)
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = user_id
+    mock_context = MagicMock()
+
+    @check_user_profile
+    async def dummy_handler(u, c):
+        pass
+
+    await dummy_handler(mock_update, mock_context)
+    mock_send_country.assert_awaited_once_with(user_id, mock_context)
+
+
+
 

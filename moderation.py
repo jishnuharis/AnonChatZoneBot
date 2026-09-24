@@ -81,6 +81,12 @@ def severity_for_score(score: int) -> int:
     return 0
 
 
+async def _ensure_user_async(user_id: int):
+    if user_id not in init.user_details:
+        await init.ensure_user_loaded(user_id)
+    return init.user_details.get(user_id) or init.user_details.setdefault(user_id, init._default_user())
+
+
 def _ensure_user(user_id: int):
     if user_id not in init.user_details:
         init.user_details[user_id] = init._default_user()
@@ -101,7 +107,7 @@ async def apply_restriction(user_id: int, severity: int, reason: str, duration_o
     severity = max(0, min(10, severity))
     duration = duration_override if duration_override is not None else SEVERITY_DURATIONS.get(severity, 0)
 
-    details = _ensure_user(user_id)
+    details = await _ensure_user_async(user_id)
 
     if duration <= 0:
         return details.get("restricted_until")
@@ -142,7 +148,7 @@ async def apply_restriction(user_id: int, severity: int, reason: str, duration_o
 
 async def clear_restriction(user_id: int):
     """Lifts any restriction on the user in memory and database."""
-    details = _ensure_user(user_id)
+    details = await _ensure_user_async(user_id)
     details["restricted_until"] = None
     details["restriction_reason"] = None
     init.dirty_users.add(user_id)
@@ -157,7 +163,7 @@ async def file_report(reporter_id: int, target_id: int, reason_code: str, contex
         return 0, 0, None
 
     label, weight = REPORT_REASONS[reason_code]
-    details = _ensure_user(target_id)
+    details = await _ensure_user_async(target_id)
     now_ts = time.time()
 
     # Anti-griefing guard: prevent a single user from spamming penalty weights within 24 hours

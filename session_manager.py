@@ -105,8 +105,12 @@ async def start_chat_session(context: ContextTypes.DEFAULT_TYPE, user1: int, use
 
     _record_recent_partner(user1, user2)
 
-    uv1 = init.user_details[user1].get("votes", {"up": 0, "down": 0})
-    uv2 = init.user_details[user2].get("votes", {"up": 0, "down": 0})
+    uv1 = (init.user_details[user1].get("votes") or {}) if isinstance(init.user_details.get(user1), dict) else {}
+    uv2 = (init.user_details[user2].get("votes") or {}) if isinstance(init.user_details.get(user2), dict) else {}
+    if not isinstance(uv1, dict):
+        uv1 = {"up": 0, "down": 0}
+    if not isinstance(uv2, dict):
+        uv2 = {"up": 0, "down": 0}
 
     shared = _overlap_score(user1, user2)
     shared_note = f"\n<i>You have {shared} shared interest{'s' if shared != 1 else ''}!</i> 🏷️" if shared else ""
