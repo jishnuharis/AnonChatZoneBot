@@ -136,3 +136,34 @@ async def test_duplicate_session_prevention():
     # Attempting to pair U1 with U3 must fail
     assert await start_chat_session(mock_context, u1, u3) is False
     assert get_partner(u1) == u2
+
+
+@pytest.mark.asyncio
+async def test_active_sessions_restored_on_startup(monkeypatch):
+    """
+    Active chat sessions in PostgreSQL must be seamlessly restored on bot restart.
+    """
+    u1, u2 = 9101, 9102
+    init.user_details.clear()
+    init.active_pairs.clear()
+    init.active_sessions.clear()
+
+    # Simulate active sessions found in database
+    mock_sessions = [("sess-abc-123", u1, u2)]
+    monkeypatch.setattr("saveNload.get_active_sessions_db", AsyncMock(return_value=mock_sessions))
+    monkeypatch.setattr("saveNload.load_user_data", AsyncMock(return_value={
+        u1: {"gender": "M", "age": 20, "country": "India"},
+        u2: {"gender": "F", "age": 22, "country": "India"},
+    }))
+    monkeypatch.setattr("saveNload.load_config", AsyncMock(return_value=None))
+
+    await init.load_all()
+
+    # Both users should be paired in memory and marked active
+    assert init.active_pairs.get(u1) == u2
+    assert init.active_pairs.get(u2) == u1
+    assert init.active_sessions.get(u1) == "sess-abc-123"
+    assert init.active_sessions.get(u2) == "sess-abc-123"
+    assert is_in_chat(u1) is True
+    assert is_in_chat(u2) is True
+

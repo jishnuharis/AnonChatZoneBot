@@ -3,7 +3,7 @@ import json
 import logging
 import uuid
 import time
-from typing import Dict, Any, Optional, List, Set
+from typing import Dict, Any, Optional, List, Set, Tuple
 from datetime import datetime, date, timezone
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import dict_row
@@ -473,6 +473,55 @@ async def create_chat_session_db(user1_id: int, user2_id: int) -> str:
     except Exception as e:
         logger.warning(f"create_chat_session_db error: {e}")
     return session_id
+
+
+async def get_active_sessions_db() -> List[Tuple[str, int, int]]:
+    """Returns all currently active chat sessions from PostgreSQL or legacy fallback."""
+    if not is_pool_ready():
+        return []
+    p = get_pool()
+    try:
+        async with p.connection() as conn:
+            cur = await conn.execute("""
+                SELECT (to_regclass('chat_sessions') IS NOT NULL);
+            """)
+            if (await cur.fetchone())[0]:
+                cur = await conn.execute("""
+                    SELECT id, user1_id, user2_id 
+                    FROM chat_sessions 
+                    WHERE status = 'active';
+                """)
+                rows = await cur.fetchall()
+                if rows:
+                    return [(str(r[0]), int(r[1]), int(r[2])) for r in rows]
+
+            # Fallback to legacy table partner_id if available
+            cur = await conn.execute("""
+                SELECT CASE 
+                    WHEN (to_regclass('user_details') IS NOT NULL) THEN 'user_details'
+                    WHEN (to_regclass('legacy_user_details_backup') IS NOT NULL) THEN 'legacy_user_details_backup'
+                    ELSE NULL
+                END;
+            """)
+            tbl = (await cur.fetchone())[0]
+            if tbl:
+                cur = await conn.execute(f"""
+                    SELECT user_id, partner_id FROM {tbl} 
+                    WHERE partner_id IS NOT NULL AND partner_id > 0;
+                """)
+                legacy_pairs = await cur.fetchall()
+                seen = set()
+                res = []
+                for u1, u2 in legacy_pairs:
+                    u1, u2 = int(u1), int(u2)
+                    if u1 not in seen and u2 not in seen:
+                        seen.add(u1)
+                        seen.add(u2)
+                        res.append((str(uuid.uuid4()), u1, u2))
+                return res
+    except Exception as e:
+        logger.warning(f"get_active_sessions_db error: {e}")
+    return []
 
 
 async def end_chat_session_db(session_id: str, reason: str = "normal"):

@@ -87,8 +87,9 @@ referral_scheme: Dict[str, Any] = {"required_referrals": 0, "expires": None}
 
 
 async def load_all():
-    """Populate active user cache and referral scheme from the DB on startup."""
-    from saveNload import load_user_data, load_config, get_user
+    """Populate active user cache, restore active chat sessions, and load referral scheme from DB on startup."""
+    import logging
+    from saveNload import load_user_data, load_config, get_active_sessions_db
 
     global referral_scheme
 
@@ -98,6 +99,23 @@ async def load_all():
         for key, value in _default_user().items():
             v.setdefault(key, value)
         user_details[user_id] = v
+
+    # Restore in-flight active chat sessions across server redeploys
+    active_sessions_data = await get_active_sessions_db()
+    for session_id, u1, u2 in active_sessions_data:
+        if u1 in active_pairs or u2 in active_pairs:
+            continue
+        active_pairs[u1] = u2
+        active_pairs[u2] = u1
+        active_sessions[u1] = session_id
+        active_sessions[u2] = session_id
+        now_ts = time.time()
+        last_activity[u1] = now_ts
+        last_activity[u2] = now_ts
+        user_details.setdefault(u1, _default_user())["partner_id"] = u2
+        user_details.setdefault(u2, _default_user())["partner_id"] = u1
+    if active_sessions_data:
+        logging.getLogger(__name__).info(f"Restored {len(active_sessions_data)} active chat session(s) across restart.")
 
     referral_scheme = await load_config("referral_scheme") or {"required_referrals": 0, "expires": None}
 
