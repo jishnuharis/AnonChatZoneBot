@@ -183,6 +183,43 @@ async def test_save_user_data_triggers_heartbeat_when_idle(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_save_user_data_flushes_user_with_user_id_in_dict(monkeypatch):
+    """Ensure save_user_data and upsert_user handle user_id in user dict without multiple values error."""
+    from saveNload import save_user_data, upsert_user
+    from unittest.mock import AsyncMock
+
+    mock_upsert = AsyncMock()
+    monkeypatch.setattr("saveNload.upsert_user", mock_upsert)
+
+    uid = 6618474423
+    data = {
+        uid: {
+            "user_id": uid,
+            "gender": "M",
+            "age": 22,
+            "country": "India",
+            "preferences": 5,
+            "points": 10
+        }
+    }
+    dirty = {uid}
+
+    await save_user_data(data, dirty)
+
+    # Verify dirty set is cleared (not re-added due to exception)
+    assert uid not in dirty
+    mock_upsert.assert_awaited_once()
+    assert mock_upsert.call_args[0][0] == uid
+    # Ensure user_id was stripped from kwargs passed to upsert_user
+    assert "user_id" not in mock_upsert.call_args[1]
+
+    # Test that upsert_user itself tolerates user_id in args and kwargs
+    monkeypatch.setattr("saveNload.is_pool_ready", lambda: False)
+    # This must not raise TypeError: upsert_user() got multiple values for argument 'user_id'
+    await upsert_user(uid, user_id=uid, gender="M")
+
+
+@pytest.mark.asyncio
 async def test_get_user_votes_queries_db_and_fallback(monkeypatch):
     from saveNload import get_user_votes
     from unittest.mock import AsyncMock, MagicMock

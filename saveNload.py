@@ -222,9 +222,13 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
-async def upsert_user(user_id: int, **kwargs):
+async def upsert_user(*args, **kwargs):
     """Inserts or updates a user core and profile record."""
     if not is_pool_ready():
+        return
+    user_id = args[0] if args else kwargs.pop("user_id", None)
+    kwargs.pop("user_id", None)
+    if not user_id:
         return
     p = get_pool()
     try:
@@ -938,7 +942,8 @@ async def save_user_data(data: dict, dirty_user: set):
         details = data.get(uid)
         if details:
             try:
-                await upsert_user(uid, **details)
+                user_kwargs = {k: v for k, v in details.items() if k != "user_id"}
+                await upsert_user(uid, **user_kwargs)
             except Exception as e:
                 logger.error(f"Failed to upsert user {uid}: {e}")
                 dirty_user.add(uid)
