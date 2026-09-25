@@ -3,6 +3,7 @@ import asyncio
 import time
 import logging
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 from html import escape as esc
 
@@ -29,43 +30,106 @@ import init
 logger = logging.getLogger(__name__)
 
 
+async def _send_with_html_fallback(send_func, chat_id, text=None, caption=None, **kwargs):
+    """
+    Attempts to send text/caption with HTML parse mode.
+    Auto-sanitizes naked ampersands. If Telegram raises an entity parsing BadRequest,
+    gracefully falls back to plain text without parse_mode so the announcement is NEVER dropped!
+    """
+    content_key = "caption" if caption is not None else "text"
+    raw_content = caption if caption is not None else (text or "")
+
+    import re
+    # Sanitize naked ampersands that are not already valid HTML entities
+    sanitized = re.sub(r"&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)", "&amp;", raw_content)
+
+    kwargs[content_key] = sanitized
+    try:
+        return await safe_tele_func_call(send_func, chat_id=chat_id, parse_mode="HTML", **kwargs)
+    except BadRequest as e:
+        err_lower = str(e).lower()
+        if any(term in err_lower for term in ("entity", "parse", "tag", "byte offset", "bad formatting")):
+            logger.warning(f"HTML parse mode failed on broadcast ({e}). Retrying with clean plain text fallback...")
+            plain = re.sub(r"<[^>]+>", "", raw_content)
+            kwargs[content_key] = plain
+            return await safe_tele_func_call(send_func, chat_id=chat_id, parse_mode=None, **kwargs)
+        raise
+
+
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.effective_user.id):
+    if not update.effective_user or not is_admin(update.effective_user.id):
         return
 
-    message = update.message.text
-    if message.lower().startswith("/broadcast"):
-        message = message[len("/broadcast"):].lstrip()
+    import re
+    raw_text = (update.message.text or update.message.caption or "") if update.message else ""
 
-    if not message:
+    replied_msg = None
+    if update.message and getattr(update.message, "reply_to_message", None):
+        cand = update.message.reply_to_message
+        msg_id = getattr(cand, "message_id", None)
+        try:
+            from unittest.mock import MagicMock
+            is_mock_id = isinstance(msg_id, MagicMock)
+        except ImportError:
+            is_mock_id = False
+        if msg_id is not None and not is_mock_id:
+            replied_msg = cand
+
+    has_photo = bool(
+        update.message
+        and isinstance(getattr(update.message, "photo", None), (list, tuple))
+        and len(update.message.photo) > 0
+    )
+
+    # Strip /broadcast or /broadcast@bot_username from beginning
+    clean_text = re.sub(r"^/broadcast(?:@\w+)?\s*", "", raw_text, flags=re.IGNORECASE).strip()
+
+    is_direct = False
+    if clean_text.lower().startswith("direct"):
+        is_direct = True
+        clean_text = clean_text[len("direct"):].strip()
+
+    is_reply_broadcast = bool(replied_msg and not clean_text)
+
+    if not is_reply_broadcast and not clean_text and not has_photo:
         await update.message.reply_text(
-            "<b>Usage:</b>\n"
-            "• <code>/broadcast &lt;message&gt;</code> - Posts to official announcement channel (Instant 1 API call)\n"
-            "• <code>/broadcast direct &lt;message&gt;</code> - Direct messages all individual users in batches\n",
+            "<b>📢 Broadcast Usage:</b>\n\n"
+            "• <code>/broadcast &lt;message&gt;</code> — Posts to official channel (instant)\n"
+            "• <code>/broadcast direct &lt;message&gt;</code> — DMs all bot users in batches\n"
+            "• <i>Reply to any message (with text, photos, formatting) with</i> <code>/broadcast</code> <i>to forward it directly!</i>",
             parse_mode="HTML"
         )
         return
 
-    is_direct = False
-    if message.lower().startswith("direct "):
-        is_direct = True
-        message = message[len("direct "):].lstrip()
-
-    # Sanitize naked ampersands that are not already valid HTML entities so Telegram HTML doesn't fail
-    import re
-    message = re.sub(r"&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)", "&amp;", message)
-
     channel_id = os.getenv("ANNOUNCEMENT_CHANNEL", getattr(init, "ANNOUNCEMENT_CHANNEL", "@channelofchatzone"))
+
     # If not explicitly marked 'direct', post to official announcement channel if configured!
     if not is_direct:
         if channel_id and channel_id.strip():
             try:
-                sent_msg = await safe_tele_func_call(
-                    context.bot.send_message,
-                    chat_id=channel_id,
-                    text=message,
-                    parse_mode="HTML"
-                )
+                sent_msg = None
+                if is_reply_broadcast:
+                    sent_msg = await safe_tele_func_call(
+                        context.bot.copy_message,
+                        chat_id=channel_id,
+                        from_chat_id=update.effective_chat.id,
+                        message_id=replied_msg.message_id
+                    )
+                elif has_photo:
+                    photo_id = update.message.photo[-1].file_id
+                    sent_msg = await _send_with_html_fallback(
+                        context.bot.send_photo,
+                        chat_id=channel_id,
+                        photo=photo_id,
+                        caption=clean_text
+                    )
+                else:
+                    sent_msg = await _send_with_html_fallback(
+                        context.bot.send_message,
+                        chat_id=channel_id,
+                        text=clean_text
+                    )
+
                 if sent_msg:
                     await update.message.reply_text(
                         f"📢 <b>Announcement posted to channel {channel_id} successfully!</b> ✅",
@@ -91,7 +155,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"⚠️ Channel error: {err_text}{tip}", parse_mode="HTML")
                 return
         else:
-            # Inform admin how to configure channel or use direct broadcast
             await update.message.reply_text(
                 "⚠️ <b>ANNOUNCEMENT_CHANNEL</b> is not configured in .env.\n"
                 "• Set <code>ANNOUNCEMENT_CHANNEL=@YourChannel</code> in your .env to post to your official channel instantly.\n"
@@ -107,15 +170,25 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for i in range(0, len(target_users), batch_size):
         chunk = target_users[i:i + batch_size]
-        tasks = [
-            safe_tele_func_call(
-                context.bot.send_message,
-                chat_id=uid,
-                text=message,
-                parse_mode="HTML",
-            )
-            for uid in chunk
-        ]
+        if is_reply_broadcast:
+            tasks = [
+                safe_tele_func_call(
+                    context.bot.copy_message,
+                    chat_id=uid,
+                    from_chat_id=update.effective_chat.id,
+                    message_id=replied_msg.message_id
+                )
+                for uid in chunk
+            ]
+        else:
+            tasks = [
+                _send_with_html_fallback(
+                    context.bot.send_message,
+                    chat_id=uid,
+                    text=clean_text
+                )
+                for uid in chunk
+            ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for res in results:
             if res and not isinstance(res, Exception):

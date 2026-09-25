@@ -8,7 +8,7 @@ from telegram.ext import (
 
 from saveNload import save_user_data, init_pool, close_pool
 from app import keep_alive
-from relay import relay_message, relay_reaction
+from relay import relay_message, relay_reaction, relay_edited_message
 
 from commands.start import start
 from commands.find import find
@@ -252,6 +252,11 @@ def main():
         (filters.TEXT | filters.Sticker.ALL | filters.PHOTO | filters.VIDEO |
          filters.VIDEO_NOTE | filters.AUDIO | filters.Document.ALL | filters.VOICE | filters.ANIMATION | filters.Dice.ALL) & ~filters.COMMAND,
         relay_message
+    ))
+
+    app.add_handler(MessageHandler(
+        filters.UpdateType.EDITED_MESSAGE & ~filters.COMMAND,
+        relay_edited_message
     ))
 
     app.add_handler(MessageReactionHandler(relay_reaction))

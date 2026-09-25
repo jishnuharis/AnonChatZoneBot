@@ -174,3 +174,43 @@ async def relay_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_id=partner_msg_id,
         reaction=reaction.new_reaction,
     )
+
+
+async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Relays edited messages to the active chat partner by editing the corresponding forwarded message in-place.
+    Catches and silences errors cleanly if message is no longer editable.
+    """
+    edit_msg = update.edited_message
+    if not edit_msg or not update.effective_user:
+        return
+
+    user_id = update.effective_user.id
+    if user_id not in init.active_pairs:
+        return
+
+    partner_id = init.active_pairs[user_id]
+    mapped = init.message_map.get(user_id, {}).get(edit_msg.message_id)
+    if not mapped or mapped[0] != partner_id:
+        return
+
+    partner_msg_id = mapped[1]
+
+    try:
+        if edit_msg.text:
+            await safe_tele_func_call(
+                context.bot.edit_message_text,
+                chat_id=partner_id,
+                message_id=partner_msg_id,
+                text=edit_msg.text,
+            )
+        elif edit_msg.caption is not None:
+            await safe_tele_func_call(
+                context.bot.edit_message_caption,
+                chat_id=partner_id,
+                message_id=partner_msg_id,
+                caption=edit_msg.caption,
+            )
+    except Exception as e:
+        logger.debug(f"Notice on relay_edited_message from {user_id} to {partner_id}: {e}")
+

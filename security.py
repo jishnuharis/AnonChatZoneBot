@@ -49,7 +49,13 @@ async def safe_tele_func_call(caller, *args, raise_on_forbidden: bool = False, *
         return None
     except BadRequest as e:
         err_msg = str(e).lower()
-        if "message is not modified" in err_msg or "message to delete not found" in err_msg or "message can't be deleted" in err_msg:
+        if (
+            "message is not modified" in err_msg
+            or "message to delete not found" in err_msg
+            or "message can't be deleted" in err_msg
+            or "message to edit not found" in err_msg
+            or "message can't be edited" in err_msg
+        ):
             return None
         logger.warning(f"BadRequest on Telegram API call: {e}")
         raise

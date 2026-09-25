@@ -177,3 +177,114 @@ async def test_in_chat_keyboard_nudge_only_and_relay():
     init.active_pairs.pop(u1, None)
     init.active_pairs.pop(u2, None)
 
+
+@pytest.mark.asyncio
+async def test_relay_edited_message():
+    """Verify that when a user edits their message or caption, it edits the partner's corresponding message in real-time."""
+    from relay import relay_edited_message
+    from telegram.error import BadRequest
+
+    u1, u2 = 7701, 7702
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.message_map[u1] = {100: (u2, 200), 101: (u2, 201)}
+
+    # 1. Edit text
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_update.edited_message.message_id = 100
+    mock_update.edited_message.text = "Hello (edited!)"
+    mock_update.edited_message.caption = None
+
+    mock_context = MagicMock()
+    mock_context.bot.edit_message_text = AsyncMock(return_value=True)
+    mock_context.bot.edit_message_caption = AsyncMock(return_value=True)
+
+    await relay_edited_message(mock_update, mock_context)
+    mock_context.bot.edit_message_text.assert_called_once_with(
+        chat_id=u2,
+        message_id=200,
+        text="Hello (edited!)"
+    )
+
+    # 2. Edit caption
+    mock_update.edited_message.message_id = 101
+    mock_update.edited_message.text = None
+    mock_update.edited_message.caption = "New media caption"
+
+    await relay_edited_message(mock_update, mock_context)
+    mock_context.bot.edit_message_caption.assert_called_once_with(
+        chat_id=u2,
+        message_id=201,
+        caption="New media caption"
+    )
+
+    # 3. Benign edit error handling (message can't be edited)
+    mock_context.bot.edit_message_text.side_effect = BadRequest("Message can't be edited")
+    mock_update.edited_message.message_id = 100
+    mock_update.edited_message.text = "Attempting to edit old message"
+    # Must not raise an exception
+    await relay_edited_message(mock_update, mock_context)
+
+    # Clean up
+    init.active_pairs.pop(u1, None)
+    init.active_pairs.pop(u2, None)
+    init.message_map.pop(u1, None)
+
+
+@pytest.mark.asyncio
+async def test_broadcast_reply_and_entity_fallback(monkeypatch):
+    """Verify reply-to-broadcast copies message and entity errors fallback to plain text."""
+    from commands.admin_commands import broadcast
+    from telegram.error import BadRequest
+
+    monkeypatch.setenv("ANNOUNCEMENT_CHANNEL", "@MyTestChannel")
+    admin_id = 88888
+    init.ADMIN_IDS.add(admin_id)
+
+    # 1. Reply to broadcast
+    mock_update = MagicMock()
+    mock_update.effective_user.id = admin_id
+    mock_update.effective_chat.id = 12345
+    mock_update.message.text = "/broadcast"
+    mock_update.message.caption = None
+    mock_update.message.photo = []
+    # Explicitly set mock reply
+    reply_target = MagicMock()
+    reply_target.message_id = 456
+    mock_update.message.reply_to_message = reply_target
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.copy_message = AsyncMock(return_value=MagicMock(message_id=501))
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=502))
+
+    await broadcast(mock_update, mock_context)
+    mock_context.bot.copy_message.assert_called_once_with(
+        chat_id="@MyTestChannel",
+        from_chat_id=12345,
+        message_id=456
+    )
+
+    # 2. Entity parse failure triggers clean plain text fallback
+    mock_update.message.reply_to_message = None
+    mock_update.message.text = "/broadcast <b>Broken tag message"
+    
+    # First call with HTML raises entity error, second call with plain succeeds
+    first_call = True
+    async def mock_send_message(*args, **kwargs):
+        nonlocal first_call
+        if kwargs.get("parse_mode") == "HTML":
+            raise BadRequest("Can't parse entities: can't find end tag")
+        return MagicMock(message_id=701)
+
+    mock_context.bot.send_message = AsyncMock(side_effect=mock_send_message)
+    await broadcast(mock_update, mock_context)
+
+    # Verify send_message was called twice (HTML failed -> Plain text fallback succeeded)
+    assert mock_context.bot.send_message.call_count == 2
+    second_call_kwargs = mock_context.bot.send_message.call_args_list[1][1]
+    assert second_call_kwargs["parse_mode"] is None
+    assert second_call_kwargs["text"] == "Broken tag message"
+
+
