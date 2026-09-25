@@ -133,6 +133,15 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if sent is not None:
                 _remember(user_id, msg.message_id, partner_id, sent.message_id)
+
+                # Ephemeral transcript recording for 'Save Conversation'
+                session_id = init.active_sessions.get(user_id)
+                if session_id:
+                    text_content = msg.text or (f"[{kind.upper() if kind else 'MEDIA'}] {caption or ''}").strip()
+                    buf = init.session_messages.setdefault(session_id, [])
+                    buf.append((user_id, text_content, time.time()))
+                    if len(buf) > 300:
+                        buf.pop(0)
         except Forbidden:
             # Partner blocked the bot! Cleanly disconnect transport session immediately
             logger.info(f"Relay detected partner {partner_id} blocked bot. Terminating session.")

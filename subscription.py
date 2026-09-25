@@ -70,6 +70,14 @@ def daily_credit_limit(user_id: int) -> int:
     return FREE_DAILY_CREDIT_LIMIT + tier["limit_bonus"]
 
 
+def get_friend_limit(user_id: int) -> int:
+    """Returns the maximum number of friends allowed: 16 base for free, +16 per tier level."""
+    tier = active_tier(user_id)
+    if not tier:
+        return 16
+    return 16 + (tier.get("priority", 1) * 16)
+
+
 def daily_credits_used(user_id: int) -> int:
     details = _details(user_id)
     today = time.strftime("%Y-%m-%d", time.gmtime())

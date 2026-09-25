@@ -21,6 +21,7 @@ def test_schema_ddl_syntax():
         "CREATE TABLE IF NOT EXISTS bot_config",
         "CREATE TABLE IF NOT EXISTS promotions",
         "CREATE TABLE IF NOT EXISTS game_questions",
+        "CREATE TABLE IF NOT EXISTS user_friends",
     ]
     for table_clause in required_tables:
         assert table_clause in CREATE_TABLES_SQL, f"Missing table DDL: {table_clause}"
@@ -28,9 +29,11 @@ def test_schema_ddl_syntax():
     # Verify key constraints and indexes
     assert "CONSTRAINT uq_user_blocks UNIQUE (blocker_id, blocked_id)" in CREATE_TABLES_SQL
     assert "CONSTRAINT uq_user_ratings UNIQUE (voter_id, target_id)" in CREATE_TABLES_SQL
+    assert "CONSTRAINT uq_user_friends UNIQUE (user_id, friend_id)" in CREATE_TABLES_SQL
     assert "idx_sessions_active" in CREATE_TABLES_SQL
     assert "idx_profiles_restricted" in CREATE_TABLES_SQL
     assert "idx_blocks_lookup" in CREATE_TABLES_SQL
+    assert "idx_user_friends_user" in CREATE_TABLES_SQL
 
 
 def test_user_profiles_schema_normalized_no_obsolete_columns():

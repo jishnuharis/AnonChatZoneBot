@@ -156,6 +156,19 @@ CREATE TABLE IF NOT EXISTS game_questions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Anonymous Friends Table (Normalized M:N with custom metadata)
+CREATE TABLE IF NOT EXISTS user_friends (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    friend_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    custom_name VARCHAR(100) NOT NULL,
+    notes TEXT DEFAULT '',
+    is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_user_friends UNIQUE (user_id, friend_id),
+    CONSTRAINT chk_no_self_friend CHECK (user_id != friend_id)
+);
+
 -- Indexes for 500k+ Users Performance
 CREATE INDEX IF NOT EXISTS idx_users_prefs ON users (preferences_bitmask);
 CREATE INDEX IF NOT EXISTS idx_profiles_restricted ON user_profiles (restricted_until) WHERE restricted_until IS NOT NULL;
@@ -171,6 +184,8 @@ CREATE INDEX IF NOT EXISTS idx_subs_user_active ON subscriptions (user_id, expir
 CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals (referrer_id);
 CREATE INDEX IF NOT EXISTS idx_promotions_active ON promotions (is_active, priority) WHERE is_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_game_questions_lookup ON game_questions (game_type, category, is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_user_friends_user ON user_friends (user_id, is_favorite DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_friends_pair ON user_friends (user_id, friend_id);
 """
 
 

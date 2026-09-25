@@ -22,6 +22,10 @@ active_pairs: Dict[int, int] = {}
 active_sessions: Dict[int, str] = {}  # user_id -> session_uuid
 recent_partners: Dict[int, List[int]] = {}  # user_id -> list of recent partner IDs
 last_activity: Dict[int, float] = {}  # user_id -> timestamp of last in-chat action
+recent_skips: Dict[int, tuple] = {}  # user_id -> (skipped_partner_id, timestamp)
+session_messages: Dict[str, List[tuple]] = {}  # session_id -> [(sender_role, text, timestamp)]
+pending_friend_requests: Dict[str, Dict[str, Any]] = {}  # req_id -> dict
+pending_friend_connections: Dict[str, Dict[str, Any]] = {}  # conn_id -> dict
 
 PREFERENCE_TAGS = [
     ("Gaming", "🎮"),

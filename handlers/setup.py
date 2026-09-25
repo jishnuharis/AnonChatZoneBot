@@ -63,6 +63,11 @@ async def handle_user_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip() if update.message.text else ""
 
+    if user_id in init.edit_stage and init.edit_stage[user_id].startswith("friend_"):
+        from handlers.friends import handle_friend_input_text
+        if await handle_friend_input_text(update, context):
+            return
+
     if user_id in init.edit_stage and init.edit_stage[user_id] == "age":
         try:
             age = int(text)

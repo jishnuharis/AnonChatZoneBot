@@ -34,6 +34,22 @@ An enterprise-ready, anonymous chat bot for Telegram engineered to handle **500,
    - Anti-spam per-user rate limiting token bucket.
    - OWNER error alert throttling (max 1 notification per 15s) preventing Telegram flood/ban during API issues.
    - HTML injection immunity and 100% parameterized SQL queries.
+8. **In-Bot Anonymous Friends List (`/friends`, `/friendreq`)**:
+   - Save connections to an internal list without revealing Telegram usernames or phone numbers.
+   - Tiered capacity (16 base for free, +16 slots per subscription tier).
+   - Automatic Roman numeral deduplication (`Bestie I`, `Bestie II`).
+   - Paginated card viewer with Nickname/Note editing, Favorite pinning, mutual friend removal, and busy-aware connect invites.
+9. **The 60-Second "Accidental Skip" Undo Button**:
+   - Allows users who accidentally skipped via `/next` to immediately reconnect with their previous partner within 60 seconds.
+10. **100% Privacy & VIP Gender Peek**:
+   - Zero public profile or bio leakage. Regular chats remain strictly anonymous.
+   - Exclusive VIP/subscriber perk: discreet partner gender notification at match start.
+11. **"Save Our Conversation" (Transcript Export)**:
+   - Clean, 100% anonymized `.txt` conversation memory delivered to Saved Messages upon chat conclusion.
+12. **Anonymous WebApp Voice Calling (`/call`)**:
+   - Private 1-on-1 audio rooms launched via Telegram WebApp (WebRTC) with zero Telegram ID or IP address exposure.
+13. **Native Emoji Reactions & Chat Action Mirroring**:
+   - Bidirectional relay of native Telegram emoji reactions and real-time chat actions (`typing...`, `recording voice...`).
 
 ---
 
@@ -113,7 +129,8 @@ The database uses PostgreSQL with foreign key constraints, cascade triggers, and
 - **`referrals`**: Referral link tracking with idempotency (`referred_id` UNIQUE).
 - **`bot_config`**: Dynamic key-value configuration (`key` PK, `value` JSONB).
 - **`promotions`**: Sponsor campaigns (`title`, `sponsor_name`, `message_text`, `button_text`, `button_url`, `priority`, `impressions_count`, `clicks_count`, `is_active`).
-- **`game_questions`**: Data-driven question repository (`game_type`, `category`, `prompt_a`, `prompt_b`, `correct_answer`).
+-**`game_questions`**: Data-driven question repository (`game_type`, `category`, `prompt_a`, `prompt_b`, `correct_answer`).
+- **`user_friends`**: Anonymous friends network (`id` PK, `user_id`, `friend_id`, `custom_name`, `notes`, `is_favorite`, `created_at`).
 
 ---
 

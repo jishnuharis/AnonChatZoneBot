@@ -73,13 +73,19 @@ def _partner_details_line(viewer_id: int, partner_id: int) -> str:
     if not is_subscribed(viewer_id):
         return ""
     partner = init.user_details.get(partner_id, {})
-    gender = "Male" if partner.get("gender") == "M" else "Female" if partner.get("gender") == "F" else "Unknown"
-    age = partner.get("age") or "Unknown"
-    country = partner.get("country") or "Unknown"
-    return f"\n<i>👤 {gender}, {age} — {country}</i>"
+    g = partner.get("gender")
+    gender = "Male 👨" if g == "M" else "Female 👩" if g == "F" else "Not specified"
+    return f"\n✨ <i>VIP Perk: Partner is {gender}</i>"
 
 
-async def start_chat_session(context: ContextTypes.DEFAULT_TYPE, user1: int, user2: int) -> bool:
+async def start_chat_session(
+    context: ContextTypes.DEFAULT_TYPE,
+    user1: int,
+    user2: int,
+    is_friend_connection: bool = False,
+    friend_name_1: str = "",
+    friend_name_2: str = "",
+) -> bool:
     """
     Atomically starts a new chat session between user1 and user2.
     Validates blocks, ban status, and active states.
@@ -98,6 +104,9 @@ async def start_chat_session(context: ContextTypes.DEFAULT_TYPE, user1: int, use
     init.active_pairs[user2] = user1
     init.active_sessions[user1] = session_id
     init.active_sessions[user2] = session_id
+
+    # Initialize ephemeral transcript message buffer
+    init.session_messages[session_id] = []
 
     init.user_details.setdefault(user1, init._default_user())["partner_id"] = user2
     init.user_details.setdefault(user2, init._default_user())["partner_id"] = user1
@@ -122,9 +131,16 @@ async def start_chat_session(context: ContextTypes.DEFAULT_TYPE, user1: int, use
     init.last_activity[user1] = now
     init.last_activity[user2] = now
 
+    if is_friend_connection:
+        text1 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b> Say hi! 👋\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text2 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b> Say hi! 👋\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+    else:
+        text1 = f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv2.get('up', 0)} 👍 {uv2.get('down', 0)} 👎{shared_note}{details1}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text2 = f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv1.get('up', 0)} 👍 {uv1.get('down', 0)} 👎{shared_note}{details2}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+
     msg1 = await safe_tele_func_call(
         context.bot.send_message, chat_id=user1,
-        text=f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv2.get('up', 0)} 👍 {uv2.get('down', 0)} 👎{shared_note}{details1}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>",
+        text=text1,
         parse_mode="HTML",
         reply_markup=IN_CHAT_KEYBOARD,
     )
@@ -136,7 +152,7 @@ async def start_chat_session(context: ContextTypes.DEFAULT_TYPE, user1: int, use
 
     msg2 = await safe_tele_func_call(
         context.bot.send_message, chat_id=user2,
-        text=f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv1.get('up', 0)} 👍 {uv1.get('down', 0)} 👎{shared_note}{details2}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>",
+        text=text2,
         parse_mode="HTML",
         reply_markup=IN_CHAT_KEYBOARD,
     )
@@ -206,7 +222,21 @@ async def end_chat_session(
         except Exception as e:
             logger.error(f"Error persisting session end for {session_id}: {e}")
 
-    # Dispatch notifications
+    # Dispatch notifications with end-of-chat options (Friends & Transcript)
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    from saveNload import are_friends_db
+
+    already_friends = await are_friends_db(user_id, partner) if partner else False
+    has_transcript = bool(session_id and session_id in init.session_messages and len(init.session_messages[session_id]) >= 2)
+
+    def _build_end_keyboard(target_pid):
+        btns = []
+        if target_pid and not already_friends:
+            btns.append([InlineKeyboardButton("⭐ Add to Anonymous Friends", callback_data=f"friendreq_end|{target_pid}")])
+        if has_transcript:
+            btns.append([InlineKeyboardButton("📥 Save Conversation Transcript", callback_data=f"export_chat|{session_id}")])
+        return InlineKeyboardMarkup(btns) if btns else None
+
     if partner and notify_partner:
         await safe_tele_func_call(
             context.bot.send_message,
@@ -215,6 +245,16 @@ async def end_chat_session(
             parse_mode="HTML",
             reply_markup=ReplyKeyboardRemove(),
         )
+        kb_p = _build_end_keyboard(user_id)
+        if kb_p:
+            await safe_tele_func_call(
+                context.bot.send_message,
+                chat_id=partner,
+                text="💬 <b>Chat Options:</b>",
+                parse_mode="HTML",
+                reply_markup=kb_p,
+            )
+
     if notify_initiator:
         await safe_tele_func_call(
             context.bot.send_message,
@@ -223,6 +263,15 @@ async def end_chat_session(
             parse_mode="HTML",
             reply_markup=ReplyKeyboardRemove(),
         )
+        kb_u = _build_end_keyboard(partner)
+        if kb_u:
+            await safe_tele_func_call(
+                context.bot.send_message,
+                chat_id=user_id,
+                text="💬 <b>Chat Options:</b>",
+                parse_mode="HTML",
+                reply_markup=kb_u,
+            )
 
     # Solicit ratings
     if partner:

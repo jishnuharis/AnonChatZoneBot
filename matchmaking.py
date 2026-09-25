@@ -148,6 +148,17 @@ async def _find_best_partner(user_id: int) -> Tuple[Optional[int], int]:
     return best_id, best_score
 
 
+async def dequeue_user(user_id: int) -> bool:
+    """Removes a user from the matchmaking queue and waiting timers."""
+    async with init.queue_lock:
+        removed = False
+        if user_id in init.waiting_users:
+            init.waiting_users.remove(user_id)
+            removed = True
+        init.wait_started.pop(user_id, None)
+        return removed
+
+
 async def enqueue_and_match(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     """
     Enqueues user and attempts an immediate interest-based match.

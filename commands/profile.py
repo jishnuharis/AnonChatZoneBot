@@ -14,6 +14,7 @@ import init
 
 def _profile_keyboard():
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("👥 Anonymous Friends List", callback_data="flist|0")],
         [InlineKeyboardButton("✏️ Edit Gender", callback_data="edit|gender"),
          InlineKeyboardButton("✏️ Edit Age", callback_data="edit|age")],
         [InlineKeyboardButton("✏️ Edit Country", callback_data="edit|country"),
@@ -87,3 +88,24 @@ async def send_profile_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int):
     if not text:
         return
     await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=text, reply_markup=_profile_keyboard(), parse_mode="HTML")
+
+
+async def handle_profile_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Returns to profile view when Back to Profile is pressed."""
+    query = update.callback_query
+    if not query:
+        return
+    await query.answer()
+    user_id = update.effective_user.id
+    text = await _build_profile_text(
+        user_id, context,
+        fallback_name=update.effective_user.full_name,
+        fallback_username=update.effective_user.username,
+    )
+    if text:
+        await safe_tele_func_call(
+            query.edit_message_text,
+            text=text,
+            reply_markup=_profile_keyboard(),
+            parse_mode="HTML"
+        )

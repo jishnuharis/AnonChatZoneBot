@@ -1180,3 +1180,290 @@ async def load_user_data() -> dict:
     except Exception as e:
         logger.warning(f"Failed to load user data from database: {e}")
     return data
+
+
+# ==========================================
+# In-Bot Anonymous Friends Management
+# ==========================================
+
+_in_memory_friends: Dict[int, Dict[int, Dict[str, Any]]] = {}
+
+ROMAN_NUMERALS = [
+    (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
+    (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
+    (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")
+]
+
+
+def int_to_roman(num: int) -> str:
+    """Converts a positive integer to its Roman numeral representation."""
+    if num <= 0:
+        return str(num)
+    roman_num = ""
+    for val, syb in ROMAN_NUMERALS:
+        while num >= val:
+            roman_num += syb
+            num -= val
+    return roman_num
+
+
+def roman_to_int(s: str) -> Optional[int]:
+    """Parses Roman numeral string back to integer if valid, else None."""
+    rom_map = {'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000}
+    s = s.upper().strip()
+    if not s or not all(c in rom_map for c in s):
+        return None
+    total = 0
+    prev_val = 0
+    for c in reversed(s):
+        curr_val = rom_map[c]
+        if curr_val < prev_val:
+            total -= curr_val
+        else:
+            total += curr_val
+            prev_val = curr_val
+    return total
+
+
+async def get_user_friends_db(user_id: int) -> List[Dict[str, Any]]:
+    """Fetches all friends for user_id sorted by is_favorite DESC, created_at DESC."""
+    if not is_pool_ready():
+        user_friends = list(_in_memory_friends.get(user_id, {}).values())
+        user_friends.sort(key=lambda f: (not f.get("is_favorite", False), -f.get("created_at_ts", 0)))
+        return user_friends
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as cur:
+                await cur.execute("""
+                    SELECT friend_id, custom_name, notes, is_favorite, created_at
+                    FROM user_friends
+                    WHERE user_id = %s
+                    ORDER BY is_favorite DESC, created_at DESC;
+                """, (user_id,))
+                return await cur.fetchall()
+    except Exception as e:
+        logger.error(f"get_user_friends_db error for {user_id}: {e}")
+        return []
+
+
+async def get_friend_count_db(user_id: int) -> int:
+    """Returns the total number of friends for user_id."""
+    if not is_pool_ready():
+        return len(_in_memory_friends.get(user_id, {}))
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            cur = await conn.execute("SELECT COUNT(*) FROM user_friends WHERE user_id = %s;", (user_id,))
+            row = await cur.fetchone()
+            return int(row[0]) if row else 0
+    except Exception as e:
+        logger.error(f"get_friend_count_db error for {user_id}: {e}")
+        return 0
+
+
+async def get_friend_card_db(user_id: int, friend_id: int) -> Optional[Dict[str, Any]]:
+    """Fetches friend card details for a specific pair."""
+    if not is_pool_ready():
+        return _in_memory_friends.get(user_id, {}).get(friend_id)
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as cur:
+                await cur.execute("""
+                    SELECT friend_id, custom_name, notes, is_favorite, created_at
+                    FROM user_friends
+                    WHERE user_id = %s AND friend_id = %s;
+                """, (user_id, friend_id))
+                return await cur.fetchone()
+    except Exception as e:
+        logger.error(f"get_friend_card_db error: {e}")
+        return None
+
+
+async def are_friends_db(user1: int, user2: int) -> bool:
+    """Returns True if user1 and user2 are already friends."""
+    if not is_pool_ready():
+        return user2 in _in_memory_friends.get(user1, {})
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            cur = await conn.execute("""
+                SELECT 1 FROM user_friends 
+                WHERE user_id = %s AND friend_id = %s 
+                LIMIT 1;
+            """, (user1, user2))
+            return (await cur.fetchone()) is not None
+    except Exception as e:
+        logger.error(f"are_friends_db error: {e}")
+        return False
+
+
+async def deduplicate_friend_nickname(user_id: int, base_name: str) -> str:
+    """
+    Applies Roman numeral deduplication rule:
+    If User already has a friend named 'Bestie':
+    - The existing friend is updated to 'Bestie I'
+    - The new friend becomes 'Bestie II'
+    If 'Bestie I' and 'Bestie II' exist:
+    - The new friend becomes 'Bestie III'
+    """
+    base_name = base_name.strip()
+    friends = await get_user_friends_db(user_id)
+    
+    exact_matches = []
+    numeral_matches = []  # list of (friend_id, num, full_name)
+
+    for f in friends:
+        name = f.get("custom_name", "").strip()
+        fid = f.get("friend_id")
+        if name.lower() == base_name.lower():
+            exact_matches.append((fid, name))
+        elif name.lower().startswith(base_name.lower() + " "):
+            suffix = name[len(base_name):].strip()
+            num = roman_to_int(suffix)
+            if num is not None:
+                numeral_matches.append((fid, num, name))
+
+    # Case 1: No match at all
+    if not exact_matches and not numeral_matches:
+        return base_name
+
+    # Case 2: Exactly one exact match and no roman numerals yet -> Update existing to 'base_name I', return 'base_name II'
+    if exact_matches and not numeral_matches:
+        old_fid, _ = exact_matches[0]
+        await update_friend_nickname_db(user_id, old_fid, f"{base_name} I")
+        return f"{base_name} II"
+
+    # Case 3: Roman numerals already exist
+    highest = max([n for _, n, _ in numeral_matches], default=1)
+    if exact_matches:
+        # If there's an un-suffixed one alongside suffixed ones, upgrade it to I if not present
+        has_one = any(n == 1 for _, n, _ in numeral_matches)
+        if not has_one:
+            old_fid, _ = exact_matches[0]
+            await update_friend_nickname_db(user_id, old_fid, f"{base_name} I")
+
+    next_num = highest + 1
+    return f"{base_name} {int_to_roman(next_num)}"
+
+
+async def add_friend_pair_db(user1: int, user2: int, name1: str, name2: str) -> bool:
+    """Mutual friendship insertion for both users."""
+    if not is_pool_ready():
+        now_ts = time.time()
+        now_dt = datetime.now(timezone.utc)
+        f1 = {"friend_id": user2, "custom_name": name1, "notes": "", "is_favorite": False, "created_at": now_dt, "created_at_ts": now_ts}
+        f2 = {"friend_id": user1, "custom_name": name2, "notes": "", "is_favorite": False, "created_at": now_dt, "created_at_ts": now_ts}
+        _in_memory_friends.setdefault(user1, {})[user2] = f1
+        _in_memory_friends.setdefault(user2, {})[user1] = f2
+        return True
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("""
+                INSERT INTO user_friends (user_id, friend_id, custom_name, notes, is_favorite, created_at)
+                VALUES (%s, %s, %s, '', FALSE, NOW())
+                ON CONFLICT (user_id, friend_id) DO UPDATE SET custom_name = EXCLUDED.custom_name;
+            """, (user1, user2, name1))
+            await conn.execute("""
+                INSERT INTO user_friends (user_id, friend_id, custom_name, notes, is_favorite, created_at)
+                VALUES (%s, %s, %s, '', FALSE, NOW())
+                ON CONFLICT (user_id, friend_id) DO UPDATE SET custom_name = EXCLUDED.custom_name;
+            """, (user2, user1, name2))
+            return True
+    except Exception as e:
+        logger.error(f"add_friend_pair_db error between {user1} and {user2}: {e}")
+        return False
+
+
+async def update_friend_nickname_db(user_id: int, friend_id: int, new_name: str) -> bool:
+    """Updates custom name for friend_id from user_id's view."""
+    if not is_pool_ready():
+        if user_id in _in_memory_friends and friend_id in _in_memory_friends[user_id]:
+            _in_memory_friends[user_id][friend_id]["custom_name"] = new_name
+            return True
+        return False
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("""
+                UPDATE user_friends
+                SET custom_name = %s
+                WHERE user_id = %s AND friend_id = %s;
+            """, (new_name, user_id, friend_id))
+            return True
+    except Exception as e:
+        logger.error(f"update_friend_nickname_db error: {e}")
+        return False
+
+
+async def update_friend_note_db(user_id: int, friend_id: int, new_note: str) -> bool:
+    """Updates private note for friend_id from user_id's view."""
+    if not is_pool_ready():
+        if user_id in _in_memory_friends and friend_id in _in_memory_friends[user_id]:
+            _in_memory_friends[user_id][friend_id]["notes"] = new_note
+            return True
+        return False
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("""
+                UPDATE user_friends
+                SET notes = %s
+                WHERE user_id = %s AND friend_id = %s;
+            """, (new_note, user_id, friend_id))
+            return True
+    except Exception as e:
+        logger.error(f"update_friend_note_db error: {e}")
+        return False
+
+
+async def toggle_friend_favorite_db(user_id: int, friend_id: int) -> bool:
+    """Toggles favorite status for a friend. Returns the new favorite state."""
+    if not is_pool_ready():
+        if user_id in _in_memory_friends and friend_id in _in_memory_friends[user_id]:
+            cur_state = _in_memory_friends[user_id][friend_id].get("is_favorite", False)
+            _in_memory_friends[user_id][friend_id]["is_favorite"] = not cur_state
+            return not cur_state
+        return False
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            cur = await conn.execute("""
+                UPDATE user_friends
+                SET is_favorite = NOT is_favorite
+                WHERE user_id = %s AND friend_id = %s
+                RETURNING is_favorite;
+            """, (user_id, friend_id))
+            row = await cur.fetchone()
+            return bool(row[0]) if row else False
+    except Exception as e:
+        logger.error(f"toggle_friend_favorite_db error: {e}")
+        return False
+
+
+async def remove_friend_pair_db(user1: int, user2: int) -> bool:
+    """Mutual friend deletion for both users."""
+    if not is_pool_ready():
+        _in_memory_friends.get(user1, {}).pop(user2, None)
+        _in_memory_friends.get(user2, {}).pop(user1, None)
+        return True
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("""
+                DELETE FROM user_friends
+                WHERE (user_id = %s AND friend_id = %s)
+                   OR (user_id = %s AND friend_id = %s);
+            """, (user1, user2, user2, user1))
+            return True
+    except Exception as e:
+        logger.error(f"remove_friend_pair_db error between {user1} and {user2}: {e}")
+        return False

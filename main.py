@@ -12,13 +12,19 @@ from relay import relay_message, relay_reaction
 
 from commands.start import start
 from commands.find import find
-from commands.next import skip_partner
+from commands.next import skip_partner, handle_undo_skip
 from commands.stop import stop
 from commands.block import block_command
 from commands.nudge import handle_nudge, status_command
 from commands.cancel import cancel
 from commands.help import help_command
-from commands.profile import show_profile
+from commands.profile import show_profile, handle_profile_back
+from commands.call import call_command, handle_call_response
+from handlers.friends import (
+    send_friend_request, show_friends_menu, handle_friend_request_response,
+    handle_friend_card_actions, handle_connect_response
+)
+from handlers.transcript import handle_export_transcript
 from commands.games import games_menu, handle_games_menu_selection
 from commands.admin_commands import (
     broadcast, connect, ban_user, unban_user, check_user,
@@ -76,6 +82,9 @@ async def set_commands(application):
         BotCommand("cancel", "Cancel ongoing game or request"),
         BotCommand("help", "Show help"),
         BotCommand("profile", "Show user profile"),
+        BotCommand("friendreq", "Add current partner to anonymous friends"),
+        BotCommand("friends", "Manage anonymous friends list"),
+        BotCommand("call", "Start anonymous voice call with partner"),
         BotCommand("games", "Play a mini-game with partner"),
         BotCommand("private", "Arm Privacy Mode for next media"),
         BotCommand("subscribe", "View/purchase subscription"),
@@ -184,6 +193,9 @@ def main():
     app.add_handler(CommandHandler("cancel", cancel))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("profile", show_profile))
+    app.add_handler(CommandHandler("friendreq", send_friend_request))
+    app.add_handler(CommandHandler("friends", lambda u, c: show_friends_menu(u, c, 0)))
+    app.add_handler(CommandHandler("call", call_command))
     app.add_handler(CommandHandler("games", games_menu))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("connect", connect))
@@ -201,6 +213,15 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_tier_selection, pattern=r"^sub\|\w+$"))
     app.add_handler(PreCheckoutQueryHandler(handle_pre_checkout))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
+
+    app.add_handler(CallbackQueryHandler(handle_undo_skip, pattern=r"^undoskip\|\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_friend_request_response, pattern=r"^freq_(acc|dec)\|\w+$"))
+    app.add_handler(CallbackQueryHandler(lambda u, c: send_friend_request(u, c, target_id=int(u.callback_query.data.split("|")[1])), pattern=r"^friendreq_end\|\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_friend_card_actions, pattern=r"^(flist|fcard|ffav|feditname|feditnote|frmconfirm|frmdo|fconn)\|\d+(?:\|\d+)?$"))
+    app.add_handler(CallbackQueryHandler(handle_connect_response, pattern=r"^f_c_(acc|dec)\|\w+$"))
+    app.add_handler(CallbackQueryHandler(handle_profile_back, pattern=r"^profile_back$"))
+    app.add_handler(CallbackQueryHandler(handle_export_transcript, pattern=r"^export_chat\|.+$"))
+    app.add_handler(CallbackQueryHandler(handle_call_response, pattern=r"^call_(acc|dec|end)\|.+$"))
 
     app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^rate\|\d+\|(up|down)$"))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^rateblock\|\d+$"))
