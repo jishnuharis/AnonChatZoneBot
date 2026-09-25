@@ -268,7 +268,7 @@ Admins can manage sponsor promotions live without modifying bot code:
 
 AnonChatZoneBot v2.0 features real-time presence indicators to eliminate ghosting anxiety and keep conversations engaging:
 
-- **Docked Typing Area Keyboard**: When paired, a persistent `ReplyKeyboardMarkup` docks directly below the typing input with `["Nudge your partner!"]`. Skips and stops are intentionally reserved for explicit slash commands (`/next`, `/stop`) to eliminate accidental skips. Cleanly unmounted on chat exit.
+- **Docked Typing Area Keyboard**: When paired, a persistent `ReplyKeyboardMarkup` docks directly below the typing input with `["👋 Nudge your partner!"]`. Skips and stops are intentionally reserved for explicit slash commands (`/next`, `/stop`) to eliminate accidental skips. Cleanly unmounted on chat exit.
 - **"Nudge your partner!" Button & `/nudge` Command**: Gentle ping with a 15-second anti-spam cooldown that sends a notification (`"👋 *NUDGE!* Your partner is nudging you!"`) and triggers typing actions on the partner's screen.
 - **`/status` Command**: Displays partner connection status and relative last activity (`Active right now`, `25s ago`, `2m ago`).
 - **Dynamic Media Chat Actions**: Automatically sends native Telegram chat actions (`upload_photo`, `upload_video`, `record_voice`, `record_video_note`, `upload_document`, `typing`) as media relays, keeping partners visually aware while media transfers.

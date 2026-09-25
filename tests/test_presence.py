@@ -127,7 +127,7 @@ async def test_in_chat_keyboard_nudge_only_and_relay():
 
     # 1. Keyboard verification
     assert len(IN_CHAT_KEYBOARD.keyboard) == 1
-    assert [b.text for b in IN_CHAT_KEYBOARD.keyboard[0]] == ["Nudge your partner!"]
+    assert [b.text for b in IN_CHAT_KEYBOARD.keyboard[0]] == ["👋 Nudge your partner!"]
 
     # 2. Relay interception verification
     u1, u2 = 9981, 9982
@@ -139,7 +139,7 @@ async def test_in_chat_keyboard_nudge_only_and_relay():
 
     mock_update = MagicMock()
     mock_update.effective_user.id = u1
-    mock_update.message.text = "Nudge your partner!"
+    mock_update.message.text = "👋 Nudge your partner!"
     mock_update.message.caption = None
     mock_update.message.photo = []
     mock_update.message.video = None
@@ -164,6 +164,14 @@ async def test_in_chat_keyboard_nudge_only_and_relay():
     send_args = mock_context.bot.send_message.call_args[1]
     assert send_args["chat_id"] == u2
     assert "Your partner is nudging you" in send_args["text"]
+
+    # Also verify non-emoji variation is intercepted cleanly
+    _nudge_timestamps.pop(u1, None)
+    mock_context.bot.send_message.reset_mock()
+    mock_update.message.text = "Nudge your partner!"
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    assert mock_context.bot.send_message.call_args[1]["chat_id"] == u2
 
     # Clean up
     init.active_pairs.pop(u1, None)

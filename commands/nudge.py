@@ -17,7 +17,7 @@ _nudge_timestamps: Dict[int, float] = {}
 async def handle_nudge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Sends a subtle presence ping / nudge to the partner.
-    Can be triggered via /nudge command or by tapping the 'Nudge your partner!' button below the typing area.
+    Can be triggered via /nudge command or by tapping the '👋 Nudge your partner!' button below the typing area.
     """
     user_id = update.effective_user.id
 

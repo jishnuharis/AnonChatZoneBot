@@ -34,7 +34,7 @@ _teardown_lock = asyncio.Lock()
 # Persistent keyboard below typing area during active chats
 IN_CHAT_KEYBOARD = ReplyKeyboardMarkup(
     [
-        ["Nudge your partner!"]
+        ["👋 Nudge your partner!"]
     ],
     resize_keyboard=True,
     is_persistent=True
