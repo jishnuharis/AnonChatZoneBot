@@ -67,17 +67,22 @@ async def handle_preferences_selection(update: Update, context: ContextTypes.DEF
             del init.edit_stage[user_id]
 
         if finishing_setup:
-            setup_done_markup = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("📢 Official Channel", url=init.CHANNEL_URL),
-                    InlineKeyboardButton("💬 Community Group", url=init.GROUP_URL),
-                ]
-            ])
-            text = (
-                f"✅ <i>Interests saved:</i> {describe_preferences(bitmask)}\n\n"
-                f"<b>You're all set! Use</b> /find <b>to start chatting.</b>"
-            )
-            await safe_tele_func_call(query.edit_message_text, text=text, reply_markup=setup_done_markup, parse_mode="HTML")
+            from channel_gate import check_channel_membership, MANDATORY_CHANNEL_PROMPT_TEXT, get_mandatory_channel_keyboard
+            is_member = await check_channel_membership(context.bot, user_id)
+            if not is_member:
+                # Show ONLY the mandatory channel joining prompt preventing user from using bot further
+                await safe_tele_func_call(
+                    query.edit_message_text,
+                    text=f"✅ <i>Interests saved!</i>\n\n{MANDATORY_CHANNEL_PROMPT_TEXT}",
+                    reply_markup=get_mandatory_channel_keyboard(),
+                    parse_mode="HTML"
+                )
+            else:
+                text = (
+                    f"✅ <i>Interests saved:</i> {describe_preferences(bitmask)}\n\n"
+                    f"<b>You're all set! Use</b> /find <b>to start chatting.</b>"
+                )
+                await safe_tele_func_call(query.edit_message_text, text=text, parse_mode="HTML")
         else:
             text = f"✅ <i>Interests updated:</i> {describe_preferences(bitmask)}"
             await safe_tele_func_call(query.edit_message_text, text=text, parse_mode="HTML")

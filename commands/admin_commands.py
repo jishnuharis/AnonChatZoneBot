@@ -524,8 +524,9 @@ async def campaign_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not args or args[0] == "help":
         await update.message.reply_text(
             "📢 <b>Campaign Management</b>\n\n"
-            "<i>/campaign list</i> - View all active campaigns\n"
-            "<i>/campaign create Sponsor | Title | Text | ButtonText | ButtonURL</i>\n",
+            "<i>/campaign list</i> — View all active campaigns\n"
+            "<i>/campaign create Sponsor | Title | Text [| ButtonText | ButtonURL [| PhotoURL]]</i>\n\n"
+            "💡 <i>Tip: You can also attach a photo or reply to a photo when running /campaign create!</i>",
             parse_mode="HTML"
         )
         return
@@ -538,7 +539,8 @@ async def campaign_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         lines = []
         for p in promos:
-            lines.append(f"• <b>[{p['id']}] {esc(p['title'])}</b> ({esc(p['sponsor_name'])}) — Views: {p['impressions_count']}, Clicks: {p['clicks_count']}")
+            photo_badge = " [📷 Photo]" if p.get("photo_url") else ""
+            lines.append(f"• <b>[{p['id']}] {esc(p['title'])}</b> ({esc(p['sponsor_name'])}){photo_badge} — Views: {p['impressions_count']}, Clicks: {p['clicks_count']}")
         await update.message.reply_text("\n".join(lines), parse_mode="HTML")
         return
 
@@ -546,14 +548,40 @@ async def campaign_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         full_text = " ".join(args[1:])
         parts = [part.strip() for part in full_text.split("|")]
         if len(parts) < 3:
-            await update.message.reply_text("<i>Usage: /campaign create Sponsor | Title | Text [| ButtonText | ButtonURL]</i>", parse_mode="HTML")
+            await update.message.reply_text(
+                "<i>Usage: /campaign create Sponsor | Title | Text [| ButtonText | ButtonURL [| PhotoURL]]</i>\n\n"
+                "💡 <i>Tip: You can also attach a photo or reply to a photo when running /campaign create!</i>",
+                parse_mode="HTML"
+            )
             return
 
         sponsor = parts[0]
         title = parts[1]
         msg_text = parts[2]
-        btn_text = parts[3] if len(parts) > 3 else None
-        btn_url = parts[4] if len(parts) > 4 else None
+        btn_text = parts[3] if len(parts) > 3 and parts[3] else None
+        btn_url = parts[4] if len(parts) > 4 and parts[4] else None
 
-        promo_id = await add_promotion_db(title, sponsor, msg_text, btn_text, btn_url)
-        await update.message.reply_text(f"✅ <i>Campaign created with ID</i> <code>{promo_id}</code>.", parse_mode="HTML")
+        # Check for photo: attached to message, replied-to photo, or 6th pipe parameter
+        photo_url = None
+        has_photo_list = bool(
+            update.message
+            and isinstance(getattr(update.message, "photo", None), (list, tuple))
+            and len(update.message.photo) > 0
+        )
+        replied_photo_list = bool(
+            update.message
+            and getattr(update.message, "reply_to_message", None)
+            and isinstance(getattr(update.message.reply_to_message, "photo", None), (list, tuple))
+            and len(update.message.reply_to_message.photo) > 0
+        )
+
+        if has_photo_list:
+            photo_url = update.message.photo[-1].file_id
+        elif replied_photo_list:
+            photo_url = update.message.reply_to_message.photo[-1].file_id
+        elif len(parts) > 5 and parts[5]:
+            photo_url = parts[5]
+
+        promo_id = await add_promotion_db(title, sponsor, msg_text, btn_text, btn_url, photo_url=photo_url)
+        photo_notice = " with photo 📷" if photo_url else ""
+        await update.message.reply_text(f"✅ <i>Campaign created{photo_notice} with ID</i> <code>{promo_id}</code>.", parse_mode="HTML")

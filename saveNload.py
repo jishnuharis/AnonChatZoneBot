@@ -889,18 +889,18 @@ async def increment_promo_click_db(promo_id: int):
         logger.warning(f"increment_promo_click_db error: {e}")
 
 
-async def add_promotion_db(title: str, sponsor_name: str, message_text: str, button_text: str = None, button_url: str = None, priority: int = 1) -> int:
-    """Adds a new sponsor campaign."""
+async def add_promotion_db(title: str, sponsor_name: str, message_text: str, button_text: str = None, button_url: str = None, priority: int = 1, photo_url: str = None) -> int:
+    """Adds a new sponsor campaign with optional photo."""
     if not is_pool_ready():
         return 1
     try:
         p = get_pool()
         async with p.connection() as conn:
             cur = await conn.execute("""
-                INSERT INTO promotions (title, sponsor_name, message_text, button_text, button_url, priority)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO promotions (title, sponsor_name, message_text, button_text, button_url, priority, photo_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id;
-            """, (title, sponsor_name, message_text, button_text, button_url, priority))
+            """, (title, sponsor_name, message_text, button_text, button_url, priority, photo_url))
             row = await cur.fetchone()
             return row[0]
     except Exception as e:

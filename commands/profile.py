@@ -21,8 +21,7 @@ def _profile_keyboard():
          InlineKeyboardButton("🏷️ Edit Interests", callback_data="edit|preferences")],
         [InlineKeyboardButton("⭐ Match Filters (Gender/Country)", callback_data="edit|match_filters")],
         [InlineKeyboardButton("🔗 My Referral Link", callback_data="refgen")],
-        [InlineKeyboardButton("📢 Official Channel", url=init.CHANNEL_URL),
-         InlineKeyboardButton("💬 Community Group", url=init.GROUP_URL)],
+        [InlineKeyboardButton("💬 Community Group", url=init.GROUP_URL)],
     ])
 
 

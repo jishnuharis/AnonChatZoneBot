@@ -11,7 +11,6 @@ import init
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 Official Channel", url=init.CHANNEL_URL),
             InlineKeyboardButton("💬 Community Group", url=init.GROUP_URL),
         ]
     ])

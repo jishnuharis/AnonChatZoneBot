@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS promotions (
     display_frequency INTEGER NOT NULL DEFAULT 1,
     impressions_count INTEGER NOT NULL DEFAULT 0,
     clicks_count INTEGER NOT NULL DEFAULT 0,
+    photo_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -188,6 +189,7 @@ CREATE INDEX IF NOT EXISTS idx_promotions_active ON promotions (is_active, prior
 CREATE INDEX IF NOT EXISTS idx_game_questions_lookup ON game_questions (game_type, category, is_active) WHERE is_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_user_friends_user ON user_friends (user_id, is_favorite DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_friends_pair ON user_friends (user_id, friend_id);
+ALTER TABLE promotions ADD COLUMN IF NOT EXISTS photo_url TEXT;
 """
 
 

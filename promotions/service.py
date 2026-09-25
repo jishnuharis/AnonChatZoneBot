@@ -59,13 +59,34 @@ async def maybe_show_promotion(bot, user_id: int) -> bool:
 
         text = f"📢 <b>Sponsored: {promo['sponsor_name']}</b>\n\n{promo['message_text']}"
 
-        msg = await safe_tele_func_call(
-            bot.send_message,
-            chat_id=user_id,
-            text=text,
-            reply_markup=keyboard,
-            parse_mode="HTML",
-        )
+        photo = promo.get("photo_url")
+        msg = None
+        if photo:
+            msg = await safe_tele_func_call(
+                bot.send_photo,
+                chat_id=user_id,
+                photo=photo,
+                caption=text,
+                reply_markup=keyboard,
+                parse_mode="HTML",
+            )
+            # If photo failed, gracefully fallback to text message
+            if not msg:
+                msg = await safe_tele_func_call(
+                    bot.send_message,
+                    chat_id=user_id,
+                    text=text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML",
+                )
+        else:
+            msg = await safe_tele_func_call(
+                bot.send_message,
+                chat_id=user_id,
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML",
+            )
 
         if msg:
             _user_last_promo_time[user_id] = now

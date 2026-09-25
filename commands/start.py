@@ -16,7 +16,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 Official Channel", url=init.CHANNEL_URL),
             InlineKeyboardButton("💬 Community Group", url=init.GROUP_URL),
         ]
     ])

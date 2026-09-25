@@ -55,6 +55,29 @@ def check_user_profile(handler_func):
 
         init.dirty_users.add(user_id)
 
+        # Gatekeep: Check mandatory channel membership
+        from channel_gate import check_channel_membership, MANDATORY_CHANNEL_PROMPT_TEXT, get_mandatory_channel_keyboard
+        if not await check_channel_membership(context.bot, user_id):
+            cmd = (update.message.text or "").split()[0].lower() if update.message and update.message.text else ""
+            if cmd in ("/stop", "/cancel") and (user_id in init.active_pairs or user_id in init.waiting_users):
+                return await handler_func(update, context, *args, **kwargs)
+
+            if update.message:
+                await safe_tele_func_call(
+                    update.message.reply_text,
+                    text=MANDATORY_CHANNEL_PROMPT_TEXT,
+                    reply_markup=get_mandatory_channel_keyboard(),
+                    parse_mode="HTML"
+                )
+            elif update.callback_query and update.callback_query.message:
+                await safe_tele_func_call(
+                    update.callback_query.message.reply_text,
+                    text=MANDATORY_CHANNEL_PROMPT_TEXT,
+                    reply_markup=get_mandatory_channel_keyboard(),
+                    parse_mode="HTML"
+                )
+            return
+
         return await handler_func(update, context, *args, **kwargs)
     return wrapper
 

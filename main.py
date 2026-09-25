@@ -39,6 +39,7 @@ from handlers.gender import handle_gender_selection
 from handlers.country import handle_country_selection
 from handlers.edit import handle_edit_selection
 from handlers.preferences import handle_preferences_selection
+from channel_gate import handle_check_channel_status, handle_start_find_callback
 
 from games.game_requests import send_request, handle_game_request_response
 import games.coin_steal as coin_steal
@@ -211,6 +212,10 @@ def main():
     app.add_handler(CommandHandler("stats", admin_stats))
     app.add_handler(CommandHandler("queue", queue_stats))
     app.add_handler(CommandHandler("campaign", campaign_command))
+    app.add_handler(MessageHandler(filters.CaptionRegex(r"^/campaign(?:@\w+)?(?:\s|$)"), campaign_command))
+
+    app.add_handler(CallbackQueryHandler(handle_check_channel_status, pattern=r"^check_channel_status$"))
+    app.add_handler(CallbackQueryHandler(handle_start_find_callback, pattern=r"^start_find_callback$"))
 
     app.add_handler(CallbackQueryHandler(handle_tier_selection, pattern=r"^sub\|\w+$"))
     app.add_handler(PreCheckoutQueryHandler(handle_pre_checkout))

@@ -433,10 +433,9 @@ async def test_community_channel_and_group_integration():
     start_kwargs = mock_start_update.message.reply_text.call_args[1]
     start_markup = start_kwargs["reply_markup"]
     start_urls = [btn.url for row in start_markup.inline_keyboard for btn in row if btn.url]
-    assert "https://t.me/channelofchatzone" in start_urls
     assert "https://t.me/groupchatzone" in start_urls
 
-    # Test /help includes channel & group buttons and text mentions
+    # Test /help includes group button and text mentions
     mock_help_update = MagicMock()
     mock_help_update.effective_user.id = user_id
     mock_help_update.message.reply_text = AsyncMock()
@@ -448,14 +447,20 @@ async def test_community_channel_and_group_integration():
     help_urls = [btn.url for row in help_markup.inline_keyboard for btn in row if btn.url]
     assert "@channelofchatzone" in help_text
     assert "@groupchatzone" in help_text
-    assert "https://t.me/channelofchatzone" in help_urls
     assert "https://t.me/groupchatzone" in help_urls
 
-    # Test profile menu keyboard has channel and group buttons
+    # Test profile menu keyboard removed channel button (now compulsory) and retains community group
     prof_kb = _profile_keyboard()
     prof_urls = [btn.url for row in prof_kb.inline_keyboard for btn in row if btn.url]
-    assert "https://t.me/channelofchatzone" in prof_urls
+    assert "https://t.me/channelofchatzone" not in prof_urls
     assert "https://t.me/groupchatzone" in prof_urls
+
+    # Test mandatory channel joining keyboard contains channel URL
+    from channel_gate import get_mandatory_channel_keyboard
+    gate_kb = get_mandatory_channel_keyboard()
+    gate_urls = [btn.url for row in gate_kb.inline_keyboard for btn in row if btn.url]
+    assert "https://t.me/channelofchatzone" in gate_urls
+
 
 
 @pytest.mark.asyncio
@@ -829,4 +834,107 @@ async def test_subscription_status_call_limits():
     grant_subscription(u_test, "weekly")
     txt_vip = status_text(u_test)
     assert "voice calls & media sends are free & unlimited" in txt_vip
+
+
+@pytest.mark.asyncio
+async def test_mandatory_channel_gatekeeping():
+    """Verify compulsory channel join blocks commands when user is not member and verifies when joined."""
+    from channel_gate import check_channel_membership, handle_check_channel_status, MANDATORY_CHANNEL_PROMPT_TEXT
+    from commands.find import find
+    from telegram.error import BadRequest
+
+    u_test = 654321
+    init.user_details[u_test] = {**init._default_user(), "gender": "M", "age": 20, "country": "US"}
+
+    mock_bot = MagicMock()
+    mock_member = MagicMock()
+
+    # 1. Non-member (status = 'left')
+    mock_member.status = "left"
+    mock_bot.get_chat_member = AsyncMock(return_value=mock_member)
+    assert await check_channel_membership(mock_bot, u_test) is False
+
+    # 2. Member (status = 'member')
+    mock_member.status = "member"
+    assert await check_channel_membership(mock_bot, u_test) is True
+
+    # 3. User not found error from Telegram
+    mock_bot.get_chat_member.side_effect = BadRequest("User not found")
+    assert await check_channel_membership(mock_bot, u_test) is False
+
+    # 4. Command gatekeeping: /find is blocked for non-member
+    mock_bot.get_chat_member.side_effect = None
+    mock_member.status = "left"
+    mock_bot.get_chat_member = AsyncMock(return_value=mock_member)
+
+    update = MagicMock()
+    update.effective_user.id = u_test
+    update.message.text = "/find"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.bot = mock_bot
+
+    await find(update, context)
+    update.message.reply_text.assert_called_once()
+    reply_kwargs = update.message.reply_text.call_args[1]
+    assert "Channel Membership Required" in reply_kwargs["text"]
+    kb = reply_kwargs["reply_markup"]
+    assert kb.inline_keyboard[0][0].text == "🌐 Join our community"
+    assert kb.inline_keyboard[1][0].text == "🔄 Check status"
+    assert u_test not in init.waiting_users
+
+    # 5. Check status button: When not member
+    cb_update = MagicMock()
+    cb_update.callback_query.from_user.id = u_test
+    cb_update.callback_query.answer = AsyncMock()
+    cb_update.callback_query.edit_message_text = AsyncMock()
+
+    await handle_check_channel_status(cb_update, context)
+    cb_update.callback_query.answer.assert_called_once()
+    assert "haven't joined" in cb_update.callback_query.answer.call_args[0][0]
+    cb_update.callback_query.edit_message_text.assert_not_called()
+
+    # 6. Check status button: When member joins
+    mock_member.status = "member"
+    cb_update.callback_query.answer.reset_mock()
+    await handle_check_channel_status(cb_update, context)
+    cb_update.callback_query.answer.assert_called_once()
+    assert "Verified" in cb_update.callback_query.answer.call_args[0][0]
+    cb_update.callback_query.edit_message_text.assert_called_once()
+    assert "Membership verified" in cb_update.callback_query.edit_message_text.call_args[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_finishing_profile_mandatory_channel_prompt():
+    """Verify that after user finishes profile details, only mandatory channel prompt is shown if not joined."""
+    from handlers.preferences import handle_preferences_selection
+
+    u_setup = 771234
+    init.user_details[u_setup] = {**init._default_user(), "gender": "F", "age": 22, "country": "Canada"}
+    init.user_input_stage[u_setup] = "preferences"
+
+    # User is not in channel
+    mock_bot = MagicMock()
+    mock_member = MagicMock()
+    mock_member.status = "left"
+    mock_bot.get_chat_member = AsyncMock(return_value=mock_member)
+
+    update = MagicMock()
+    update.callback_query.from_user.id = u_setup
+    update.callback_query.data = "pref|done"
+    update.callback_query.answer = AsyncMock()
+    update.callback_query.edit_message_text = AsyncMock()
+
+    context = MagicMock()
+    context.bot = mock_bot
+
+    await handle_preferences_selection(update, context)
+    update.callback_query.edit_message_text.assert_called_once()
+    kwargs = update.callback_query.edit_message_text.call_args[1]
+    assert "Channel Membership Required" in kwargs["text"]
+    kb = kwargs["reply_markup"]
+    assert kb.inline_keyboard[0][0].text == "🌐 Join our community"
+    assert kb.inline_keyboard[1][0].text == "🔄 Check status"
+
 
