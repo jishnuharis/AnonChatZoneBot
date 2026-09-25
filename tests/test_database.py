@@ -454,6 +454,75 @@ async def test_run_migrations_checks_ratings_migrated():
     assert len(legacy_checks) > 0, "Should inspect legacy tables when ratings_migrated is absent"
 
 
+@pytest.mark.asyncio
+async def test_check_user_profile_forwards_args_and_kwargs(monkeypatch):
+    """Verify check_user_profile properly forwards *args and **kwargs (e.g. charge=True)."""
+    from handlers.setup import check_user_profile
+    from unittest.mock import MagicMock
+    import init
+
+    user_id = 777666
+    init.user_details[user_id] = {
+        "user_id": user_id,
+        "gender": "M",
+        "age": 22,
+        "country": "India",
+    }
+
+    received_charge = None
+    received_extra = None
+
+    @check_user_profile
+    async def sample_func(update, context, charge: bool = False, extra_flag: str = "default"):
+        nonlocal received_charge, received_extra
+        received_charge = charge
+        received_extra = extra_flag
+        return "success"
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = user_id
+    mock_context = MagicMock()
+
+    result = await sample_func(mock_update, mock_context, charge=True, extra_flag="test_val")
+    assert result == "success"
+    assert received_charge is True
+    assert received_extra == "test_val"
+
+
+@pytest.mark.asyncio
+async def test_skip_partner_invokes_find_with_charge(monkeypatch):
+    """Verify skip_partner runs find with charge=True without TypeError."""
+    from commands.next import skip_partner
+    from unittest.mock import AsyncMock, MagicMock
+    import init
+
+    user_id = 554433
+    partner_id = 998811
+
+    init.user_details[user_id] = {
+        "user_id": user_id,
+        "gender": "F",
+        "age": 20,
+        "country": "US",
+    }
+    init.active_pairs[user_id] = partner_id
+    init.active_pairs[partner_id] = user_id
+
+    mock_find = AsyncMock()
+    monkeypatch.setattr("commands.next.find", mock_find)
+    monkeypatch.setattr("commands.next.end_chat_session", AsyncMock())
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = user_id
+    mock_update.message.reply_text = AsyncMock()
+    mock_context = MagicMock()
+
+    await skip_partner(mock_update, mock_context)
+
+    mock_find.assert_awaited_once_with(mock_update, mock_context, charge=True)
+
+
+
 
 
 

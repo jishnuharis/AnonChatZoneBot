@@ -15,7 +15,7 @@ import referral
 
 def check_user_profile(handler_func):
     @wraps(handler_func)
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         user_id = update.effective_user.id
 
         if user_id not in init.user_details:
@@ -55,7 +55,7 @@ def check_user_profile(handler_func):
 
         init.dirty_users.add(user_id)
 
-        return await handler_func(update, context)
+        return await handler_func(update, context, *args, **kwargs)
     return wrapper
 
 
