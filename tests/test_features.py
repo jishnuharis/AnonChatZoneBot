@@ -405,3 +405,54 @@ async def test_help_command_contains_all_active_commands():
     ]
     for cmd in expected_commands:
         assert cmd in text, f"Command {cmd} missing from /help text!"
+
+
+@pytest.mark.asyncio
+async def test_community_channel_and_group_integration():
+    from commands.start import start
+    from commands.help import help_command
+    from commands.profile import _profile_keyboard
+    from commands.admin_commands import broadcast
+
+    # Verify init URLs
+    assert init.CHANNEL_URL == "https://t.me/channelofchatzone"
+    assert init.GROUP_URL == "https://t.me/groupchatzone"
+    assert init.ANNOUNCEMENT_CHANNEL == "@channelofchatzone"
+    assert init.COMMUNITY_GROUP == "@groupchatzone"
+
+    # Test /start includes channel & group inline buttons
+    user_id = 9991
+    init.user_details[user_id] = {**init._default_user(), "gender": "M", "age": 20, "country": "US"}
+    mock_start_update = MagicMock()
+    mock_start_update.effective_user.id = user_id
+    mock_start_update.message.reply_text = AsyncMock()
+    mock_context = MagicMock()
+
+    await start(mock_start_update, mock_context)
+    mock_start_update.message.reply_text.assert_called_once()
+    start_kwargs = mock_start_update.message.reply_text.call_args[1]
+    start_markup = start_kwargs["reply_markup"]
+    start_urls = [btn.url for row in start_markup.inline_keyboard for btn in row if btn.url]
+    assert "https://t.me/channelofchatzone" in start_urls
+    assert "https://t.me/groupchatzone" in start_urls
+
+    # Test /help includes channel & group buttons and text mentions
+    mock_help_update = MagicMock()
+    mock_help_update.effective_user.id = user_id
+    mock_help_update.message.reply_text = AsyncMock()
+
+    await help_command(mock_help_update, mock_context)
+    help_kwargs = mock_help_update.message.reply_text.call_args[1]
+    help_text = help_kwargs["text"]
+    help_markup = help_kwargs["reply_markup"]
+    help_urls = [btn.url for row in help_markup.inline_keyboard for btn in row if btn.url]
+    assert "@channelofchatzone" in help_text
+    assert "@groupchatzone" in help_text
+    assert "https://t.me/channelofchatzone" in help_urls
+    assert "https://t.me/groupchatzone" in help_urls
+
+    # Test profile menu keyboard has channel and group buttons
+    prof_kb = _profile_keyboard()
+    prof_urls = [btn.url for row in prof_kb.inline_keyboard for btn in row if btn.url]
+    assert "https://t.me/channelofchatzone" in prof_urls
+    assert "https://t.me/groupchatzone" in prof_urls

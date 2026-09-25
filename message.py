@@ -105,7 +105,11 @@ HELP_TEXT = (
     "<b>⚡ Credits & VIP Perks:</b>\n"
     "Free accounts receive daily credits that refresh every midnight UTC. VIP members enjoy higher limits, unlimited media sharing, and an exclusive peek at their partner's gender upon matching. Check /subscribe to upgrade.\n\n"
     "<b>🛡️ Safety & Respect:</b>\n"
-    "You are in total control of your experience. At the end of every chat, you can rate or report your partner. Repeated misconduct is handled automatically to keep the community safe and friendly."
+    "You are in total control of your experience. At the end of every chat, you can rate or report your partner. Repeated misconduct is handled automatically to keep the community safe and friendly.\n\n"
+    "<b>🌐 Community & Announcements:</b>\n"
+    "Stay updated with new features, announcements, and connect with fellow chatters:\n"
+    "• Official Channel: <a href=\"https://t.me/channelofchatzone\">@channelofchatzone</a>\n"
+    "• Community Group: <a href=\"https://t.me/groupchatzone\">@groupchatzone</a>"
 )
 
 # ---------------------------------------------------------------------------

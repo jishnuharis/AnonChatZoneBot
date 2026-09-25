@@ -13,6 +13,11 @@ for _piece in _admin_env.split(","):
     if _piece.isdigit():
         ADMIN_IDS.add(int(_piece))
 
+ANNOUNCEMENT_CHANNEL = os.getenv("ANNOUNCEMENT_CHANNEL", "@channelofchatzone")
+COMMUNITY_GROUP = os.getenv("COMMUNITY_GROUP", "@groupchatzone")
+CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/channelofchatzone")
+GROUP_URL = os.getenv("GROUP_URL", "https://t.me/groupchatzone")
+
 # Concurrency-safe queue lock
 queue_lock = asyncio.Lock()
 

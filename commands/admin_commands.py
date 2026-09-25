@@ -50,10 +50,10 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_direct = True
         message = message[len("direct "):].lstrip()
 
-    channel_id = os.getenv("ANNOUNCEMENT_CHANNEL")
+    channel_id = os.getenv("ANNOUNCEMENT_CHANNEL", getattr(init, "ANNOUNCEMENT_CHANNEL", "@channelofchatzone"))
     # If not explicitly marked 'direct', post to official announcement channel if configured!
     if not is_direct:
-        if channel_id:
+        if channel_id and channel_id.strip():
             try:
                 sent_msg = await safe_tele_func_call(
                     context.bot.send_message,

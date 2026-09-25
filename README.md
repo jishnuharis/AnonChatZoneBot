@@ -1,5 +1,8 @@
 # 💬 AnonChatZoneBot (v2.0 Scalable Architecture)
 
+[![Official Channel](https://img.shields.io/badge/Telegram-Channel-blue?logo=telegram)](https://t.me/channelofchatzone)
+[![Community Group](https://img.shields.io/badge/Telegram-Community%20Group-blue?logo=telegram)](https://t.me/groupchatzone)
+
 An enterprise-ready, anonymous chat bot for Telegram engineered to handle **500,000+ users** with high concurrency, transactional PostgreSQL storage (3NF baseline), robust matchmaking, silent chat preservation, multi-layer ban/block enforcement, data-driven mini-games, and a sponsors/promotions engine.
 
 ---
@@ -145,7 +148,10 @@ The database uses PostgreSQL with foreign key constraints, cascade triggers, and
 | `PORT` | ❌ | `8080` | Port for the Flask health-check server |
 | `DB_POOL_MIN` | ❌ | `5` | Minimum connection pool size |
 | `DB_POOL_MAX` | ❌ | `30` | Maximum connection pool size |
-| `ANNOUNCEMENT_CHANNEL` | ❌ | - | Official Telegram Channel (`@Channel` or `-100...`) for instant broadcast |
+| `ANNOUNCEMENT_CHANNEL` | ❌ | `@channelofchatzone` | Official Telegram Channel (`@Channel` or `-100...`) for instant broadcast |
+| `COMMUNITY_GROUP` | ❌ | `@groupchatzone` | Official Telegram Community Group (`@groupchatzone`) |
+| `CHANNEL_URL` | ❌ | `https://t.me/channelofchatzone` | Direct link to official channel |
+| `GROUP_URL` | ❌ | `https://t.me/groupchatzone` | Direct link to community group |
 | `LOCAL_BOT_API_URL` | ❌ | - | Base URL for self-hosted Telegram Bot API server (enables 2GB media & high speed) |
 
 ---
