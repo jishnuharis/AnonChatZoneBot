@@ -40,7 +40,11 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     daily_calls_reset_day DATE NOT NULL DEFAULT CURRENT_DATE,
     is_banned BOOLEAN NOT NULL DEFAULT FALSE,
     preferred_gender VARCHAR(8) NOT NULL DEFAULT 'ANY',
-    preferred_country VARCHAR(64) NOT NULL DEFAULT 'ANY'
+    preferred_country VARCHAR(64) NOT NULL DEFAULT 'ANY',
+    current_streak INTEGER NOT NULL DEFAULT 0,
+    longest_streak INTEGER NOT NULL DEFAULT 0,
+    last_streak_date DATE,
+    streak_rewards_claimed JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
 -- User Blocks (M:N between users)
@@ -190,6 +194,10 @@ CREATE INDEX IF NOT EXISTS idx_game_questions_lookup ON game_questions (game_typ
 CREATE INDEX IF NOT EXISTS idx_user_friends_user ON user_friends (user_id, is_favorite DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_friends_pair ON user_friends (user_id, friend_id);
 ALTER TABLE promotions ADD COLUMN IF NOT EXISTS photo_url TEXT;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS current_streak INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS longest_streak INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_streak_date DATE;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS streak_rewards_claimed JSONB NOT NULL DEFAULT '[]'::jsonb;
 """
 
 

@@ -62,6 +62,36 @@ def _record_recent_partner(user1: int, user2: int):
             history.pop(0)
 
 
+ICEBREAKERS = [
+    "If you could have dinner with anyone dead or alive, who would it be?",
+    "What's the best movie or series you watched recently?",
+    "If you won $10,000 today, what's the very first thing you'd do?",
+    "What's an unpopular opinion you hold with pure passion?",
+    "Pineapple on pizza: crime against humanity or culinary genius?",
+    "What song is currently stuck on repeat in your head?",
+    "If you could travel anywhere right now, where are you boarding a flight to?",
+    "What is your absolute favorite comfort food after a long day?",
+    "What superpower would you choose: flight, invisibility, or teleportation?",
+    "Morning person or nocturnal night owl?",
+]
+
+
+def _build_shared_interest_or_icebreaker(user1: int, user2: int) -> str:
+    p1 = init.user_details.get(user1, {}).get("preferences", 0) or 0
+    p2 = init.user_details.get(user2, {}).get("preferences", 0) or 0
+    overlap = p1 & p2
+    shared_tags = []
+    for i, (name, emoji) in enumerate(init.PREFERENCE_TAGS):
+        if overlap & (1 << i):
+            shared_tags.append(f"{emoji} {name}")
+
+    if shared_tags:
+        return f"\n✨ <b>You both like:</b> {', '.join(shared_tags)}"
+    else:
+        import random
+        return f"\n💡 <i>Icebreaker:</i> <b>\"{random.choice(ICEBREAKERS)}\"</b>"
+
+
 def _overlap_score(a: int, b: int) -> int:
     pa = init.user_details.get(a, {}).get("preferences", 0)
     pb = init.user_details.get(b, {}).get("preferences", 0)
@@ -121,8 +151,7 @@ async def start_chat_session(
     if not isinstance(uv2, dict):
         uv2 = {"up": 0, "down": 0}
 
-    shared = _overlap_score(user1, user2)
-    shared_note = f"\n<i>You have {shared} shared interest{'s' if shared != 1 else ''}!</i> 🏷️" if shared else ""
+    starter_section = _build_shared_interest_or_icebreaker(user1, user2)
 
     details1 = _partner_details_line(user1, user2)
     details2 = _partner_details_line(user2, user1)
@@ -135,11 +164,11 @@ async def start_chat_session(
         text1 = f"🎯 <b>Connected to target user! Say hi!</b> 👋\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
         text2 = f"🎯 <b>Someone found you.... Say hi!!</b>\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
     elif is_friend_connection:
-        text1 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b> Say hi! 👋\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
-        text2 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b> Say hi! 👋\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text1 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b> Say hi! 👋{starter_section}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text2 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b> Say hi! 👋{starter_section}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
     else:
-        text1 = f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv2.get('up', 0)} 👍 {uv2.get('down', 0)} 👎{shared_note}{details1}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
-        text2 = f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv1.get('up', 0)} 👍 {uv1.get('down', 0)} 👎{shared_note}{details2}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text1 = f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv2.get('up', 0)} 👍 {uv2.get('down', 0)} 👎{starter_section}{details1}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text2 = f"🎯 <b>Found someone.... Say hi!!</b>\n<i>Rating:</i> {uv1.get('up', 0)} 👍 {uv1.get('down', 0)} 👎{starter_section}{details2}\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
 
     msg1 = await safe_tele_func_call(
         context.bot.send_message, chat_id=user1,
@@ -235,6 +264,18 @@ async def end_chat_session(
 
     already_friends = await are_friends_db(user_id, partner) if partner else False
     has_transcript = bool(session_id and session_id in init.session_messages and len(init.session_messages[session_id]) >= 2)
+
+    # Process Daily Chat Streaks for active participants
+    if has_transcript:
+        try:
+            from streaks import update_streak_on_chat, claim_milestone_reward
+            for uid in (user_id, partner):
+                if uid:
+                    new_streak, inc, rew = update_streak_on_chat(uid)
+                    if inc and rew:
+                        asyncio.create_task(claim_milestone_reward(context.bot, uid, new_streak, rew))
+        except Exception as e:
+            logger.debug(f"Streak update notice on session end: {e}")
 
     def _build_end_keyboard(target_pid, is_initiator=False):
         btns = []

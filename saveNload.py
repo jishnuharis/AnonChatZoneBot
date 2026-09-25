@@ -117,6 +117,10 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
             p.daily_calls_used, p.daily_calls_reset_day, p.is_banned,
             COALESCE(p.preferred_gender, 'ANY') as pref_gender,
             COALESCE(p.preferred_country, 'ANY') as pref_country,
+            COALESCE(p.current_streak, 0) as current_streak,
+            COALESCE(p.longest_streak, 0) as longest_streak,
+            p.last_streak_date,
+            COALESCE(p.streak_rewards_claimed, '[]'::jsonb) as streak_rewards_claimed,
             s.tier as subscription_tier, s.expires_at as subscription_expires,
             COALESCE(r_up.votes_up, 0) as votes_up,
             COALESCE(r_down.votes_down, 0) as votes_down,
@@ -218,6 +222,10 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                     "referral_credited": bool(row["referral_credited"]),
                     "referral_count": row["referral_count"],
                     "referral_rewarded_count": row["referral_rewarded_count"],
+                    "current_streak": row.get("current_streak") or 0,
+                    "longest_streak": row.get("longest_streak") or 0,
+                    "last_streak_date": str(row["last_streak_date"]) if row.get("last_streak_date") else None,
+                    "streak_rewards_claimed": json.loads(row["streak_rewards_claimed"]) if isinstance(row.get("streak_rewards_claimed"), str) else (row.get("streak_rewards_claimed") if isinstance(row.get("streak_rewards_claimed"), list) else []),
                     "partner_id": None, # Session state managed via session_manager
                 }
     except Exception as e:
@@ -281,13 +289,26 @@ async def upsert_user(*args, **kwargs):
                     except ValueError:
                         reset_call_day = date.today()
 
+                streak_date = kwargs.get("last_streak_date")
+                if isinstance(streak_date, str):
+                    try:
+                        streak_date = datetime.strptime(streak_date, "%Y-%m-%d").date()
+                    except ValueError:
+                        streak_date = None
+
+                claimed = kwargs.get("streak_rewards_claimed", [])
+                if not isinstance(claimed, list):
+                    claimed = []
+                claimed_json = json.dumps(claimed)
+
                 await conn.execute("""
                     INSERT INTO user_profiles (
                         user_id, severity_score, restricted_until, restriction_reason,
                         daily_credits_used, daily_credits_reset_day,
                         daily_calls_used, daily_calls_reset_day,
-                        is_banned, preferred_gender, preferred_country
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        is_banned, preferred_gender, preferred_country,
+                        current_streak, longest_streak, last_streak_date, streak_rewards_claimed
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                     ON CONFLICT (user_id) DO UPDATE SET
                         severity_score = COALESCE(EXCLUDED.severity_score, user_profiles.severity_score),
                         restricted_until = EXCLUDED.restricted_until,
@@ -298,7 +319,11 @@ async def upsert_user(*args, **kwargs):
                         daily_calls_reset_day = COALESCE(EXCLUDED.daily_calls_reset_day, user_profiles.daily_calls_reset_day),
                         is_banned = COALESCE(EXCLUDED.is_banned, user_profiles.is_banned),
                         preferred_gender = COALESCE(EXCLUDED.preferred_gender, user_profiles.preferred_gender),
-                        preferred_country = COALESCE(EXCLUDED.preferred_country, user_profiles.preferred_country);
+                        preferred_country = COALESCE(EXCLUDED.preferred_country, user_profiles.preferred_country),
+                        current_streak = COALESCE(EXCLUDED.current_streak, user_profiles.current_streak),
+                        longest_streak = GREATEST(COALESCE(EXCLUDED.longest_streak, 0), user_profiles.longest_streak),
+                        last_streak_date = COALESCE(EXCLUDED.last_streak_date, user_profiles.last_streak_date),
+                        streak_rewards_claimed = COALESCE(EXCLUDED.streak_rewards_claimed, user_profiles.streak_rewards_claimed);
                 """, (
                     user_id,
                     kwargs.get("severity_score", 0),
@@ -311,6 +336,10 @@ async def upsert_user(*args, **kwargs):
                     kwargs.get("is_banned", False),
                     kwargs.get("pref_gender", "ANY"),
                     kwargs.get("pref_country", "ANY"),
+                    kwargs.get("current_streak", 0),
+                    kwargs.get("longest_streak", 0),
+                    streak_date,
+                    claimed_json,
                 ))
 
                 # 3. Upsert referrals if referred_by is set

@@ -166,6 +166,33 @@ def grant_subscription(user_id: int, tier_key: str, source: str = "purchase") ->
     return new_expiry
 
 
+def grant_vip_days(user_id: int, days: int, tier_key: str = "daily", source: str = "streak_reward") -> float:
+    """
+    Grants or extends VIP access by a specific number of days.
+    Guarantees no accidental tier downgrading when adding days.
+    """
+    details = _details(user_id)
+    now = time.time()
+    current_expiry = details.get("subscription_expires") or 0
+    current_tier_key = details.get("subscription_tier")
+
+    base = current_expiry if current_expiry > now else now
+    new_expiry = base + days * 86400
+
+    details["subscription_expires"] = new_expiry
+
+    if current_tier_key in TIERS and current_expiry > now:
+        current_priority = TIERS[current_tier_key].get("priority", 0)
+        new_priority = TIERS.get(tier_key, {}).get("priority", 1)
+        if new_priority >= current_priority:
+            details["subscription_tier"] = tier_key
+    else:
+        details["subscription_tier"] = tier_key
+
+    init.dirty_users.add(user_id)
+    return new_expiry
+
+
 def status_text(user_id: int) -> str:
     tier = active_tier(user_id)
     if not tier:

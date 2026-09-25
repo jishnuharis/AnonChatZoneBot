@@ -31,6 +31,8 @@ from commands.admin_commands import (
     giveaway_subscription, referral_scheme_command, admin_stats, queue_stats, campaign_command
 )
 from commands.subscribe import show_subscribe_menu, handle_tier_selection
+from commands.top import show_top_leaderboard, handle_top_callback
+from commands.gift import gift_command, handle_gift_callback
 from handlers.payments import handle_pre_checkout, handle_successful_payment
 from referral import handle_referral_link_button
 
@@ -89,6 +91,8 @@ async def set_commands(application):
         BotCommand("games", "Play a mini-game with partner"),
         BotCommand("private", "Arm Privacy Mode for next media"),
         BotCommand("subscribe", "View/purchase subscription"),
+        BotCommand("top", "Show weekly leaderboard"),
+        BotCommand("gift", "Send a gift to your chat partner"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -207,6 +211,9 @@ def main():
     app.add_handler(CommandHandler("checkuser", check_user))
     app.add_handler(CommandHandler("private", handle_private_command))
     app.add_handler(CommandHandler("subscribe", show_subscribe_menu))
+    app.add_handler(CommandHandler("top", show_top_leaderboard))
+    app.add_handler(CommandHandler("leaderboard", show_top_leaderboard))
+    app.add_handler(CommandHandler("gift", gift_command))
     app.add_handler(CommandHandler("giveaway", giveaway_subscription))
     app.add_handler(CommandHandler("referral", referral_scheme_command))
     app.add_handler(CommandHandler("stats", admin_stats))
@@ -217,6 +224,8 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_check_channel_status, pattern=r"^check_channel_status$"))
     app.add_handler(CallbackQueryHandler(handle_start_find_callback, pattern=r"^start_find_callback$"))
 
+    app.add_handler(CallbackQueryHandler(handle_top_callback, pattern=r"^top\|\w+$"))
+    app.add_handler(CallbackQueryHandler(handle_gift_callback, pattern=r"^gift\|\w+$"))
     app.add_handler(CallbackQueryHandler(handle_tier_selection, pattern=r"^sub\|\w+$"))
     app.add_handler(PreCheckoutQueryHandler(handle_pre_checkout))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))

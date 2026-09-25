@@ -56,6 +56,13 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
     c_map = {"ANY": "Any", "SAME": f"Same Country ({user.get('country')})"}
     filter_line = f"<b>Match Filters:</b> {g_map.get(pref_g, pref_g)} | {c_map.get(pref_c, pref_c)}\n" if subscription.is_subscribed(user_id) else ""
 
+    streak = user.get("current_streak", 0) or 0
+    longest = user.get("longest_streak", 0) or 0
+    from streaks import get_next_streak_milestone
+    next_day, next_rew = get_next_streak_milestone(streak)
+    next_info = f" <i>(Next: {next_day}d ➔ {next_rew['label']})</i>" if next_day else ""
+    streak_line = f"🔥 <b>Chat Streak:</b> {streak} day{'s' if streak != 1 else ''} <i>(Best: {longest}d)</i>{next_info}\n"
+
     return (
         "<b>👤 Your Profile</b>\n\n"
         f"<b>Name:</b> {full_name}{username_line}\n"
@@ -65,7 +72,8 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
         f"<b>Country:</b> {esc(str(user.get('country')))}\n"
         f"<b>Interests:</b> {prefs_text}\n"
         f"<b>Rating:</b> {up_votes} 👍 {down_votes} 👎\n"
-        f"<b>Points:</b> {user.get('points', 0)}\n\n"
+        f"<b>Points:</b> {user.get('points', 0)}\n"
+        f"{streak_line}\n"
         f"{filter_line}"
         f"{subscription.status_text(user_id)}"
     )

@@ -80,6 +80,11 @@ def _default_user() -> Dict[str, Any]:
         "referral_count": 0,
         "referral_rewarded_count": 0,
         "referral_credited": False,
+
+        "current_streak": 0,
+        "longest_streak": 0,
+        "last_streak_date": None,
+        "streak_rewards_claimed": [],
     }
 
 
