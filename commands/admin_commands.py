@@ -36,28 +36,35 @@ async def _send_with_html_fallback(send_func, chat_id, text=None, caption=None, 
     Auto-sanitizes naked ampersands. If Telegram raises an entity parsing BadRequest,
     gracefully falls back to plain text without parse_mode so the announcement is NEVER dropped!
     """
-    content_key = "caption" if caption is not None else "text"
+    content_key = "caption" if (caption is not None or "photo" in kwargs or "video" in kwargs) else "text"
     raw_content = caption if caption is not None else (text or "")
 
-    import re
-    # Sanitize naked ampersands that are not already valid HTML entities
-    sanitized = re.sub(r"&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)", "&amp;", raw_content)
+    if raw_content:
+        import re
+        # Sanitize naked ampersands that are not already valid HTML entities
+        sanitized = re.sub(r"&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)", "&amp;", raw_content)
 
-    kwargs[content_key] = sanitized
-    try:
-        return await safe_tele_func_call(send_func, chat_id=chat_id, parse_mode="HTML", **kwargs)
-    except BadRequest as e:
-        err_lower = str(e).lower()
-        if any(term in err_lower for term in ("entity", "parse", "tag", "byte offset", "bad formatting")):
-            logger.warning(f"HTML parse mode failed on broadcast ({e}). Retrying with clean plain text fallback...")
-            plain = re.sub(r"<[^>]+>", "", raw_content)
-            kwargs[content_key] = plain
-            return await safe_tele_func_call(send_func, chat_id=chat_id, parse_mode=None, **kwargs)
-        raise
+        kwargs[content_key] = sanitized
+        try:
+            return await safe_tele_func_call(send_func, chat_id=chat_id, parse_mode="HTML", **kwargs)
+        except BadRequest as e:
+            err_lower = str(e).lower()
+            if any(term in err_lower for term in ("entity", "parse", "tag", "byte offset", "bad formatting")):
+                logger.warning(f"HTML parse mode failed on broadcast ({e}). Retrying with clean plain text fallback...")
+                plain = re.sub(r"<[^>]+>", "", raw_content)
+                kwargs[content_key] = plain
+                return await safe_tele_func_call(send_func, chat_id=chat_id, parse_mode=None, **kwargs)
+            raise
+    else:
+        # Photo or media sent without any caption text
+        return await safe_tele_func_call(send_func, chat_id=chat_id, **kwargs)
 
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user or not is_admin(update.effective_user.id):
+        if update.effective_user and update.effective_user.id in init.active_pairs:
+            from relay import relay_message
+            return await relay_message(update, context)
         return
 
     import re

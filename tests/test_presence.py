@@ -288,3 +288,44 @@ async def test_broadcast_reply_and_entity_fallback(monkeypatch):
     assert second_call_kwargs["text"] == "Broken tag message"
 
 
+@pytest.mark.asyncio
+async def test_broadcast_photo_caption(monkeypatch):
+    """Verify that sending a photo directly with /broadcast caption posts photo to channel."""
+    from commands.admin_commands import broadcast
+
+    monkeypatch.setenv("ANNOUNCEMENT_CHANNEL", "@MyTestChannel")
+    admin_id = 99911
+    init.ADMIN_IDS.add(admin_id)
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = admin_id
+    mock_update.message.text = None
+    mock_update.message.caption = "/broadcast 🚀 Special Announcement!"
+    photo_mock = MagicMock()
+    photo_mock.file_id = "test_photo_file_id_999"
+    mock_update.message.photo = [photo_mock]
+    mock_update.message.reply_to_message = None
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.send_photo = AsyncMock(return_value=MagicMock(message_id=888))
+
+    await broadcast(mock_update, mock_context)
+    mock_context.bot.send_photo.assert_called_once_with(
+        chat_id="@MyTestChannel",
+        photo="test_photo_file_id_999",
+        caption="🚀 Special Announcement!",
+        parse_mode="HTML"
+    )
+
+    # Also test photo with ONLY "/broadcast" caption (no caption text)
+    mock_context.bot.send_photo.reset_mock()
+    mock_update.message.caption = "/broadcast"
+    await broadcast(mock_update, mock_context)
+    mock_context.bot.send_photo.assert_called_once_with(
+        chat_id="@MyTestChannel",
+        photo="test_photo_file_id_999"
+    )
+
+
+

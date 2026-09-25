@@ -199,6 +199,7 @@ def main():
     app.add_handler(CommandHandler("call", call_command))
     app.add_handler(CommandHandler("games", games_menu))
     app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(MessageHandler(filters.CaptionRegex(r"^/broadcast(?:@\w+)?(?:\s|$)"), broadcast))
     app.add_handler(CommandHandler("connect", connect))
     app.add_handler(CommandHandler("ban", ban_user))
     app.add_handler(CommandHandler("unban", unban_user))
