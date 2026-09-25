@@ -41,6 +41,20 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    from subscription import can_make_call, is_subscribed
+    allowed, used, limit = can_make_call(user_id)
+    if not allowed:
+        await safe_tele_func_call(
+            update.message.reply_text,
+            text=(
+                f"⚠️ <b>Daily Voice Call Limit Reached</b> ({used}/{limit})\n\n"
+                "Free accounts can make up to <b>3 voice calls per day</b> (resets at midnight UTC).\n"
+                "Upgrade to VIP with /subscribe to unlock <b>unlimited voice calls</b>, priority matching, and exclusive perks!"
+            ),
+            parse_mode="HTML",
+        )
+        return
+
     active_voice_calls[session_id] = {
         "initiator": user_id,
         "receiver": partner_id,
@@ -67,9 +81,14 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=call_keyboard,
     )
 
+    call_msg = "📞 <b>Calling partner...</b>\n<i>Waiting for them to accept your call request...</i>"
+    if not is_subscribed(user_id):
+        remaining = max(0, limit - used)
+        call_msg += f"\n\n<i>Daily free calls remaining today: {remaining}/{limit}</i>"
+
     await safe_tele_func_call(
         update.message.reply_text,
-        text="📞 <b>Calling partner...</b>\n<i>Waiting for them to accept your call request...</i>",
+        text=call_msg,
         parse_mode="HTML",
     )
 
@@ -113,6 +132,9 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
             active_voice_calls.pop(session_id, None)
             await safe_tele_func_call(query.edit_message_text, text="⚠️ <b>Chat session ended before call connected.</b>", parse_mode="HTML")
             return
+
+        from subscription import consume_daily_call
+        consume_daily_call(initiator)
 
         call_data["status"] = "active"
 

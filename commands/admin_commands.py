@@ -51,6 +51,10 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_direct = True
         message = message[len("direct "):].lstrip()
 
+    # Sanitize naked ampersands that are not already valid HTML entities so Telegram HTML doesn't fail
+    import re
+    message = re.sub(r"&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)", "&amp;", message)
+
     channel_id = os.getenv("ANNOUNCEMENT_CHANNEL", getattr(init, "ANNOUNCEMENT_CHANNEL", "@channelofchatzone"))
     # If not explicitly marked 'direct', post to official announcement channel if configured!
     if not is_direct:
@@ -70,13 +74,21 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return
                 else:
                     await update.message.reply_text(
-                        f"⚠️ <i>Failed to post to {channel_id}. Verify bot is an admin with post permissions in channel.</i>",
+                        f"⚠️ <i>Failed to post to {channel_id}. Verify bot is an administrator with 'Post Messages' permission in the channel.</i>",
                         parse_mode="HTML"
                     )
                     return
             except Exception as e:
                 logger.error(f"Error posting announcement to channel {channel_id}: {e}")
-                await update.message.reply_text(f"⚠️ Channel error: {e}", parse_mode="HTML")
+                err_text = esc(str(e))
+                tip = ""
+                err_lower = str(e).lower()
+                if any(k in err_lower for k in ("chat not found", "rights", "forbidden", "administrator")):
+                    tip = (
+                        "\n\n💡 <b>Tip:</b> Make sure the bot has been added to your channel "
+                        f"<code>{channel_id}</code> as an <b>Administrator</b> with the <b>Post Messages</b> permission enabled."
+                    )
+                await update.message.reply_text(f"⚠️ Channel error: {err_text}{tip}", parse_mode="HTML")
                 return
         else:
             # Inform admin how to configure channel or use direct broadcast

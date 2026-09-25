@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     last_severity_decay TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     daily_credits_used INTEGER NOT NULL DEFAULT 0,
     daily_credits_reset_day DATE NOT NULL DEFAULT CURRENT_DATE,
+    daily_calls_used INTEGER NOT NULL DEFAULT 0,
+    daily_calls_reset_day DATE NOT NULL DEFAULT CURRENT_DATE,
     is_banned BOOLEAN NOT NULL DEFAULT FALSE,
     preferred_gender VARCHAR(8) NOT NULL DEFAULT 'ANY',
     preferred_country VARCHAR(64) NOT NULL DEFAULT 'ANY'
@@ -385,6 +387,8 @@ async def run_migrations(conn: AsyncConnection):
     await conn.execute("""
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_gender VARCHAR(8) DEFAULT 'ANY';
         ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_country VARCHAR(64) DEFAULT 'ANY';
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS daily_calls_used INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS daily_calls_reset_day DATE NOT NULL DEFAULT CURRENT_DATE;
     """)
 
     # Drop removed/obsolete columns from user_profiles

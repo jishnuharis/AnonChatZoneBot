@@ -678,3 +678,155 @@ async def test_tier_based_block_limits(monkeypatch):
     assert limit == 32
     res = await add_user_block(u_paid, 2033)
     assert res is False
+
+
+@pytest.mark.asyncio
+async def test_free_tier_daily_call_limit_and_paid_unlimited():
+    from commands.call import call_command, handle_call_response, active_voice_calls
+    from subscription import can_make_call, daily_calls_used, FREE_DAILY_CALL_LIMIT, grant_subscription
+    from session_manager import start_chat_session, end_chat_session
+
+    u_free = 9101
+    u_partner = 9102
+    u_paid = 9103
+
+    init.user_details[u_free] = {**init._default_user(), "gender": "M", "age": 22, "country": "US"}
+    init.user_details[u_partner] = {**init._default_user(), "gender": "F", "age": 23, "country": "US"}
+    init.user_details[u_paid] = {**init._default_user(), "gender": "M", "age": 25, "country": "US"}
+    grant_subscription(u_paid, "daily")
+
+    assert FREE_DAILY_CALL_LIMIT == 3
+
+    # Free user makes 3 calls
+    for call_idx in range(1, 4):
+        context = MagicMock()
+        context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=100 + call_idx))
+
+        await start_chat_session(context, u_free, u_partner)
+        session_id = init.active_sessions.get(u_free)
+
+        # Free user can make call
+        can_call, used, limit = can_make_call(u_free)
+        assert can_call is True
+        assert used == call_idx - 1
+        assert limit == 3
+
+        update = MagicMock()
+        update.effective_user.id = u_free
+        update.message.reply_text = AsyncMock()
+
+        await call_command(update, context)
+        assert update.message.reply_text.called
+        assert "Calling partner" in update.message.reply_text.call_args[1]["text"]
+
+        # Partner accepts call
+        cb_query = MagicMock()
+        cb_query.data = f"call_acc|{session_id}"
+        cb_query.answer = AsyncMock()
+        cb_query.edit_message_text = AsyncMock()
+        cb_update = MagicMock()
+        cb_update.effective_user.id = u_partner
+        cb_update.callback_query = cb_query
+
+        await handle_call_response(cb_update, context)
+        assert daily_calls_used(u_free) == call_idx
+
+        await end_chat_session(context, u_free, "next")
+        active_voice_calls.clear()
+
+    # Free user attempts 4th call -> blocked!
+    await start_chat_session(context, u_free, u_partner)
+    can_call, used, limit = can_make_call(u_free)
+    assert can_call is False
+    assert used == 3
+    assert limit == 3
+
+    update4 = MagicMock()
+    update4.effective_user.id = u_free
+    update4.message.reply_text = AsyncMock()
+
+    await call_command(update4, context)
+    update4.message.reply_text.assert_called_once()
+    reply_text = update4.message.reply_text.call_args[1]["text"]
+    assert "Daily Voice Call Limit Reached" in reply_text
+    assert "3/3" in reply_text
+
+    await end_chat_session(context, u_free, "next")
+
+    # Paid user has unlimited calls
+    can_call_paid, used_paid, limit_paid = can_make_call(u_paid)
+    assert can_call_paid is True
+    assert limit_paid == -1
+
+    for _ in range(5):
+        await start_chat_session(context, u_paid, u_partner)
+        session_id = init.active_sessions.get(u_paid)
+
+        update_paid = MagicMock()
+        update_paid.effective_user.id = u_paid
+        update_paid.message.reply_text = AsyncMock()
+
+        await call_command(update_paid, context)
+        assert "Calling partner" in update_paid.message.reply_text.call_args[1]["text"]
+
+        cb_query = MagicMock()
+        cb_query.data = f"call_acc|{session_id}"
+        cb_query.answer = AsyncMock()
+        cb_query.edit_message_text = AsyncMock()
+        cb_update = MagicMock()
+        cb_update.effective_user.id = u_partner
+        cb_update.callback_query = cb_query
+
+        await handle_call_response(cb_update, context)
+        await end_chat_session(context, u_paid, "next")
+        active_voice_calls.clear()
+
+
+@pytest.mark.asyncio
+async def test_broadcast_ampersand_auto_sanitization():
+    from commands.admin_commands import broadcast
+
+    admin_id = 9999
+    init.ADMIN_IDS.add(admin_id)
+
+    update = MagicMock()
+    update.effective_user.id = admin_id
+    update.message.text = "/broadcast 🚀 Friends (/friends & /friendreq) &amp; Live Typing & Gaming"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=555))
+
+    await broadcast(update, context)
+
+    context.bot.send_message.assert_called_once()
+    sent_text = context.bot.send_message.call_args[1]["text"]
+    assert "&amp; /friendreq" in sent_text
+    assert "&amp; Gaming" in sent_text
+    # Should not double-escape &amp;
+    assert "&amp;amp;" not in sent_text
+    assert update.message.reply_text.called
+    assert "posted to channel" in update.message.reply_text.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_subscription_status_call_limits():
+    from subscription import status_text, consume_daily_call, grant_subscription
+
+    u_test = 9201
+    init.user_details[u_test] = {**init._default_user(), "gender": "M", "age": 20, "country": "US"}
+
+    # Initially 3 remaining
+    txt1 = status_text(u_test)
+    assert "3/3 remaining today" in txt1
+
+    # Consume 1 call
+    consume_daily_call(u_test)
+    txt2 = status_text(u_test)
+    assert "2/3 remaining today" in txt2
+
+    # VIP subscription
+    grant_subscription(u_test, "weekly")
+    txt_vip = status_text(u_test)
+    assert "voice calls & media sends are free & unlimited" in txt_vip
+

@@ -30,6 +30,7 @@ SUBSCRIBE_INTRO_TEXT = (
     "<b>Perks on any active plan:</b>\n"
     "• Higher daily credit limit (more skips)\n"
     "• Send unlimited photos, videos, voice & video notes — free-tier media sends cost 1 daily credit each\n"
+    "• Unlimited anonymous voice calls — free accounts are limited to 3 calls/day\n"
     "• Higher active block capacity (up to 32 blocks vs 3 on free accounts)\n"
     "• Unlock /private (Privacy Mode) for photos/videos/voice notes\n"
     "• Get a peek at your partner's details when matched\n\n"
@@ -37,14 +38,14 @@ SUBSCRIBE_INTRO_TEXT = (
 )
 SUBSCRIBE_INVOICE_TITLE = "Chat Zone — {label} Plan"
 SUBSCRIBE_INVOICE_DESCRIPTION = (
-    "{label} subscription: daily credit limit of {limit}, unlimited media sends, "
+    "{label} subscription: daily credit limit of {limit}, unlimited media sends, unlimited voice calls, "
     "Privacy Mode access, partner details on match, and {points} bonus points."
 )
 SUBSCRIBE_PAYMENT_SUCCESS_TEXT = (
     "✅ <b>{label} plan activated!</b>\n"
     "<i>Active until:</i> <code>{expires}</code>\n"
     "<b>+{points}</b> points added to your account 🎉\n"
-    "Daily credit limit is now <b>{limit}</b> — and your media sends are unlimited & free."
+    "Daily credit limit is now <b>{limit}</b> — and your voice calls & media sends are unlimited & free."
 )
 
 # ---------------------------------------------------------------------------
@@ -92,7 +93,7 @@ HELP_TEXT = (
     "/status — <i>Check your partner's connection status</i>\n"
     "/friendreq — <i>Add your partner to your Anonymous Friends</i>\n"
     "/friends — <i>Open your friends list & reconnect</i>\n"
-    "/call — <i>Start a private voice call</i>\n"
+    "/call — <i>Start a private voice call (3 calls/day on free, unlimited on VIP)</i>\n"
     "/games — <i>Challenge your partner to a mini-game</i>\n"
     "/private — <i>Send media with view protection</i>\n"
     "/profile — <i>View & customize your profile and interests</i>\n"
@@ -104,7 +105,7 @@ HELP_TEXT = (
     "<b>↩️ Accidental Disconnects & Memories:</b>\n"
     "Skipped or ended a chat by mistake? Use the instant Undo button to pick up right where you left off. When a memorable chat comes to an end, you can also export a private transcript to keep in your Saved Messages.\n\n"
     "<b>⚡ Credits & VIP Perks:</b>\n"
-    "Free accounts receive daily credits that refresh every midnight UTC and can keep up to 3 active 24-hour blocks. VIP members enjoy higher credit limits, up to 32 active blocks, unlimited media sharing, and an exclusive peek at their partner's gender upon matching. Check /subscribe to upgrade.\n\n"
+    "Free accounts receive daily credits that refresh every midnight UTC, 3 voice calls per day, and up to 3 active 24-hour blocks. VIP members enjoy higher credit limits, unlimited voice calls, up to 32 active blocks, unlimited media sharing, and an exclusive peek at their partner's gender upon matching. Check /subscribe to upgrade.\n\n"
     "<b>🛡️ Safety & Respect:</b>\n"
     "You are in total control of your experience. At the end of every chat, you can rate or report your partner. Repeated misconduct is handled automatically to keep the community safe and friendly.\n\n"
     "<b>🌐 Community & Announcements:</b>\n"

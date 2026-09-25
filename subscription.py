@@ -6,6 +6,7 @@ import init
 logger = logging.getLogger(__name__)
 
 FREE_DAILY_CREDIT_LIMIT = 32
+FREE_DAILY_CALL_LIMIT = 3
 
 TIERS = {
     "daily": {
@@ -99,6 +100,37 @@ def has_daily_credit(user_id: int) -> bool:
     return daily_credits_used(user_id) < daily_credit_limit(user_id)
 
 
+def daily_calls_used(user_id: int) -> int:
+    details = _details(user_id)
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if details.get("daily_calls_reset_day") != today:
+        details["daily_calls_reset_day"] = today
+        details["daily_calls_used"] = 0
+        init.dirty_users.add(user_id)
+    return details.get("daily_calls_used", 0)
+
+
+def consume_daily_call(user_id: int):
+    """Consumes 1 daily voice call for free-tier users. Paid users are unlimited."""
+    if is_subscribed(user_id):
+        return
+    daily_calls_used(user_id)
+    details = _details(user_id)
+    details["daily_calls_used"] = details.get("daily_calls_used", 0) + 1
+    init.dirty_users.add(user_id)
+
+
+def can_make_call(user_id: int) -> tuple[bool, int, int]:
+    """
+    Checks if user is allowed to initiate a voice call.
+    Returns (allowed, used, limit) where limit=-1 denotes unlimited.
+    """
+    if is_subscribed(user_id):
+        return (True, daily_calls_used(user_id), -1)
+    used = daily_calls_used(user_id)
+    return (used < FREE_DAILY_CALL_LIMIT, used, FREE_DAILY_CALL_LIMIT)
+
+
 def grant_subscription(user_id: int, tier_key: str, source: str = "purchase") -> float:
     """
     Grants or extends a subscription.
@@ -137,12 +169,18 @@ def grant_subscription(user_id: int, tier_key: str, source: str = "purchase") ->
 def status_text(user_id: int) -> str:
     tier = active_tier(user_id)
     if not tier:
-        return "❌ <i>No active subscription. Use</i> /subscribe <i>to unlock perks.</i>"
+        used_calls = daily_calls_used(user_id)
+        rem_calls = max(0, FREE_DAILY_CALL_LIMIT - used_calls)
+        return (
+            "❌ <i>No active subscription. Use</i> /subscribe <i>to unlock perks.</i>\n"
+            f"<i>Daily voice calls:</i> <b>{rem_calls}/{FREE_DAILY_CALL_LIMIT} remaining today</b>\n"
+            f"<i>Daily credit limit:</i> {FREE_DAILY_CREDIT_LIMIT} (/next skips & media sends)"
+        )
     expires = init.user_details[user_id]["subscription_expires"]
     remaining_days = max(0, (expires - time.time()) / 86400)
     return (
         f"✅ <b>{tier['label']}</b> <i>plan active</i> — "
         f"<i>{remaining_days:.1f} days left</i>\n"
         f"<i>Daily credit limit:</i> {daily_credit_limit(user_id)} "
-        f"<i>(/next skips; media sends are free & unlimited on your plan)</i>"
+        f"<i>(/next skips; voice calls & media sends are free & unlimited on your plan)</i>"
     )

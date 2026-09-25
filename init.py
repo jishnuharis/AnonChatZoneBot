@@ -70,6 +70,9 @@ def _default_user() -> Dict[str, Any]:
         "daily_credits_used": 0,
         "daily_credits_reset_day": None,
 
+        "daily_calls_used": 0,
+        "daily_calls_reset_day": None,
+
         "pref_gender": "ANY",  # Paid filter: "ANY", "M", "F"
         "pref_country": "ANY",  # Paid filter: "ANY", "SAME", or country name
 

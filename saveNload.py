@@ -113,7 +113,8 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
         SELECT 
             u.user_id, u.gender, u.age, u.country, u.preferences_bitmask as preferences, u.points,
             p.severity_score, p.restricted_until, p.restriction_reason, p.last_severity_decay,
-            p.daily_credits_used, p.daily_credits_reset_day, p.is_banned,
+            p.daily_credits_used, p.daily_credits_reset_day,
+            p.daily_calls_used, p.daily_calls_reset_day, p.is_banned,
             COALESCE(p.preferred_gender, 'ANY') as pref_gender,
             COALESCE(p.preferred_country, 'ANY') as pref_country,
             s.tier as subscription_tier, s.expires_at as subscription_expires,
@@ -204,6 +205,8 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                     "last_severity_decay": decay_epoch,
                     "daily_credits_used": row["daily_credits_used"] or 0,
                     "daily_credits_reset_day": str(row["daily_credits_reset_day"]),
+                    "daily_calls_used": row.get("daily_calls_used") or 0,
+                    "daily_calls_reset_day": str(row["daily_calls_reset_day"]) if row.get("daily_calls_reset_day") else None,
                     "pref_gender": row.get("pref_gender") or "ANY",
                     "pref_country": row.get("pref_country") or "ANY",
                     "subscription_tier": row["subscription_tier"],
@@ -271,18 +274,28 @@ async def upsert_user(*args, **kwargs):
                     except ValueError:
                         reset_day = date.today()
 
+                reset_call_day = kwargs.get("daily_calls_reset_day")
+                if isinstance(reset_call_day, str):
+                    try:
+                        reset_call_day = datetime.strptime(reset_call_day, "%Y-%m-%d").date()
+                    except ValueError:
+                        reset_call_day = date.today()
+
                 await conn.execute("""
                     INSERT INTO user_profiles (
                         user_id, severity_score, restricted_until, restriction_reason,
-                        daily_credits_used, daily_credits_reset_day, is_banned,
-                        preferred_gender, preferred_country
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        daily_credits_used, daily_credits_reset_day,
+                        daily_calls_used, daily_calls_reset_day,
+                        is_banned, preferred_gender, preferred_country
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET
                         severity_score = COALESCE(EXCLUDED.severity_score, user_profiles.severity_score),
                         restricted_until = EXCLUDED.restricted_until,
                         restriction_reason = EXCLUDED.restriction_reason,
                         daily_credits_used = COALESCE(EXCLUDED.daily_credits_used, user_profiles.daily_credits_used),
                         daily_credits_reset_day = COALESCE(EXCLUDED.daily_credits_reset_day, user_profiles.daily_credits_reset_day),
+                        daily_calls_used = COALESCE(EXCLUDED.daily_calls_used, user_profiles.daily_calls_used),
+                        daily_calls_reset_day = COALESCE(EXCLUDED.daily_calls_reset_day, user_profiles.daily_calls_reset_day),
                         is_banned = COALESCE(EXCLUDED.is_banned, user_profiles.is_banned),
                         preferred_gender = COALESCE(EXCLUDED.preferred_gender, user_profiles.preferred_gender),
                         preferred_country = COALESCE(EXCLUDED.preferred_country, user_profiles.preferred_country);
@@ -293,6 +306,8 @@ async def upsert_user(*args, **kwargs):
                     kwargs.get("restriction_reason"),
                     kwargs.get("daily_credits_used", 0),
                     reset_day or date.today(),
+                    kwargs.get("daily_calls_used", 0),
+                    reset_call_day or date.today(),
                     kwargs.get("is_banned", False),
                     kwargs.get("pref_gender", "ANY"),
                     kwargs.get("pref_country", "ANY"),
@@ -1137,7 +1152,8 @@ async def load_user_data() -> dict:
                            COALESCE(p.preferred_gender, 'ANY') as pref_gender,
                            COALESCE(p.preferred_country, 'ANY') as pref_country,
                            p.severity_score, p.restricted_until, p.restriction_reason, p.last_severity_decay,
-                           p.daily_credits_used, p.daily_credits_reset_day, p.is_banned,
+                           p.daily_credits_used, p.daily_credits_reset_day,
+                           p.daily_calls_used, p.daily_calls_reset_day, p.is_banned,
                            s.tier as subscription_tier, s.expires_at as subscription_expires,
                            ref.referrer_id as referred_by,
                            ref.credited as referral_credited,
@@ -1225,6 +1241,8 @@ async def load_user_data() -> dict:
                             "last_severity_decay": decay_epoch,
                             "daily_credits_used": r.get("daily_credits_used") or 0,
                             "daily_credits_reset_day": str(r.get("daily_credits_reset_day")) if r.get("daily_credits_reset_day") else None,
+                            "daily_calls_used": r.get("daily_calls_used") or 0,
+                            "daily_calls_reset_day": str(r.get("daily_calls_reset_day")) if r.get("daily_calls_reset_day") else None,
                             "referred_by": r.get("referred_by"),
                             "referral_credited": bool(r.get("referral_credited")),
                             "referral_count": r.get("referral_count") or 0,
