@@ -14,7 +14,7 @@ from commands.start import start
 from commands.find import find
 from commands.next import skip_partner, handle_undo_skip
 from commands.stop import stop
-from commands.block import block_command
+from commands.block import block_command, handle_block_callback
 from commands.nudge import handle_nudge, status_command
 from commands.cancel import cancel
 from commands.help import help_command
@@ -223,8 +223,9 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_export_transcript, pattern=r"^export_chat\|.+$"))
     app.add_handler(CallbackQueryHandler(handle_call_response, pattern=r"^call_(acc|dec|end)\|.+$"))
 
+    app.add_handler(CallbackQueryHandler(handle_block_callback, pattern=r"^(block_confirm|block_cancel)(?:\|\d+\|(?:active|recent))?$"))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^rate\|\d+\|(up|down)$"))
-    app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^rateblock\|\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^(rateblock|rateblock_confirm|rateblock_cancel)\|\d+$"))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern=r"^report\|\d+$"))
     app.add_handler(CallbackQueryHandler(handle_report_reason, pattern=r"^reportreason\|\d+\|\w+$"))
     app.add_handler(CallbackQueryHandler(handle_report_back, pattern=r"^reportback\|\d+$"))

@@ -70,12 +70,44 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if action == "rateblock":
+        await query.answer()
+        confirm_markup = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🚫 Yes, Block User", callback_data=f"rateblock_confirm|{target_id}"),
+                InlineKeyboardButton("« Cancel", callback_data=f"rateblock_cancel|{target_id}"),
+            ]
+        ])
+        await safe_tele_func_call(
+            query.edit_message_text,
+            text=(
+                "⚠️ <b>Are you sure you want to block this user?</b>\n"
+                "Neither of you will match with each other for the next 24 hours."
+            ),
+            reply_markup=confirm_markup,
+            parse_mode="HTML"
+        )
+        return
+
+    if action == "rateblock_confirm":
         await add_user_block(user_id, target_id)
         await safe_tele_func_call(query.answer, "🚫 User blocked! You will not match with them for the next 24 hours.", show_alert=True)
+        await safe_tele_func_call(
+            query.edit_message_text,
+            text="🚫 <b>User blocked.</b> You will not be paired with them for the next 24 hours.",
+            reply_markup=None,
+            parse_mode="HTML"
+        )
+        return
 
-        # Update keyboard on message to remove block button
-        markup = _feedback_keyboard(target_id, can_vote=False, can_block=False)
-        await safe_tele_func_call(query.edit_message_reply_markup, reply_markup=markup)
+    if action == "rateblock_cancel":
+        await query.answer()
+        markup = _feedback_keyboard(target_id, can_vote=False, can_block=True)
+        await safe_tele_func_call(
+            query.edit_message_text,
+            text=RATE_PROMPT_TEXT,
+            reply_markup=markup,
+            parse_mode="HTML"
+        )
         return
 
     if action == "report":

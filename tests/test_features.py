@@ -456,3 +456,117 @@ async def test_community_channel_and_group_integration():
     prof_urls = [btn.url for row in prof_kb.inline_keyboard for btn in row if btn.url]
     assert "https://t.me/channelofchatzone" in prof_urls
     assert "https://t.me/groupchatzone" in prof_urls
+
+
+@pytest.mark.asyncio
+async def test_block_command_confirmation_flow(monkeypatch):
+    from commands.block import block_command, handle_block_callback
+    from session_manager import start_chat_session, is_in_chat
+
+    mock_add_block = AsyncMock()
+    monkeypatch.setattr("commands.block.add_user_block", mock_add_block)
+
+    u1, u2 = 8801, 8802
+    init.user_details[u1] = {**init._default_user(), "gender": "M", "age": 20, "country": "US"}
+    init.user_details[u2] = {**init._default_user(), "gender": "F", "age": 21, "country": "US"}
+
+    context = MagicMock()
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=101))
+    await start_chat_session(context, u1, u2)
+    assert is_in_chat(u1)
+
+    # 1. User runs /block -> prompt confirmation dialog instead of immediate block
+    update = MagicMock()
+    update.effective_user.id = u1
+    update.message.reply_text = AsyncMock()
+
+    await block_command(update, context)
+
+    update.message.reply_text.assert_called_once()
+    kwargs = update.message.reply_text.call_args[1]
+    assert "Are you sure you want to block" in kwargs["text"]
+    markup = kwargs["reply_markup"]
+    btn_data = [btn.callback_data for row in markup.inline_keyboard for btn in row]
+    assert f"block_confirm|{u2}|active" in btn_data
+    assert "block_cancel" in btn_data
+
+    # Chat must still be active (not severed prematurely)
+    assert is_in_chat(u1)
+    mock_add_block.assert_not_called()
+
+    # 2. User clicks cancel -> chat stays alive
+    cb_cancel_update = MagicMock()
+    cb_cancel_update.effective_user.id = u1
+    cb_cancel_query = MagicMock()
+    cb_cancel_query.data = "block_cancel"
+    cb_cancel_query.answer = AsyncMock()
+    cb_cancel_query.edit_message_text = AsyncMock()
+    cb_cancel_update.callback_query = cb_cancel_query
+
+    await handle_block_callback(cb_cancel_update, context)
+    cb_cancel_query.edit_message_text.assert_called_once()
+    assert "cancelled" in cb_cancel_query.edit_message_text.call_args[1]["text"].lower()
+    assert is_in_chat(u1)
+    mock_add_block.assert_not_called()
+
+    # 3. User clicks confirm -> chat severs and user is blocked
+    cb_confirm_update = MagicMock()
+    cb_confirm_update.effective_user.id = u1
+    cb_confirm_query = MagicMock()
+    cb_confirm_query.data = f"block_confirm|{u2}|active"
+    cb_confirm_query.answer = AsyncMock()
+    cb_confirm_query.edit_message_text = AsyncMock()
+    cb_confirm_update.callback_query = cb_confirm_query
+
+    await handle_block_callback(cb_confirm_update, context)
+    mock_add_block.assert_called_once_with(u1, u2)
+    assert not is_in_chat(u1)
+    assert "blocked" in cb_confirm_query.edit_message_text.call_args[1]["text"].lower()
+
+
+@pytest.mark.asyncio
+async def test_rateblock_ending_chat_confirmation_flow(monkeypatch):
+    from handlers.rating import handle_vote
+
+    mock_add_block = AsyncMock()
+    monkeypatch.setattr("handlers.rating.add_user_block", mock_add_block)
+
+    u1, u2 = 8803, 8804
+
+    # 1. User taps "rateblock|8804" -> shows confirmation dialog
+    update = MagicMock()
+    update.effective_user.id = u1
+    query = MagicMock()
+    query.data = f"rateblock|{u2}"
+    query.answer = AsyncMock()
+    query.edit_message_text = AsyncMock()
+    update.callback_query = query
+
+    context = MagicMock()
+    await handle_vote(update, context)
+
+    query.edit_message_text.assert_called_once()
+    text = query.edit_message_text.call_args[1]["text"]
+    markup = query.edit_message_text.call_args[1]["reply_markup"]
+    assert "Are you sure you want to block" in text
+    btn_data = [btn.callback_data for row in markup.inline_keyboard for btn in row]
+    assert f"rateblock_confirm|{u2}" in btn_data
+    assert f"rateblock_cancel|{u2}" in btn_data
+    mock_add_block.assert_not_called()
+
+    # 2. User taps cancel -> restores rating menu
+    query.reset_mock()
+    query.data = f"rateblock_cancel|{u2}"
+    await handle_vote(update, context)
+    query.edit_message_text.assert_called_once()
+    cancel_markup = query.edit_message_text.call_args[1]["reply_markup"]
+    cancel_btn_data = [btn.callback_data for row in cancel_markup.inline_keyboard for btn in row]
+    assert f"rateblock|{u2}" in cancel_btn_data
+    mock_add_block.assert_not_called()
+
+    # 3. User taps confirm -> block executed
+    query.reset_mock()
+    query.data = f"rateblock_confirm|{u2}"
+    await handle_vote(update, context)
+    mock_add_block.assert_called_once_with(u1, u2)
+    assert "User blocked" in query.edit_message_text.call_args[1]["text"]
