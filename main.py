@@ -94,6 +94,7 @@ async def set_commands(application):
     admin_commands = commands + [
         BotCommand("stats", "Bot user and performance statistics"),
         BotCommand("queue", "Queue and matchmaking status"),
+        BotCommand("connect", "Connect directly to a user ID"),
         BotCommand("checkuser", "Check user status and reports"),
         BotCommand("ban", "Ban or restrict a user"),
         BotCommand("unban", "Lift restriction on a user"),

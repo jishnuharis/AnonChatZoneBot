@@ -570,3 +570,52 @@ async def test_rateblock_ending_chat_confirmation_flow(monkeypatch):
     await handle_vote(update, context)
     mock_add_block.assert_called_once_with(u1, u2)
     assert "User blocked" in query.edit_message_text.call_args[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_admin_connect_session_lifecycle_and_menu(monkeypatch):
+    from commands.admin_commands import connect
+    from main import set_commands
+    from session_manager import is_in_chat
+
+    # 1. Verify /connect is included in admin commands menu
+    mock_app = MagicMock()
+    mock_app.bot.set_my_commands = AsyncMock()
+    init.ADMIN_IDS = {9901}
+    init.OWNER = 9901
+
+    await set_commands(mock_app)
+    admin_calls = [call for call in mock_app.bot.set_my_commands.call_args_list if "scope" in call[1]]
+    assert len(admin_calls) > 0
+    admin_cmd_list = admin_calls[0][0][0]
+    admin_cmd_names = [c.command for c in admin_cmd_list]
+    assert "connect" in admin_cmd_names, "/connect must be registered in admin command menu!"
+
+    # 2. Test /connect records session in chat_sessions database
+    mock_create_session = AsyncMock(return_value="test-admin-session-uuid-123")
+    monkeypatch.setattr("session_manager.create_chat_session_db", mock_create_session)
+
+    admin_id, target_id = 9901, 7702
+    init.user_details[admin_id] = {**init._default_user(), "gender": "M", "age": 25, "country": "US"}
+    init.user_details[target_id] = {**init._default_user(), "gender": "F", "age": 22, "country": "US"}
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = admin_id
+    mock_update.message.text = f"/connect {target_id}"
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=505))
+
+    await connect(mock_update, mock_context)
+
+    # Both users are in chat
+    assert is_in_chat(admin_id)
+    assert is_in_chat(target_id)
+    assert init.active_pairs[admin_id] == target_id
+    assert init.active_pairs[target_id] == admin_id
+
+    # Database session created
+    mock_create_session.assert_called_once_with(admin_id, target_id)
+    assert init.active_sessions[admin_id] == "test-admin-session-uuid-123"
+    assert init.active_sessions[target_id] == "test-admin-session-uuid-123"

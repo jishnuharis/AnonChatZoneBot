@@ -85,6 +85,7 @@ async def start_chat_session(
     is_friend_connection: bool = False,
     friend_name_1: str = "",
     friend_name_2: str = "",
+    is_admin_connect: bool = False,
 ) -> bool:
     """
     Atomically starts a new chat session between user1 and user2.
@@ -94,7 +95,7 @@ async def start_chat_session(
     if user1 == user2 or is_in_chat(user1) or is_in_chat(user2):
         return False
 
-    if await is_blocked_pairwise(user1, user2):
+    if not is_admin_connect and await is_blocked_pairwise(user1, user2):
         logger.warning(f"Blocked match attempt prevented between {user1} and {user2}")
         return False
 
@@ -131,7 +132,10 @@ async def start_chat_session(
     init.last_activity[user1] = now
     init.last_activity[user2] = now
 
-    if is_friend_connection:
+    if is_admin_connect:
+        text1 = f"🎯 <b>Connected to target user! Say hi!</b> 👋\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
+        text2 = f"🎯 <b>Someone found you.... Say hi!!</b>\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
+    elif is_friend_connection:
         text1 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b> Say hi! 👋\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
         text2 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b> Say hi! 👋\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
     else:

@@ -9,6 +9,7 @@ from html import escape as esc
 from security import safe_tele_func_call, format_duration
 from handlers.rating import ask_for_rating
 from games.registry import end_any_active_game
+from session_manager import start_chat_session, end_chat_session, is_in_chat, get_partner
 from moderation import is_admin, apply_restriction, clear_restriction, severity_for_score, SEVERITY_DURATIONS
 from saveNload import add_promotion_db, get_active_promotions_db, get_pool
 from games.content.content_manager import get_stats as get_game_content_stats, add_wyr_question, add_trivia_question
@@ -126,48 +127,57 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(GIVE_VALID_CONNECT_USER_ID_TEXT, parse_mode="HTML")
         return
 
-    if target_id not in init.user_details:
-        await update.message.reply_text(TARGET_NOT_IN_DB_TEXT, parse_mode="HTML")
+    if target_id == user_id:
+        await update.message.reply_text("<b>You cannot connect to yourself.</b>", parse_mode="HTML")
         return
 
-    if target_id == init.user_details[user_id]["partner_id"]:
+    if target_id not in init.user_details:
+        await init.ensure_user_loaded(target_id)
+        if target_id not in init.user_details:
+            await update.message.reply_text(TARGET_NOT_IN_DB_TEXT, parse_mode="HTML")
+            return
+
+    if is_in_chat(user_id) and get_partner(user_id) == target_id:
         await update.message.reply_text(ALREADY_CONNECTED_TO_TARGET_TEXT, parse_mode="HTML")
         return
 
-    targets_partner = init.user_details[target_id]["partner_id"]
-    if targets_partner:
-        init.active_pairs.pop(targets_partner, None)
-        init.active_pairs.pop(target_id, None)
-        init.message_map.pop(targets_partner, None)
-        init.message_map.pop(target_id, None)
-        init.user_details[targets_partner]["partner_id"] = None
-        await end_any_active_game(context, targets_partner)
-        await end_any_active_game(context, target_id)
+    # If target or admin is waiting in queue, remove them
+    async with init.queue_lock:
+        if user_id in init.waiting_users:
+            init.waiting_users.remove(user_id)
+            init.wait_started.pop(user_id, None)
+        if target_id in init.waiting_users:
+            init.waiting_users.remove(target_id)
+            init.wait_started.pop(target_id, None)
 
-        await safe_tele_func_call(context.bot.send_message, chat_id=targets_partner, text=PARTNER_LEFT_CHAT_TEXT, parse_mode="HTML")
-        await ask_for_rating(context.bot, targets_partner, target_id)
+    # Cleanly terminate existing active chat sessions for target and admin
+    if is_in_chat(target_id):
+        await end_chat_session(
+            context,
+            target_id,
+            reason="admin_reconnect",
+            notify_initiator=False,
+            notify_partner=True,
+        )
 
-    users_partner = init.user_details[user_id]["partner_id"]
-    if users_partner:
-        init.active_pairs.pop(users_partner, None)
-        init.active_pairs.pop(user_id, None)
-        init.message_map.pop(users_partner, None)
-        init.message_map.pop(user_id, None)
-        init.user_details[users_partner]["partner_id"] = None
-        await end_any_active_game(context, users_partner)
-        await end_any_active_game(context, user_id)
+    if is_in_chat(user_id):
+        await end_chat_session(
+            context,
+            user_id,
+            reason="admin_reconnect",
+            notify_initiator=False,
+            notify_partner=True,
+        )
 
-        await safe_tele_func_call(context.bot.send_message, chat_id=users_partner, text=PARTNER_LEFT_CHAT_TEXT, parse_mode="HTML")
-        await ask_for_rating(context.bot, users_partner, user_id)
-
-    init.active_pairs[user_id] = target_id
-    init.active_pairs[target_id] = user_id
-    init.user_details[user_id]["partner_id"] = target_id
-    init.user_details[target_id]["partner_id"] = user_id
-    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"🎯 <b>Connected to target user! Say hi!</b>\n/next <i>- Next</i>\n/stop <i>- Stop</i>", parse_mode="HTML")
-    await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=f"🎯 <b>Someone found you.... Say hi!!</b>\n/next <i>- Next</i>\n/stop <i>- Stop</i>", parse_mode="HTML")
-
-    init.dirty_users.update([user_id, target_id])
+    # Start session atomically with DB logging into chat_sessions table!
+    success = await start_chat_session(
+        context,
+        user_id,
+        target_id,
+        is_admin_connect=True,
+    )
+    if not success:
+        await update.message.reply_text("⚠️ <b>Failed to connect to target user.</b>", parse_mode="HTML")
 
 
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
