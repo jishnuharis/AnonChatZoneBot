@@ -381,3 +381,27 @@ async def test_anonymous_voice_call_flow():
     # Call marked active and WebApp join buttons sent to both users
     assert active_voice_calls[session_id]["status"] == "active"
     assert "Call Connected" in cb_query.edit_message_text.call_args[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_help_command_contains_all_active_commands():
+    from commands.help import help_command
+
+    update = MagicMock()
+    update.effective_user.id = 9999
+    update.message.reply_text = AsyncMock()
+    init.user_details[9999] = {**init._default_user(), "gender": "M", "age": 20, "country": "US"}
+
+    context = MagicMock()
+    await help_command(update, context)
+
+    update.message.reply_text.assert_called_once()
+    text = update.message.reply_text.call_args[1]["text"]
+
+    expected_commands = [
+        "/start", "/find", "/next", "/stop", "/nudge", "/status",
+        "/friendreq", "/friends", "/call", "/block", "/profile",
+        "/games", "/private", "/subscribe", "/help"
+    ]
+    for cmd in expected_commands:
+        assert cmd in text, f"Command {cmd} missing from /help text!"
