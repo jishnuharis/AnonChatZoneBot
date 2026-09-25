@@ -91,6 +91,50 @@ async def test_accidental_skip_undo_button_success():
 
 
 @pytest.mark.asyncio
+async def test_accidental_stop_undo_success():
+    from commands.stop import stop
+    context = MagicMock()
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=123))
+
+    u1, u2 = 1005, 1006
+    init.user_details[u1] = {**init._default_user(), "gender": "M", "age": 20, "country": "US"}
+    init.user_details[u2] = {**init._default_user(), "gender": "F", "age": 21, "country": "US"}
+
+    # Start active chat
+    await start_chat_session(context, u1, u2)
+    assert is_in_chat(u1) and is_in_chat(u2)
+
+    # User 1 stops the chat via /stop
+    update = MagicMock()
+    update.effective_user.id = u1
+    update.message.reply_text = AsyncMock()
+
+    await stop(update, context)
+
+    # Chat should be ended and stop recorded in recent_skips
+    assert not is_in_chat(u1)
+    assert u1 in init.recent_skips
+    assert init.recent_skips[u1][0] == u2
+
+    # User 1 taps Undo Stop within 60s
+    cb_update = MagicMock()
+    cb_update.effective_user.id = u1
+    cb_update.callback_query.data = f"undoskip|{u2}"
+    cb_update.callback_query.answer = AsyncMock()
+    cb_update.callback_query.edit_message_text = AsyncMock()
+
+    await handle_undo_skip(cb_update, context)
+
+    # Successfully reconnected!
+    assert is_in_chat(u1)
+    assert is_in_chat(u2)
+    assert init.active_pairs.get(u1) == u2
+    assert u1 not in init.recent_skips
+    cb_update.callback_query.edit_message_text.assert_called_once()
+    assert "reconnected" in cb_update.callback_query.edit_message_text.call_args[1]["text"].lower()
+
+
+@pytest.mark.asyncio
 async def test_accidental_skip_undo_expired():
     context = MagicMock()
     u1, u2 = 2001, 2002

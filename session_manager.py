@@ -222,15 +222,22 @@ async def end_chat_session(
         except Exception as e:
             logger.error(f"Error persisting session end for {session_id}: {e}")
 
-    # Dispatch notifications with end-of-chat options (Friends & Transcript)
+    # Dispatch notifications with end-of-chat options (Friends & Transcript & Undo)
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
     from saveNload import are_friends_db
+
+    # Record skip or stop for 60s accidental disconnect undo
+    if partner and reason in ("user_stopped", "skipped"):
+        init.recent_skips[user_id] = (partner, time.time())
 
     already_friends = await are_friends_db(user_id, partner) if partner else False
     has_transcript = bool(session_id and session_id in init.session_messages and len(init.session_messages[session_id]) >= 2)
 
-    def _build_end_keyboard(target_pid):
+    def _build_end_keyboard(target_pid, is_initiator=False):
         btns = []
+        if is_initiator and target_pid and reason in ("user_stopped", "skipped"):
+            btn_label = "↩️ Undo Stop (60s)" if reason == "user_stopped" else "↩️ Undo Skip (60s)"
+            btns.append([InlineKeyboardButton(btn_label, callback_data=f"undoskip|{target_pid}")])
         if target_pid and not already_friends:
             btns.append([InlineKeyboardButton("⭐ Add to Anonymous Friends", callback_data=f"friendreq_end|{target_pid}")])
         if has_transcript:
@@ -245,7 +252,7 @@ async def end_chat_session(
             parse_mode="HTML",
             reply_markup=ReplyKeyboardRemove(),
         )
-        kb_p = _build_end_keyboard(user_id)
+        kb_p = _build_end_keyboard(user_id, is_initiator=False)
         if kb_p:
             await safe_tele_func_call(
                 context.bot.send_message,
@@ -263,7 +270,7 @@ async def end_chat_session(
             parse_mode="HTML",
             reply_markup=ReplyKeyboardRemove(),
         )
-        kb_u = _build_end_keyboard(partner)
+        kb_u = _build_end_keyboard(partner, is_initiator=True)
         if kb_u:
             await safe_tele_func_call(
                 context.bot.send_message,
