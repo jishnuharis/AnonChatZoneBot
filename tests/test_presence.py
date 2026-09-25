@@ -117,3 +117,55 @@ async def test_channel_broadcast(monkeypatch):
     reply_args = mock_update.message.reply_text.call_args
     reply_text = reply_args[0][0] if reply_args[0] else reply_args[1].get("text", "")
     assert "posted to channel @mytestchannel" in reply_text.lower()
+
+
+@pytest.mark.asyncio
+async def test_in_chat_keyboard_nudge_only_and_relay():
+    """Verify that in-chat keyboard contains ONLY 'Nudge your partner!' to prevent accidental skips, and relay intercepts it."""
+    from session_manager import IN_CHAT_KEYBOARD
+    from relay import relay_message
+
+    # 1. Keyboard verification
+    assert len(IN_CHAT_KEYBOARD.keyboard) == 1
+    assert [b.text for b in IN_CHAT_KEYBOARD.keyboard[0]] == ["Nudge your partner!"]
+
+    # 2. Relay interception verification
+    u1, u2 = 9981, 9982
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    _nudge_timestamps.pop(u1, None)
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_update.message.text = "Nudge your partner!"
+    mock_update.message.caption = None
+    mock_update.message.photo = []
+    mock_update.message.video = None
+    mock_update.message.voice = None
+    mock_update.message.video_note = None
+    mock_update.message.document = None
+    mock_update.message.audio = None
+    mock_update.message.animation = None
+    mock_update.message.sticker = None
+    mock_update.message.contact = None
+    mock_update.message.location = None
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.send_chat_action = AsyncMock(return_value=True)
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=301))
+
+    await relay_message(mock_update, mock_context)
+
+    # Nudge was sent to u2, NOT relayed as normal text
+    mock_context.bot.send_message.assert_called_once()
+    send_args = mock_context.bot.send_message.call_args[1]
+    assert send_args["chat_id"] == u2
+    assert "Your partner is nudging you" in send_args["text"]
+
+    # Clean up
+    init.active_pairs.pop(u1, None)
+    init.active_pairs.pop(u2, None)
+

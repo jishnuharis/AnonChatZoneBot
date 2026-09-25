@@ -57,7 +57,7 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         # Intercept In-Chat Button taps from keyboard
-        if msg.text == "👋 Nudge":
+        if msg.text in ("Nudge your partner!", "👋 Nudge"):
             from commands.nudge import handle_nudge
             await handle_nudge(update, context)
             return
