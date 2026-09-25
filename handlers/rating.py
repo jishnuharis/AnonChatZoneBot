@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 
 from security import safe_tele_func_call
 from moderation import REPORT_REASONS, file_report
-from saveNload import record_user_rating, add_user_block, get_user_votes
+from saveNload import record_user_rating, add_user_block, get_user_votes, can_user_block
 from message import RATE_PROMPT_TEXT, REPORT_REASON_PROMPT_TEXT, REPORT_LOGGED_TEXT
 
 import init
@@ -70,6 +70,15 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if action == "rateblock":
+        allowed, count, limit = await can_user_block(user_id, target_id)
+        if not allowed:
+            if limit == 3:
+                alert = "⚠️ Block limit reached (3/3)! Free accounts can have up to 3 active blocks. Upgrade with /subscribe for up to 32 blocks."
+            else:
+                alert = "⚠️ Block limit reached (32/32)! You have reached the maximum limit of 32 active blocks."
+            await safe_tele_func_call(query.answer, alert, show_alert=True)
+            return
+
         await query.answer()
         confirm_markup = InlineKeyboardMarkup([
             [
@@ -80,8 +89,9 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_tele_func_call(
             query.edit_message_text,
             text=(
-                "⚠️ <b>Are you sure you want to block this user?</b>\n"
-                "Neither of you will match with each other for the next 24 hours."
+                f"⚠️ <b>Are you sure you want to block this user?</b>\n"
+                f"Neither of you will match with each other for the next 24 hours.\n"
+                f"Active blocks: <b>{count}/{limit}</b>"
             ),
             reply_markup=confirm_markup,
             parse_mode="HTML"
@@ -89,6 +99,15 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if action == "rateblock_confirm":
+        allowed, count, limit = await can_user_block(user_id, target_id)
+        if not allowed:
+            if limit == 3:
+                alert = "⚠️ Block limit reached (3/3)! Free accounts can have up to 3 active blocks. Upgrade with /subscribe for up to 32 blocks."
+            else:
+                alert = "⚠️ Block limit reached (32/32)! You have reached the maximum limit of 32 active blocks."
+            await safe_tele_func_call(query.answer, alert, show_alert=True)
+            return
+
         await add_user_block(user_id, target_id)
         await safe_tele_func_call(query.answer, "🚫 User blocked! You will not match with them for the next 24 hours.", show_alert=True)
         await safe_tele_func_call(

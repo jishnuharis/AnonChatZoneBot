@@ -318,6 +318,54 @@ async def upsert_user(*args, **kwargs):
 # ============================================================================
 
 BLOCK_EXPIRY_SECONDS = 86400  # 24 hours
+FREE_USER_BLOCK_LIMIT = 3
+PAID_USER_BLOCK_LIMIT = 32
+
+
+def get_block_limit(user_id: int) -> int:
+    """Returns the maximum allowed active blocks (3 for free, 32 for paid)."""
+    from subscription import is_subscribed
+    return PAID_USER_BLOCK_LIMIT if is_subscribed(user_id) else FREE_USER_BLOCK_LIMIT
+
+
+async def count_active_blocks(blocker_id: int) -> int:
+    """Returns the count of active blocks initiated by blocker_id in the last 24 hours."""
+    now_ts = time.time()
+    blocks = init.user_details.get(blocker_id, {}).get("blocked_users")
+    if isinstance(blocks, dict):
+        mem_count = sum(1 for ts in blocks.values() if (now_ts - ts) < BLOCK_EXPIRY_SECONDS)
+    else:
+        mem_count = len(blocks or [])
+
+    if not is_pool_ready():
+        return mem_count
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            cur = await conn.execute("""
+                SELECT COUNT(*) FROM user_blocks 
+                WHERE blocker_id = %s AND created_at > NOW() - INTERVAL '24 hours';
+            """, (blocker_id,))
+            row = await cur.fetchone()
+            db_count = row[0] if row else 0
+            return max(mem_count, db_count)
+    except Exception as e:
+        logger.warning(f"count_active_blocks error: {e}")
+        return mem_count
+
+
+async def can_user_block(user_id: int, target_id: int) -> Tuple[bool, int, int]:
+    """Returns (allowed, current_count, max_limit)."""
+    limit = get_block_limit(user_id)
+    now_ts = time.time()
+    blocks = init.user_details.get(user_id, {}).get("blocked_users")
+    # If the user is already actively blocked, refreshing/updating does not consume a new slot
+    if _is_block_active(blocks, target_id, now_ts):
+        return True, 0, limit
+
+    count = await count_active_blocks(user_id)
+    return (count < limit), count, limit
 
 
 def _is_block_active(blocks, target_id: int, now_ts: float) -> bool:
@@ -332,10 +380,17 @@ def _is_block_active(blocks, target_id: int, now_ts: float) -> bool:
     return False
 
 
-async def add_user_block(blocker_id: int, blocked_id: int) -> bool:
-    """Records a 24-hour user-to-user block."""
+async def add_user_block(blocker_id: int, blocked_id: int, enforce_limit: bool = True) -> bool:
+    """Records a 24-hour user-to-user block subject to tier limits (3 free / 32 paid)."""
     if blocker_id == blocked_id:
         return False
+
+    if enforce_limit:
+        allowed, count, limit = await can_user_block(blocker_id, blocked_id)
+        if not allowed:
+            logger.info(f"User {blocker_id} hit block limit ({count}/{limit})")
+            return False
+
     now_ts = time.time()
     # Always register in local memory structure with timestamp
     init.user_details.setdefault(blocker_id, init._default_user())

@@ -619,3 +619,62 @@ async def test_admin_connect_session_lifecycle_and_menu(monkeypatch):
     mock_create_session.assert_called_once_with(admin_id, target_id)
     assert init.active_sessions[admin_id] == "test-admin-session-uuid-123"
     assert init.active_sessions[target_id] == "test-admin-session-uuid-123"
+
+
+@pytest.mark.asyncio
+async def test_tier_based_block_limits(monkeypatch):
+    from saveNload import add_user_block, can_user_block, get_block_limit, count_active_blocks
+    import time
+
+    monkeypatch.setattr("saveNload.is_pool_ready", lambda: False)
+
+    u_free = 99881
+    u_paid = 99882
+    now = time.time()
+
+    init.user_details[u_free] = {**init._default_user(), "subscription_expires": None}
+    init.user_details[u_paid] = {**init._default_user(), "subscription_expires": now + 86400 * 30}
+
+    # Verify limits
+    assert get_block_limit(u_free) == 3
+    assert get_block_limit(u_paid) == 32
+
+    # Free user adds 3 blocks -> all succeed
+    for i in range(1, 4):
+        target = 1000 + i
+        allowed, count, limit = await can_user_block(u_free, target)
+        assert allowed is True
+        assert count == i - 1
+        assert limit == 3
+        res = await add_user_block(u_free, target)
+        assert res is True
+
+    assert await count_active_blocks(u_free) == 3
+
+    # Free user attempts 4th block -> rejected
+    allowed, count, limit = await can_user_block(u_free, 1004)
+    assert allowed is False
+    assert count == 3
+    assert limit == 3
+    res = await add_user_block(u_free, 1004)
+    assert res is False
+
+    # Re-blocking an existing target (e.g. 1001) should still be allowed
+    allowed, _, _ = await can_user_block(u_free, 1001)
+    assert allowed is True
+
+    # Paid user adds 32 blocks -> all succeed
+    for i in range(1, 33):
+        target = 2000 + i
+        res = await add_user_block(u_paid, target)
+        assert res is True
+
+    assert await count_active_blocks(u_paid) == 32
+
+    # Paid user attempts 33rd block -> rejected
+    allowed, count, limit = await can_user_block(u_paid, 2033)
+    assert allowed is False
+    assert count == 32
+    assert limit == 32
+    res = await add_user_block(u_paid, 2033)
+    assert res is False
