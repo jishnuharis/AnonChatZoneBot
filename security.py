@@ -69,11 +69,47 @@ async def safe_tele_func_call(caller, *args, raise_on_forbidden: bool = False, *
 
 async def safe_reply(update: Update, text: str, **kwargs):
     kwargs.setdefault("parse_mode", "HTML")
-    if update.callback_query:
-        await safe_tele_func_call(update.callback_query.answer)
-        await safe_tele_func_call(update.callback_query.message.reply_text, text, **kwargs)
-    elif update.message:
-        await safe_tele_func_call(update.message.reply_text, text, **kwargs)
+    context = kwargs.pop("context", None)
+    answer_query = kwargs.pop("answer_query", False)
+
+    # 1. Message update
+    if getattr(update, "message", None) is not None and hasattr(update.message, "reply_text"):
+        return await safe_tele_func_call(update.message.reply_text, text=text, **kwargs)
+
+    # 2. CallbackQuery update
+    if getattr(update, "callback_query", None) is not None:
+        query = update.callback_query
+        if answer_query and hasattr(query, "answer"):
+            await safe_tele_func_call(query.answer)
+        query_msg = getattr(query, "message", None)
+        if query_msg is not None and hasattr(query_msg, "reply_text"):
+            return await safe_tele_func_call(query_msg.reply_text, text=text, **kwargs)
+
+    # 3. Effective message fallback
+    eff_msg = getattr(update, "effective_message", None)
+    if eff_msg is not None and hasattr(eff_msg, "reply_text"):
+        return await safe_tele_func_call(eff_msg.reply_text, text=text, **kwargs)
+
+    # 4. Fallback to direct bot.send_message
+    bot = kwargs.pop("bot", None)
+    if not bot and context and hasattr(context, "bot"):
+        bot = context.bot
+    if not bot and hasattr(update, "get_bot"):
+        try:
+            bot = update.get_bot()
+        except Exception:
+            bot = None
+    if not bot:
+        bot = getattr(update, "_bot", None)
+
+    chat_id = None
+    if getattr(update, "effective_chat", None) is not None:
+        chat_id = getattr(update.effective_chat, "id", None)
+    if chat_id is None and getattr(update, "effective_user", None) is not None:
+        chat_id = getattr(update.effective_user, "id", None)
+
+    if bot and chat_id is not None:
+        return await safe_tele_func_call(bot.send_message, chat_id=chat_id, text=text, **kwargs)
 
 
 def format_duration(seconds: float) -> str:
@@ -111,6 +147,7 @@ async def restriction_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<i>Reason:</i> <code>{esc(str(reason))}</code>\n"
             f"<i>Time left:</i> <code>{esc(remaining_str)}</code>\n\n"
             "<i>If you think this is a mistake, reach out to a bot admin to sort it out.</i>",
+            answer_query=True,
         )
         raise ApplicationHandlerStop
 

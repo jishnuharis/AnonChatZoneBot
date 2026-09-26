@@ -4,7 +4,7 @@ from telegram.ext import ContextTypes
 
 from commands.find import find
 from handlers.setup import check_user_profile
-from security import safe_tele_func_call
+from security import safe_tele_func_call, safe_reply
 from session_manager import end_chat_session, is_in_chat, start_chat_session, IN_CHAT_KEYBOARD
 from matchmaking import dequeue_user
 from message import PARTNER_SKIPPED_TEXT, NOT_IN_CHAT_USE_FIND_TEXT
@@ -31,18 +31,18 @@ async def skip_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
             undo_keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("↩️ Undo Skip (60s)", callback_data=f"undoskip|{partner_id}")]
             ])
-            await safe_tele_func_call(
-                update.message.reply_text,
+            await safe_reply(
+                update,
                 text=f"{PARTNER_SKIPPED_TEXT}\n<i>Did you skip by accident? Tap below within 60s to reconnect!</i>",
-                parse_mode="HTML",
                 reply_markup=undo_keyboard,
+                context=context,
             )
         else:
-            await safe_tele_func_call(update.message.reply_text, text=PARTNER_SKIPPED_TEXT, parse_mode="HTML")
+            await safe_reply(update, text=PARTNER_SKIPPED_TEXT, context=context)
 
         await find(update, context, charge=True)
     else:
-        await safe_tele_func_call(update.message.reply_text, text=NOT_IN_CHAT_USE_FIND_TEXT, parse_mode="HTML")
+        await safe_reply(update, text=NOT_IN_CHAT_USE_FIND_TEXT, context=context)
 
 
 async def handle_undo_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):

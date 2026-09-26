@@ -102,6 +102,7 @@ async def handle_start_find_callback(update: Update, context: ContextTypes.DEFAU
     """Callback when user clicks 'Find Partner' after verifying channel membership."""
     query = update.callback_query
     if query:
-        await query.answer()
+        await safe_tele_func_call(query.answer)
+        await safe_tele_func_call(query.edit_message_reply_markup, reply_markup=None)
         from commands.find import find
         await find(update, context)

@@ -938,3 +938,88 @@ async def test_finishing_profile_mandatory_channel_prompt():
     assert kb.inline_keyboard[1][0].text == "🔄 Check status"
 
 
+@pytest.mark.asyncio
+async def test_handle_start_find_callback_no_message():
+    """
+    Guarantees that clicking 'Find Partner' inline button (start_find_callback)
+    where update.message is None executes successfully without AttributeError.
+    """
+    from channel_gate import handle_start_find_callback
+    from message import LOOKING_FOR_PARTNER_TEXT
+
+    u_cb = 7024102995
+    init.user_details[u_cb] = {**init._default_user(), "gender": "M", "age": 25, "country": "US"}
+    init.waiting_users.clear()
+    init.active_pairs.clear()
+
+    mock_bot = MagicMock()
+    mock_member = MagicMock()
+    mock_member.status = "member"
+    mock_bot.get_chat_member = AsyncMock(return_value=mock_member)
+
+    # In a Telegram CallbackQuery update, update.message is ALWAYS None
+    update = MagicMock()
+    update.message = None
+    update.effective_user.id = u_cb
+    update.effective_chat.id = u_cb
+    query = MagicMock()
+    query.from_user.id = u_cb
+    query.answer = AsyncMock()
+    query.edit_message_reply_markup = AsyncMock()
+    query_msg = MagicMock()
+    query_msg.reply_text = AsyncMock()
+    query.message = query_msg
+    update.callback_query = query
+    update.effective_message = query_msg
+
+    context = MagicMock()
+    context.bot = mock_bot
+
+    await handle_start_find_callback(update, context)
+
+    # Verify query answered and markup removed
+    query.answer.assert_called_once()
+    query.edit_message_reply_markup.assert_called_once_with(reply_markup=None)
+
+    # Verify message replied with LOOKING_FOR_PARTNER_TEXT without crashing
+    query_msg.reply_text.assert_called_once()
+    call_kwargs = query_msg.reply_text.call_args[1]
+    assert call_kwargs["text"] == LOOKING_FOR_PARTNER_TEXT
+    assert u_cb in init.waiting_users
+
+
+@pytest.mark.asyncio
+async def test_safe_reply_fallbacks():
+    """Tests safe_reply with various update configurations."""
+    from security import safe_reply
+
+    # 1. Standard message update
+    up1 = MagicMock()
+    up1.message.reply_text = AsyncMock()
+    up1.callback_query = None
+    await safe_reply(up1, "Test Message 1")
+    up1.message.reply_text.assert_called_once_with(text="Test Message 1", parse_mode="HTML")
+
+    # 2. Callback query with message
+    up2 = MagicMock()
+    up2.message = None
+    up2.callback_query.answer = AsyncMock()
+    up2.callback_query.message.reply_text = AsyncMock()
+    await safe_reply(up2, "Test Message 2", answer_query=True)
+    up2.callback_query.answer.assert_called_once()
+    up2.callback_query.message.reply_text.assert_called_once_with(text="Test Message 2", parse_mode="HTML")
+
+    # 3. Callback query without message (e.g., inline query callback) - fallback to bot.send_message
+    up3 = MagicMock()
+    up3.message = None
+    up3.callback_query.message = None
+    up3.callback_query.answer = AsyncMock()
+    up3.effective_message = None
+    up3.effective_chat.id = 999
+    mock_bot = MagicMock()
+    mock_bot.send_message = AsyncMock()
+    await safe_reply(up3, "Test Message 3", bot=mock_bot)
+    mock_bot.send_message.assert_called_once_with(chat_id=999, text="Test Message 3", parse_mode="HTML")
+
+
+

@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from functools import wraps
 
 from handlers.country import send_country_selection
-from security import safe_tele_func_call
+from security import safe_tele_func_call, safe_reply
 from message import (
     WELCOME_NEW_USER_TEXT, SETUP_PROFILE_GENDER_PROMPT_TEXT, SELECT_GENDER_TEXT,
     ENTER_AGE_TEXT, INVALID_AGE_TEXT, PREFERENCES_BUTTONS_NUDGE_TEXT,
@@ -34,8 +34,8 @@ def check_user_profile(handler_func):
                     InlineKeyboardButton("♀️ Female", callback_data="gender|F")
                 ]]
                 markup = InlineKeyboardMarkup(keyboard)
-                await safe_tele_func_call(update.message.reply_text, text=WELCOME_NEW_USER_TEXT, parse_mode="HTML")
-                await safe_tele_func_call(update.message.reply_text, text=SETUP_PROFILE_GENDER_PROMPT_TEXT, reply_markup=markup, parse_mode="HTML")
+                await safe_reply(update, text=WELCOME_NEW_USER_TEXT, context=context)
+                await safe_reply(update, text=SETUP_PROFILE_GENDER_PROMPT_TEXT, reply_markup=markup, context=context)
                 return
 
             stage = init.user_input_stage.get(user_id, "gender")
@@ -45,9 +45,9 @@ def check_user_profile(handler_func):
                     InlineKeyboardButton("♀️ Female", callback_data="gender|F")
                 ]]
                 markup = InlineKeyboardMarkup(keyboard)
-                await safe_tele_func_call(update.message.reply_text, text=SELECT_GENDER_TEXT, reply_markup=markup, parse_mode="HTML")
+                await safe_reply(update, text=SELECT_GENDER_TEXT, reply_markup=markup, context=context)
             elif stage == "age":
-                await safe_tele_func_call(update.message.reply_text, text=ENTER_AGE_TEXT, parse_mode="HTML")
+                await safe_reply(update, text=ENTER_AGE_TEXT, context=context)
             elif stage == "country":
                 from handlers.country import send_country_selection
                 await send_country_selection(user_id, context)
@@ -62,20 +62,12 @@ def check_user_profile(handler_func):
             if cmd in ("/stop", "/cancel") and (user_id in init.active_pairs or user_id in init.waiting_users):
                 return await handler_func(update, context, *args, **kwargs)
 
-            if update.message:
-                await safe_tele_func_call(
-                    update.message.reply_text,
-                    text=MANDATORY_CHANNEL_PROMPT_TEXT,
-                    reply_markup=get_mandatory_channel_keyboard(),
-                    parse_mode="HTML"
-                )
-            elif update.callback_query and update.callback_query.message:
-                await safe_tele_func_call(
-                    update.callback_query.message.reply_text,
-                    text=MANDATORY_CHANNEL_PROMPT_TEXT,
-                    reply_markup=get_mandatory_channel_keyboard(),
-                    parse_mode="HTML"
-                )
+            await safe_reply(
+                update,
+                text=MANDATORY_CHANNEL_PROMPT_TEXT,
+                reply_markup=get_mandatory_channel_keyboard(),
+                context=context
+            )
             return
 
         return await handler_func(update, context, *args, **kwargs)
