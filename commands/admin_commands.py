@@ -91,21 +91,75 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Strip /broadcast or /broadcast@bot_username from beginning
     clean_text = re.sub(r"^/broadcast(?:@\w+)?\s*", "", raw_text, flags=re.IGNORECASE).strip()
 
+    is_test = False
     is_direct = False
-    if clean_text.lower().startswith("direct"):
+
+    if clean_text.lower() == "test" or clean_text.lower().startswith("test "):
+        is_test = True
+        clean_text = clean_text[4:].strip()
+        if clean_text.lower().startswith("direct"):
+            clean_text = clean_text[len("direct"):].strip()
+    elif clean_text.lower().startswith("direct"):
         is_direct = True
         clean_text = clean_text[len("direct"):].strip()
+        if clean_text.lower() == "test" or clean_text.lower().startswith("test "):
+            is_test = True
+            clean_text = clean_text[4:].strip()
 
     is_reply_broadcast = bool(replied_msg and not clean_text)
 
     if not is_reply_broadcast and not clean_text and not has_photo:
         await update.message.reply_text(
             "<b>📢 Broadcast Usage:</b>\n\n"
+            "• <code>/broadcast test &lt;message&gt;</code> — Test preview sent <b>only to you</b>\n"
             "• <code>/broadcast &lt;message&gt;</code> — Posts to official channel (instant)\n"
             "• <code>/broadcast direct &lt;message&gt;</code> — DMs all bot users in batches\n"
-            "• <i>Reply to any message (with text, photos, formatting) with</i> <code>/broadcast</code> <i>to forward it directly!</i>",
+            "• <i>Reply to any message with</i> <code>/broadcast test</code> <i>to test, or</i> <code>/broadcast direct</code> <i>to send to all!</i>",
             parse_mode="HTML"
         )
+        return
+
+    # If test mode is requested, send ONLY to the caller/owner without touching users or channels!
+    if is_test:
+        target_chat = update.effective_chat.id
+        try:
+            sent_msg = None
+            if is_reply_broadcast:
+                sent_msg = await safe_tele_func_call(
+                    context.bot.copy_message,
+                    chat_id=target_chat,
+                    from_chat_id=update.effective_chat.id,
+                    message_id=replied_msg.message_id
+                )
+            elif has_photo:
+                photo_id = update.message.photo[-1].file_id
+                sent_msg = await _send_with_html_fallback(
+                    context.bot.send_photo,
+                    chat_id=target_chat,
+                    photo=photo_id,
+                    caption=clean_text
+                )
+            else:
+                sent_msg = await _send_with_html_fallback(
+                    context.bot.send_message,
+                    chat_id=target_chat,
+                    text=clean_text
+                )
+
+            if sent_msg:
+                await update.message.reply_text(
+                    "🧪 <b>[Test Mode] Broadcast preview delivered only to you!</b> ✅\n"
+                    "<i>No other users or channels received this message.</i>",
+                    parse_mode="HTML"
+                )
+            else:
+                await update.message.reply_text(
+                    "⚠️ <i>Failed to deliver test broadcast preview.</i>",
+                    parse_mode="HTML"
+                )
+        except Exception as e:
+            logger.error(f"Error in test broadcast: {e}")
+            await update.message.reply_text(f"⚠️ Test broadcast error: {esc(str(e))}", parse_mode="HTML")
         return
 
     channel_id = os.getenv("ANNOUNCEMENT_CHANNEL", getattr(init, "ANNOUNCEMENT_CHANNEL", "@channelofchatzone"))

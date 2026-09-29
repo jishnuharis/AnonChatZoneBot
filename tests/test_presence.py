@@ -328,4 +328,43 @@ async def test_broadcast_photo_caption(monkeypatch):
     )
 
 
+@pytest.mark.asyncio
+async def test_broadcast_test_mode_owner_only(monkeypatch):
+    """Verify /broadcast test delivers only to the caller/owner and does NOT touch users or channels."""
+    from commands.admin_commands import broadcast
+
+    monkeypatch.setenv("ANNOUNCEMENT_CHANNEL", "@MyTestChannel")
+    admin_id = 77777
+    init.ADMIN_IDS.add(admin_id)
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = admin_id
+    mock_update.effective_chat.id = admin_id
+    mock_update.message.text = "/broadcast test <b>Preview announcement!</b>"
+    mock_update.message.caption = None
+    mock_update.message.photo = []
+    mock_update.message.reply_to_message = None
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=901))
+    mock_context.bot.copy_message = AsyncMock()
+
+    await broadcast(mock_update, mock_context)
+
+    # Must be sent ONLY to the caller/owner's chat_id
+    mock_context.bot.send_message.assert_called_once_with(
+        chat_id=admin_id,
+        text="<b>Preview announcement!</b>",
+        parse_mode="HTML"
+    )
+    # Channel should NOT be touched
+    assert mock_context.bot.copy_message.call_count == 0
+
+    # User receives test confirmation
+    reply_calls = mock_update.message.reply_text.call_args_list
+    assert any("Test Mode" in call.args[0] for call in reply_calls)
+
+
+
 
