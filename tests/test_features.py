@@ -1029,4 +1029,50 @@ async def test_safe_reply_fallbacks():
     mock_bot.send_message.assert_called_once_with(chat_id=999, text="Test Message 3", parse_mode="HTML")
 
 
+@pytest.mark.asyncio
+async def test_custom_referral_reward_days():
+    import referral
+    from commands.admin_commands import referral_scheme_command
+    from subscription import is_subscribed
+
+    admin_id = 99881
+    init.ADMIN_IDS.add(admin_id)
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = admin_id
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    # Test setting custom 2 days of VIP: /referral 10 30 2
+    mock_context.args = ["10", "30", "2"]
+
+    await referral_scheme_command(mock_update, mock_context)
+    assert init.referral_scheme["required_referrals"] == 10
+    assert init.referral_scheme["reward_days"] == 2
+    reply_text = mock_update.message.reply_text.call_args[0][0]
+    assert "2 days of VIP" in reply_text
+
+    # Test credit referral awards 2 days
+    inviter_id = 55501
+    referred_id = 55502
+    init.user_details[inviter_id] = {**init._default_user(), "referral_count": 9, "referral_rewarded_count": 0}
+    init.user_details[referred_id] = {**init._default_user(), "referred_by": inviter_id, "referral_credited": False}
+
+    with patch("saveNload.credit_referral_db", new_callable=AsyncMock), \
+         patch("saveNload.add_subscription_db", new_callable=AsyncMock), \
+         patch("saveNload.reward_referrals_db", new_callable=AsyncMock):
+        bot_mock = MagicMock()
+        bot_mock.send_message = AsyncMock()
+        ctx_mock = MagicMock()
+        ctx_mock.bot = bot_mock
+        await referral.credit_referral(ctx_mock, referred_id)
+
+    assert is_subscribed(inviter_id)
+    assert init.user_details[inviter_id]["referral_count"] == 10
+    assert init.user_details[inviter_id]["referral_rewarded_count"] == 10
+    exp = init.user_details[inviter_id]["subscription_expires"]
+    assert exp > time.time() + 86400 * 1.5  # at least ~2 days granted
+
+
+
 

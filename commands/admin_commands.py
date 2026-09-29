@@ -509,21 +509,23 @@ async def referral_scheme_command(update: Update, context: ContextTypes.DEFAULT_
     try:
         required_referrals = int(args[0])
         duration_days = int(args[1])
+        reward_days = int(args[2]) if len(args) >= 3 else 1
     except ValueError:
         await update.message.reply_text(REFERRAL_USAGE_TEXT, parse_mode="HTML")
         return
 
-    scheme = await referral.set_scheme(required_referrals, duration_days)
+    scheme = await referral.set_scheme(required_referrals, duration_days, reward_days)
 
     if not scheme.get("required_referrals"):
         await update.message.reply_text(REFERRAL_DISABLED_TEXT, parse_mode="HTML")
         return
 
-    tier = subscription.TIERS[referral.REWARD_TIER]
+    rew_days = scheme.get("reward_days", 1)
+    day_word = "day" if rew_days == 1 else "days"
     expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(scheme["expires"]))
     await update.message.reply_text(
         f"✅ <i>Referral scheme active: refer</i> <b>{scheme['required_referrals']}</b> "
-        f"<i>friends who finish onboarding →</i> <b>{tier['label']}</b> <i>subscription.</i>\n"
+        f"<i>friends who finish onboarding →</i> <b>{rew_days} {day_word} of VIP</b>.\n"
         f"<i>Promo runs until</i> <code>{esc(expires_str)}</code>.",
         parse_mode="HTML",
     )

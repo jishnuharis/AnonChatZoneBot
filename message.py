@@ -152,11 +152,9 @@ NOT_RESTRICTED_TEXT = "✅ Not restricted"
 NO_REPORTS_TEXT = "\t\tNone"
 
 REFERRAL_USAGE_TEXT = (
-    "<i>Usage:</i> <code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt;</code>\n"
-    "<i>e.g.</i> <code>/referral 5 7</code> - refer 5 friends who finish setup, get a free weekly "
-    "subscription, repeatable - promo stays live for 7 days.\n\n"
-    "<i>To turn it off:</i>\n\t<code>/referral &lt;required_referrals&gt; 0</code>,"
-    "\n\t<code>/referral -1 &lt;promo_duration_days&gt;</code>, or both."
+    "<i>Usage:</i> <code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt; [reward_days]</code>\n"
+    "<i>e.g.</i> <code>/referral 10 30 2</code> — refer 10 friends, get 2 days VIP, promo active for 30 days.\n\n"
+    "<i>To turn it off:</i>\n\t<code>/referral 0 0</code>"
 )
 REFERRAL_DISABLED_TEXT = "🛑 <b>Referral scheme turned off.</b>"
 

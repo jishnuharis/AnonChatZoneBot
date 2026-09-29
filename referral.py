@@ -21,13 +21,14 @@ def scheme_active() -> bool:
     return required >= 1 and bool(expires) and expires > time.time()
 
 
-async def set_scheme(required_referrals: int, duration_days: int) -> dict:
+async def set_scheme(required_referrals: int, duration_days: int, reward_days: int = 1) -> dict:
     if required_referrals == -1 or duration_days <= 0:
-        init.referral_scheme = {"required_referrals": 0, "expires": None}
+        init.referral_scheme = {"required_referrals": 0, "expires": None, "reward_days": 1}
     else:
         init.referral_scheme = {
             "required_referrals": required_referrals,
             "expires": time.time() + duration_days * 86400,
+            "reward_days": max(1, reward_days),
         }
     await save_config("referral_scheme", init.referral_scheme)
     return init.referral_scheme
@@ -85,6 +86,7 @@ async def credit_referral(context, user_id: int):
         return
 
     # Reward all accumulated full multiples
+    reward_days = init.referral_scheme.get("reward_days", 1)
     rewards_granted = 0
     while True:
         unrewarded = inviter["referral_count"] - inviter.get("referral_rewarded_count", 0)
@@ -92,15 +94,16 @@ async def credit_referral(context, user_id: int):
             break
         inviter["referral_rewarded_count"] = inviter.get("referral_rewarded_count", 0) + required
         rewards_granted += 1
-        new_expiry = subscription.grant_subscription(inviter_id, REWARD_TIER, source="referral")
-        tier = subscription.TIERS[REWARD_TIER]
-        await add_subscription_db(inviter_id, REWARD_TIER, tier["duration_days"], source="referral")
+        new_expiry = subscription.grant_vip_days(inviter_id, days=reward_days, source="referral")
+        tier_name = "daily" if reward_days < 7 else ("weekly" if reward_days < 30 else "monthly")
+        await add_subscription_db(inviter_id, tier_name, reward_days, source="referral")
 
     if rewards_granted > 0:
         await reward_referrals_db(inviter_id, required * rewards_granted)
         init.dirty_users.add(inviter_id)
-        tier = subscription.TIERS[REWARD_TIER]
         expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(new_expiry))
+        total_days = reward_days * rewards_granted
+        day_word = "day" if total_days == 1 else "days"
 
         await safe_tele_func_call(
             context.bot.send_message,
@@ -108,8 +111,7 @@ async def credit_referral(context, user_id: int):
             text=(
                 f"🎉 <b>Referral reward unlocked!</b>\n"
                 f"<i>You've referred {required * rewards_granted} friends who joined and finished setting up their profile.</i>\n"
-                f"<i>+{tier['label']} subscription granted, active until</i> <code>{expires_str}</code> "
-                f"<i>(+{tier['bonus_points'] * rewards_granted} points too) 🎁</i>"
+                f"<i>+{total_days} {day_word} of VIP subscription granted, active until</i> <code>{expires_str}</code> 🎁"
             ),
             parse_mode="HTML",
         )
@@ -124,14 +126,15 @@ async def maybe_announce(bot, user_id: int):
         return
 
     required = init.referral_scheme["required_referrals"]
-    tier = subscription.TIERS[REWARD_TIER]
+    reward_days = init.referral_scheme.get("reward_days", 1)
+    day_word = "day" if reward_days == 1 else "days"
     await safe_tele_func_call(
         bot.send_message,
         chat_id=user_id,
         text=(
             f"🎁 <b>Referral bonus is live right now!</b>\n"
             f"<i>Refer {required} friends who join and finish setting up their profile, and you'll get a free "
-            f"{tier['label']} subscription — repeatable every {required} referrals, for as long as the promo runs.</i>"
+            f"{reward_days} {day_word} of VIP subscription — repeatable every {required} referrals, for as long as the promo runs.</i>"
         ),
         reply_markup=_link_keyboard(),
         parse_mode="HTML",
@@ -154,8 +157,13 @@ async def handle_referral_link_button(update, context):
     progress_line = ""
     if scheme_active():
         required = init.referral_scheme["required_referrals"]
+        reward_days = init.referral_scheme.get("reward_days", 1)
+        day_word = "day" if reward_days == 1 else "days"
         toward_next = (count - rewarded) % required
-        progress_line = f"\n<i>Progress toward your next reward:</i> {toward_next}/{required}"
+        progress_line = (
+            f"\n<i>Reward:</i> <b>{reward_days} {day_word} of VIP</b>"
+            f"\n<i>Progress toward your next reward:</i> {toward_next}/{required}"
+        )
     elif count:
         progress_line = "\n<i>No promo running right now - your count is saved for whenever one starts.</i>"
 

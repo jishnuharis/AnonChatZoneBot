@@ -99,7 +99,7 @@ game_requests: Dict[int, Dict[str, Any]] = {}
 pending_media: Dict[str, Dict[str, Any]] = {}
 message_map: Dict[int, Dict[int, tuple]] = {}
 
-referral_scheme: Dict[str, Any] = {"required_referrals": 0, "expires": None}
+referral_scheme: Dict[str, Any] = {"required_referrals": 0, "expires": None, "reward_days": 1}
 
 
 async def load_all():
@@ -133,7 +133,8 @@ async def load_all():
     if active_sessions_data:
         logging.getLogger(__name__).info(f"Restored {len(active_sessions_data)} active chat session(s) across restart.")
 
-    referral_scheme = await load_config("referral_scheme") or {"required_referrals": 0, "expires": None}
+    referral_scheme = await load_config("referral_scheme") or {"required_referrals": 0, "expires": None, "reward_days": 1}
+    referral_scheme.setdefault("reward_days", 1)
 
 
 async def ensure_user_loaded(user_id: int) -> Dict[str, Any]:
