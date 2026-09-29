@@ -11,6 +11,7 @@ Features:
 import asyncio
 import logging
 import os
+import random
 from typing import Set
 
 from telegram import Update
@@ -92,7 +93,7 @@ def claim_rush_hour_reward(user_id: int) -> bool:
 
 
 async def broadcast_rush_hour(context: ContextTypes.DEFAULT_TYPE, message_text: str):
-    """Safely broadcasts Rush Hour announcements in chunks to users and official channel."""
+    """Safely broadcasts Rush Hour announcements in randomized parallel chunks to users and official channel."""
     # 1. Post to official channel if configured
     channel_id = os.getenv("ANNOUNCEMENT_CHANNEL", getattr(init, "ANNOUNCEMENT_CHANNEL", "@channelofchatzone"))
     if channel_id and channel_id.strip():
@@ -107,26 +108,31 @@ async def broadcast_rush_hour(context: ContextTypes.DEFAULT_TYPE, message_text: 
         except Exception as e:
             logger.warning(f"Could not post Rush Hour notice to channel: {e}")
 
-    # 2. Broadcast to users in throttled batches
+    # 2. Shuffle target users for complete fairness across broadcasts
     target_users = list(init.user_details.keys())
+    random.shuffle(target_users)
+
     batch_size = 20
     sent = 0
 
     for i in range(0, len(target_users), batch_size):
         chunk = target_users[i:i + batch_size]
-        for uid in chunk:
-            try:
-                res = await safe_tele_func_call(
-                    context.bot.send_message,
-                    chat_id=uid,
-                    text=message_text,
-                    parse_mode="HTML"
-                )
-                if res:
-                    sent += 1
-            except Exception as e:
-                logger.debug(f"Failed to send rush hour notice to {uid}: {e}")
-        await asyncio.sleep(0.5)
+        tasks = [
+            safe_tele_func_call(
+                context.bot.send_message,
+                chat_id=uid,
+                text=message_text,
+                parse_mode="HTML"
+            )
+            for uid in chunk
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for r in results:
+            if r and not isinstance(r, Exception):
+                sent += 1
+
+        # Pause to respect Telegram's 30 msg/sec global broadcast limit
+        await asyncio.sleep(0.8)
 
     logger.info(f"Rush Hour broadcast completed: sent to {sent}/{len(target_users)} users.")
 
