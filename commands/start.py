@@ -14,6 +14,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not all([init.user_details[user_id].get("gender"), init.user_details[user_id].get("age"), init.user_details[user_id].get("country")]):
         return
+
+    # Deep-link support: if user clicked https://t.me/Bot?start=find from a channel or group
+    if context.args and context.args[0].lower() == "find":
+        from commands.find import find
+        return await find(update, context)
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("💬 Community Group", url=init.GROUP_URL),

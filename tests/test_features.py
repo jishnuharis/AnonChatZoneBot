@@ -435,7 +435,14 @@ async def test_community_channel_and_group_integration():
     start_urls = [btn.url for row in start_markup.inline_keyboard for btn in row if btn.url]
     assert "https://t.me/groupchatzone" in start_urls
 
-    # Test /help includes group button and text mentions
+    # Test /start find deep link invokes find() directly
+    mock_start_update.message.reply_text.reset_mock()
+    mock_context.args = ["find"]
+    with patch("commands.find.find", new_callable=AsyncMock) as mock_find:
+        await start(mock_start_update, mock_context)
+        mock_find.assert_awaited_once_with(mock_start_update, mock_context)
+
+    mock_context.args = []
     mock_help_update = MagicMock()
     mock_help_update.effective_user.id = user_id
     mock_help_update.message.reply_text = AsyncMock()
