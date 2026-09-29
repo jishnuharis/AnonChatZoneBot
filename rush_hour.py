@@ -186,6 +186,13 @@ async def rush_hour_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="🌙 <b>Rush Hour manually ended!</b>",
             context=context,
         )
+    elif subcmd == "reset":
+        _claimed_user_ids.clear()
+        await safe_reply(
+            update,
+            text=f"🔄 <b>Claimed slots reset!</b> (0/{MAX_REWARD_WINNERS} claimed)",
+            context=context,
+        )
     elif subcmd == "test":
         set_rush_hour_active(True)
         claimed = claim_rush_hour_reward(user_id)
@@ -212,6 +219,7 @@ async def rush_hour_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"<i>Admin controls:</i>\n"
                 f"• <code>/rushhour start</code> — Manually activate & broadcast\n"
                 f"• <code>/rushhour end</code> — Manually deactivate\n"
+                f"• <code>/rushhour reset</code> — Reset claimed winner slots to 0/5\n"
                 f"• <code>/rushhour test</code> — Test claim reward for yourself"
             ),
             context=context,
