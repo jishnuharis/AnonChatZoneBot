@@ -1,4 +1,5 @@
 import os
+import datetime
 import logging
 from telegram import BotCommand, Update, BotCommandScopeChat
 from telegram.ext import (
@@ -35,6 +36,7 @@ from commands.top import show_top_leaderboard, handle_top_callback
 from commands.gift import gift_command, handle_gift_callback
 from handlers.payments import handle_pre_checkout, handle_successful_payment
 from referral import handle_referral_link_button
+from rush_hour import start_rush_hour_job, end_rush_hour_job, rush_hour_command
 
 from handlers.rating import handle_vote, handle_report_reason, handle_report_back
 from handlers.gender import handle_gender_selection
@@ -107,6 +109,7 @@ async def set_commands(application):
         BotCommand("referral", "Configure referral promo"),
         BotCommand("broadcast", "Send message to users"),
         BotCommand("campaign", "Manage sponsor campaigns"),
+        BotCommand("rushhour", "Manage or trigger Rush Hour"),
     ]
     admin_ids = set(init.ADMIN_IDS)
     if init.OWNER and str(init.OWNER).isdigit():
@@ -155,6 +158,21 @@ async def on_startup(application):
     application.job_queue.run_repeating(periodic_severity_decay, interval=86400, first=3600)
     application.job_queue.run_repeating(periodic_queue_sweep, interval=5, first=5)
     application.job_queue.run_repeating(periodic_media_sweep, interval=3600, first=3600)
+
+    # Schedule Rush Hour every Friday & Saturday from 8:00 PM to 10:00 PM IST (UTC+5:30)
+    tz_ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    application.job_queue.run_daily(
+        start_rush_hour_job,
+        time=datetime.time(hour=20, minute=0, tzinfo=tz_ist),
+        days=(5, 6),
+        name="rush_hour_start"
+    )
+    application.job_queue.run_daily(
+        end_rush_hour_job,
+        time=datetime.time(hour=22, minute=0, tzinfo=tz_ist),
+        days=(5, 6),
+        name="rush_hour_end"
+    )
 
     active_chats_count = len(init.active_pairs) // 2
     users_count = len(init.user_details)
@@ -220,6 +238,7 @@ def main():
     app.add_handler(CommandHandler("queue", queue_stats))
     app.add_handler(CommandHandler("campaign", campaign_command))
     app.add_handler(MessageHandler(filters.CaptionRegex(r"^/campaign(?:@\w+)?(?:\s|$)"), campaign_command))
+    app.add_handler(CommandHandler("rushhour", rush_hour_command))
 
     app.add_handler(CallbackQueryHandler(handle_check_channel_status, pattern=r"^check_channel_status$"))
     app.add_handler(CallbackQueryHandler(handle_start_find_callback, pattern=r"^start_find_callback$"))

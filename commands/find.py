@@ -43,7 +43,19 @@ async def find(update: Update, context: ContextTypes.DEFAULT_TYPE, charge: bool 
             return  # Fixed: return immediately when out of credits!
         consume_daily_credit(user_id)
 
+    # Rush Hour first-5 reward check
+    from rush_hour import is_rush_hour_active, claim_rush_hour_reward, RUSH_HOUR_WINNER_NOTIFICATION
+    if is_rush_hour_active() and claim_rush_hour_reward(user_id):
+        await safe_reply(
+            update,
+            text=RUSH_HOUR_WINNER_NOTIFICATION,
+            context=context,
+        )
+
     if user_id not in init.waiting_users:
-        await safe_reply(update, text=LOOKING_FOR_PARTNER_TEXT, context=context)
+        status_text = LOOKING_FOR_PARTNER_TEXT
+        if is_rush_hour_active():
+            status_text += "\n\n🔥 <b>Rush Hour is ACTIVE! Instant matchmaking in progress...</b>"
+        await safe_reply(update, text=status_text, context=context)
 
     await enqueue_and_match(context, user_id)

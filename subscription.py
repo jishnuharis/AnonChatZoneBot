@@ -193,6 +193,33 @@ def grant_vip_days(user_id: int, days: int, tier_key: str = "daily", source: str
     return new_expiry
 
 
+def grant_vip_hours(user_id: int, hours: float = 1.0, tier_key: str = "daily", source: str = "rush_hour") -> float:
+    """
+    Grants or extends VIP access by a specific number of hours.
+    Guarantees no accidental tier downgrading when adding hours.
+    """
+    details = _details(user_id)
+    now = time.time()
+    current_expiry = details.get("subscription_expires") or 0
+    current_tier_key = details.get("subscription_tier")
+
+    base = current_expiry if current_expiry > now else now
+    new_expiry = base + hours * 3600
+
+    details["subscription_expires"] = new_expiry
+
+    if current_tier_key in TIERS and current_expiry > now:
+        current_priority = TIERS[current_tier_key].get("priority", 0)
+        new_priority = TIERS.get(tier_key, {}).get("priority", 1)
+        if new_priority >= current_priority:
+            details["subscription_tier"] = tier_key
+    else:
+        details["subscription_tier"] = tier_key
+
+    init.dirty_users.add(user_id)
+    return new_expiry
+
+
 def status_text(user_id: int) -> str:
     tier = active_tier(user_id)
     if not tier:
@@ -204,10 +231,18 @@ def status_text(user_id: int) -> str:
             f"<i>Daily credit limit:</i> {FREE_DAILY_CREDIT_LIMIT} (/next skips & media sends)"
         )
     expires = init.user_details[user_id]["subscription_expires"]
-    remaining_days = max(0, (expires - time.time()) / 86400)
+    rem_secs = max(0, (expires - time.time()))
+    if rem_secs < 86400:
+        rem_hrs = rem_secs / 3600
+        time_left_str = f"{rem_hrs:.1f} hours left" if rem_hrs >= 1 else f"{max(1, int(rem_secs // 60))} minutes left"
+    else:
+        remaining_days = rem_secs / 86400
+        time_left_str = f"{remaining_days:.1f} days left"
+
     return (
         f"✅ <b>{tier['label']}</b> <i>plan active</i> — "
-        f"<i>{remaining_days:.1f} days left</i>\n"
+        f"<i>{time_left_str}</i>\n"
         f"<i>Daily credit limit:</i> {daily_credit_limit(user_id)} "
         f"<i>(/next skips; voice calls & media sends are free & unlimited on your plan)</i>"
     )
+
