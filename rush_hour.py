@@ -9,6 +9,7 @@ Features:
 - Admin command /rushhour (status, start, end, test).
 """
 import asyncio
+import datetime
 import logging
 import os
 import random
@@ -29,16 +30,28 @@ _is_active: bool = False
 _claimed_user_ids: Set[int] = set()
 MAX_REWARD_WINNERS = 5
 
-RUSH_HOUR_START_TEXT = (
-    "🔥 <b>WEEKEND RUSH HOUR IS LIVE!</b> (8:00 PM – 10:00 PM IST) ⚡\n\n"
-    "Queues are full and wait times are zero! Everyone is chatting right now.\n\n"
-    "🎁 <b>SPEED BONUS:</b> The first 5 users to tap /find right now unlock "
-    "<b>1 HOUR OF FREE VIP PREMIUM</b>! 👑\n\n"
-    "👉 Tap /find to claim your spot and chat!"
-)
+
+def get_rush_hour_start_text() -> str:
+    """Returns dynamic Rush Hour announcement text based on current day."""
+    tz_ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    now_ist = datetime.datetime.now(tz_ist)
+    # Python weekday(): Monday is 0, Friday is 4, Saturday is 5, Sunday is 6
+    is_weekend = now_ist.weekday() in (4, 5, 6)
+    title = "WEEKEND RUSH HOUR" if is_weekend else "RUSH HOUR"
+
+    return (
+        f"🔥 <b>{title} IS LIVE!</b> (8:00 PM – 10:00 PM IST) ⚡\n\n"
+        "Queues are full and wait times are zero! Everyone is chatting right now.\n\n"
+        "🎁 <b>SPEED BONUS:</b> The first 5 users to tap /find right now unlock "
+        "<b>1 HOUR OF FREE VIP PREMIUM</b>! 👑\n\n"
+        "👉 Tap /find to claim your spot and chat!"
+    )
+
+
+RUSH_HOUR_START_TEXT = get_rush_hour_start_text()
 
 RUSH_HOUR_END_TEXT = (
-    "🌙 <b>Weekend Rush Hour has ended!</b>\n\n"
+    "🌙 <b>Rush Hour has ended!</b>\n\n"
     "Thanks to everyone who joined the chats tonight. Catch you in the next Rush Hour! 💬"
 )
 
@@ -138,12 +151,12 @@ async def broadcast_rush_hour(context: ContextTypes.DEFAULT_TYPE, message_text: 
 
 
 async def start_rush_hour_job(context: ContextTypes.DEFAULT_TYPE):
-    """Scheduled callback: Starts Rush Hour every Friday & Saturday at 8:00 PM IST."""
+    """Scheduled callback: Starts Rush Hour at 8:00 PM IST."""
     global _is_active
     _is_active = True
     _claimed_user_ids.clear()
     logger.info("🔥 Rush Hour started!")
-    await broadcast_rush_hour(context, RUSH_HOUR_START_TEXT)
+    await broadcast_rush_hour(context, get_rush_hour_start_text())
 
 
 async def end_rush_hour_job(context: ContextTypes.DEFAULT_TYPE):
