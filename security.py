@@ -1,4 +1,6 @@
+import re
 from telegram import Update
+from telegram.constants import MessageEntityType
 from telegram.error import Forbidden, Conflict, BadRequest, NetworkError, TimedOut, RetryAfter
 from telegram.ext import ContextTypes, ApplicationHandlerStop
 
@@ -203,3 +205,39 @@ async def global_error_handler(update, context):
                 logger.debug(f"Could not deliver error to OWNER: {send_err}")
     except Exception as err:
         logger.error(f"Error inside the global error handler: {err}")
+
+
+_URL_REGEX = re.compile(
+    r"(?i)\b(?:https?://|ftp://|www\.)[^\s/$.?#].[^\s]*"
+    r"|(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|me|co|xyz|info|biz|ru|in|app|site|online|tech|link|live|top|gg|club|vip|dev|ai|cc|to|ly|pro|store|space|agency|cloud|social|tv|page|click)\b"
+    r"|(?:t|telegram)\.me/[a-zA-Z0-9_+]+"
+    r"|tg://[^\s]+"
+    r"|@[a-zA-Z0-9_]{3,}"
+    r"|\b[a-zA-Z0-9-]+\s*\.\s*(?:com|org|net|io|me|xyz|app|site|top|gg|club|vip|dev|ai|to|ly)\b"
+)
+
+
+def contains_link(msg) -> bool:
+    """
+    Returns True if the message or caption contains any URL, Telegram link,
+    masked link entity, or Telegram @username handle.
+    """
+    if not msg:
+        return False
+
+    entities = []
+    if getattr(msg, "entities", None):
+        entities.extend(msg.entities)
+    if getattr(msg, "caption_entities", None):
+        entities.extend(msg.caption_entities)
+
+    for ent in entities:
+        ent_type = getattr(ent, "type", "")
+        if ent_type in ("url", "text_link", "mention", MessageEntityType.URL, MessageEntityType.TEXT_LINK, MessageEntityType.MENTION):
+            return True
+
+    text_to_check = f"{getattr(msg, 'text', '') or ''} {getattr(msg, 'caption', '') or ''}"
+    if _URL_REGEX.search(text_to_check):
+        return True
+
+    return False

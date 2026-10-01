@@ -159,6 +159,8 @@ async def start_chat_session(
     now = time.time()
     init.last_activity[user1] = now
     init.last_activity[user2] = now
+    init.session_start_times[user1] = now
+    init.session_start_times[user2] = now
 
     if is_admin_connect:
         text1 = f"🎯 <b>Connected to target user! Say hi!</b> 👋\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
@@ -228,6 +230,10 @@ async def end_chat_session(
         init.last_activity.pop(user_id, None)
         if partner:
             init.last_activity.pop(partner, None)
+
+        init.session_start_times.pop(user_id, None)
+        if partner:
+            init.session_start_times.pop(partner, None)
 
         if user_id in init.user_details:
             init.user_details[user_id]["partner_id"] = None

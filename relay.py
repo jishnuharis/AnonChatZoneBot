@@ -1,14 +1,17 @@
 import logging
 import time
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
 from telegram.error import Forbidden
 from telegram.ext import ContextTypes
 
 from handlers.setup import handle_user_setup
-from security import safe_tele_func_call, check_rate_limit
+from security import safe_tele_func_call, check_rate_limit, contains_link
 from media_privacy import extract_media, maybe_send_private, split_private_caption, SUPPORTED_KINDS
-from message import FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, MEDIA_DAILY_LIMIT_REACHED_TEXT
+from message import (
+    FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, MEDIA_DAILY_LIMIT_REACHED_TEXT,
+    LINK_RESTRICTED_TEXT, MEDIA_WARMUP_LOCKED_TEXT,
+)
 from subscription import is_subscribed, has_daily_credit, consume_daily_credit, daily_credit_limit
 from session_manager import handle_transport_disconnect
 
@@ -68,6 +71,46 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         init.last_activity[user_id] = time.time()
+
+        is_free = not is_subscribed(user_id)
+
+        # Enforce zero links for free tier
+        if is_free and contains_link(msg):
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=LINK_RESTRICTED_TEXT,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
+                ]),
+                parse_mode="HTML",
+            )
+            return
+
+        # Enforce 1-minute warmup lock on all media & stickers for free tier
+        is_media_or_sticker = bool(
+            msg.photo
+            or msg.video
+            or msg.voice
+            or msg.video_note
+            or msg.sticker
+            or msg.animation
+            or msg.document
+            or msg.audio
+        )
+        if is_free and is_media_or_sticker:
+            session_start = init.session_start_times.get(user_id, time.time())
+            elapsed = time.time() - session_start
+            if elapsed < 60:
+                remaining = max(1, int(60 - elapsed))
+                await safe_tele_func_call(
+                    update.message.reply_text,
+                    text=MEDIA_WARMUP_LOCKED_TEXT.format(remaining=remaining),
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
+                    ]),
+                    parse_mode="HTML",
+                )
+                return
 
         kind, file_id, caption, duration = extract_media(msg)
         if kind in SUPPORTED_KINDS:
@@ -195,6 +238,17 @@ async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     partner_msg_id = mapped[1]
+
+    if not is_subscribed(user_id) and contains_link(edit_msg):
+        await safe_tele_func_call(
+            edit_msg.reply_text,
+            text=LINK_RESTRICTED_TEXT,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
+            ]),
+            parse_mode="HTML",
+        )
+        return
 
     try:
         if edit_msg.text:

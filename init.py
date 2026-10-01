@@ -25,6 +25,7 @@ waiting_users: List[int] = []
 wait_started: Dict[int, float] = {}
 active_pairs: Dict[int, int] = {}
 active_sessions: Dict[int, str] = {}  # user_id -> session_uuid
+session_start_times: Dict[int, float] = {}  # user_id -> timestamp when current chat session began
 recent_partners: Dict[int, List[int]] = {}  # user_id -> list of recent partner IDs
 last_activity: Dict[int, float] = {}  # user_id -> timestamp of last in-chat action
 recent_skips: Dict[int, tuple] = {}  # user_id -> (skipped_partner_id, timestamp)
@@ -128,6 +129,8 @@ async def load_all():
         now_ts = time.time()
         last_activity[u1] = now_ts
         last_activity[u2] = now_ts
+        session_start_times[u1] = now_ts
+        session_start_times[u2] = now_ts
         user_details.setdefault(u1, _default_user())["partner_id"] = u2
         user_details.setdefault(u2, _default_user())["partner_id"] = u1
     if active_sessions_data:

@@ -21,6 +21,7 @@ from commands.cancel import cancel
 from commands.help import help_command
 from commands.profile import show_profile, handle_profile_back
 from commands.call import call_command, handle_call_response
+from commands.link import link_command
 from handlers.friends import (
     send_friend_request, show_friends_menu, handle_friend_request_response,
     handle_friend_card_actions, handle_connect_response
@@ -95,6 +96,7 @@ async def set_commands(application):
         BotCommand("subscribe", "View/purchase subscription"),
         BotCommand("top", "Show weekly leaderboard"),
         BotCommand("gift", "Send a gift to your chat partner"),
+        BotCommand("link", "Share your Telegram profile"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -218,6 +220,7 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("profile", show_profile))
     app.add_handler(CommandHandler("friendreq", send_friend_request))
+    app.add_handler(CommandHandler("link", link_command))
     app.add_handler(CommandHandler("friends", lambda u, c: show_friends_menu(u, c, 0)))
     app.add_handler(CommandHandler("call", call_command))
     app.add_handler(CommandHandler("games", games_menu))

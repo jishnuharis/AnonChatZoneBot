@@ -1,4 +1,5 @@
 import os
+import re
 import asyncio
 import time
 import logging
@@ -8,18 +9,15 @@ from telegram.ext import ContextTypes
 from html import escape as esc
 
 from security import safe_tele_func_call, format_duration
-from handlers.rating import ask_for_rating
-from games.registry import end_any_active_game
 from session_manager import start_chat_session, end_chat_session, is_in_chat, get_partner
 from moderation import is_admin, apply_restriction, clear_restriction, severity_for_score, SEVERITY_DURATIONS
-from saveNload import add_promotion_db, get_active_promotions_db, get_pool
-from games.content.content_manager import get_stats as get_game_content_stats, add_wyr_question, add_trivia_question
+from saveNload import add_promotion_db, get_active_promotions_db
 from message import (
-    GIVE_BROADCAST_MESSAGE_TEXT, GIVE_VALID_CONNECT_USER_ID_TEXT, TARGET_NOT_IN_DB_TEXT,
-    ALREADY_CONNECTED_TO_TARGET_TEXT, PARTNER_LEFT_CHAT_TEXT, ADMIN_HELP_TEXT, BAN_USAGE_TEXT,
+    GIVE_VALID_CONNECT_USER_ID_TEXT, TARGET_NOT_IN_DB_TEXT,
+    ALREADY_CONNECTED_TO_TARGET_TEXT, ADMIN_HELP_TEXT, BAN_USAGE_TEXT,
     SEVERITY_RANGE_TEXT, CANT_RESTRICT_SELF_TEXT, ADMINS_CANT_BE_RESTRICTED_TEXT,
     SEVERITY_ZERO_NOOP_TEXT, UNBAN_USAGE_TEXT, GIVE_VALID_USER_ID_TEXT, RESTRICTION_LIFTED_TEXT,
-    CHECKUSER_USAGE_TEXT, NO_RECORD_OF_USER_TEXT, NOT_RESTRICTED_TEXT, NO_REPORTS_TEXT,
+    CHECKUSER_USAGE_TEXT, NOT_RESTRICTED_TEXT, NO_REPORTS_TEXT,
     GIVEAWAY_USAGE_TEXT, GIVEAWAY_UNKNOWN_TIER_TEXT, REFERRAL_USAGE_TEXT, REFERRAL_DISABLED_TEXT,
 )
 import subscription
@@ -40,7 +38,6 @@ async def _send_with_html_fallback(send_func, chat_id, text=None, caption=None, 
     raw_content = caption if caption is not None else (text or "")
 
     if raw_content:
-        import re
         # Sanitize naked ampersands that are not already valid HTML entities
         sanitized = re.sub(r"&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)", "&amp;", raw_content)
 
@@ -67,7 +64,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await relay_message(update, context)
         return
 
-    import re
     raw_text = (update.message.text or update.message.caption or "") if update.message else ""
 
     replied_msg = None

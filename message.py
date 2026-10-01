@@ -99,6 +99,7 @@ HELP_TEXT = (
     "/profile — <i>View & customize your profile and interests</i>\n"
     "/top — <i>Weekly Leaderboard (streaks, karma, games)</i>\n"
     "/gift — <i>Send a Telegram Stars gift to your partner</i>\n"
+    "/link — <i>Share your Telegram profile</i>\n"
     "/block — <i>Block partner from matching with you again</i>\n"
     "/subscribe — <i>Explore VIP perks & credit upgrades</i>\n"
     "/help — <i>Open this user guide</i>\n\n"
@@ -211,6 +212,29 @@ SELECT_COUNTRY_TEXT = "🌍 <b>Select your country:</b>"
 # ---------------------------------------------------------------------------
 FAILED_TO_SEND_MESSAGE_TEXT = "❌ <b>Failed to send message.</b>"
 NOT_IN_CHAT_USE_FIND_INLINE_TEXT = "❗ <b>You're not in a chat.</b>\nUse /find to connect."
+
+LINK_RESTRICTED_TEXT = (
+    "🔒 <b>Links and usernames cannot be shared in chat.</b>\n\n"
+    "• <i>To share your profile safely, use</i> <code>/link</code>\n"
+    "• <i>Or upgrade to VIP with /subscribe to send links freely!</i>"
+)
+MEDIA_WARMUP_LOCKED_TEXT = (
+    "⏳ <b>Media sharing unlocks after the first minute of chat.</b>\n"
+    "<i>Available in</i> <b>{remaining}s</b> <i>(or upgrade to VIP with /subscribe to send immediately).</i>"
+)
+LINK_COMMAND_WARMUP_LOCKED_TEXT = (
+    "⏳ <b>Profile sharing unlocks after the first minute of chat.</b>\n"
+    "<i>Available in</i> <b>{remaining}s</b> <i>(or upgrade to VIP to share anytime).</i>"
+)
+LINK_NO_USERNAME_TEXT = (
+    "⚠️ <b>You don't have a Telegram username set!</b>\n\n"
+    "<i>To share your profile safely, you must set a username in your Telegram settings:</i>\n"
+    "1. Open Telegram <b>Settings</b>\n"
+    "2. Tap <b>Edit Profile</b> → <b>Username</b>\n"
+    "3. Set a username, then try <code>/link</code> again!"
+)
+LINK_SENT_TO_PARTNER_ALERT = "🔗 <b>Your chat partner shared their Telegram profile with you!</b>"
+LINK_SENT_SUCCESS_TEXT = "✅ <i>Your profile link has been shared with your partner.</i>"
 
 # ---------------------------------------------------------------------------
 # media_privacy.py
