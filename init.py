@@ -86,6 +86,11 @@ def _default_user() -> Dict[str, Any]:
         "longest_streak": 0,
         "last_streak_date": None,
         "streak_rewards_claimed": [],
+
+        "created_at": time.time(),
+        "last_active": time.time(),
+        "total_messages": 0,
+        "total_chat_duration": 0.0,
     }
 
 

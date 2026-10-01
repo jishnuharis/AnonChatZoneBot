@@ -1,3 +1,4 @@
+import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -5,7 +6,7 @@ from html import escape as esc
 
 from handlers.setup import check_user_profile
 from handlers.preferences import describe_preferences
-from security import safe_tele_func_call
+from security import safe_tele_func_call, format_duration
 from saveNload import get_user_votes
 import subscription
 
@@ -63,14 +64,27 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
     next_info = f" <i>(Next: {next_day}d ➔ {next_rew['label']})</i>" if next_day else ""
     streak_line = f"🔥 <b>Chat Streak:</b> {streak} day{'s' if streak != 1 else ''} <i>(Best: {longest}d)</i>{next_info}\n"
 
+    created_ts = user.get("created_at")
+    created_line = time.strftime("%Y-%m-%d", time.gmtime(created_ts)) if created_ts else "Unknown"
+
+    total_msgs = user.get("total_messages", 0)
+
+    total_dur = user.get("total_chat_duration", 0.0)
+    if (user.get("partner_id") or user_id in init.active_pairs) and user_id in init.session_start_times:
+        total_dur += max(0.0, time.time() - init.session_start_times[user_id])
+    duration_line = format_duration(total_dur)
+
     return (
         "<b>👤 Your Profile</b>\n\n"
         f"<b>Name:</b> {full_name}{username_line}\n"
         f"<b>ID:</b> <code>{user_id}</code>\n"
+        f"<b>Member Since:</b> {created_line}\n"
         f"<b>Gender:</b> {'Male' if user.get('gender') == 'M' else 'Female'}\n"
         f"<b>Age:</b> {user.get('age')}\n"
         f"<b>Country:</b> {esc(str(user.get('country')))}\n"
         f"<b>Interests:</b> {prefs_text}\n"
+        f"<b>Messages Sent:</b> {total_msgs}\n"
+        f"<b>Time in Chats:</b> {duration_line}\n"
         f"<b>Rating:</b> {up_votes} 👍 {down_votes} 👎\n"
         f"<b>Points:</b> {user.get('points', 0)}\n"
         f"{streak_line}\n"

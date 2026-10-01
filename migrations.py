@@ -44,7 +44,10 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     current_streak INTEGER NOT NULL DEFAULT 0,
     longest_streak INTEGER NOT NULL DEFAULT 0,
     last_streak_date DATE,
-    streak_rewards_claimed JSONB NOT NULL DEFAULT '[]'::jsonb
+    streak_rewards_claimed JSONB NOT NULL DEFAULT '[]'::jsonb,
+    total_messages BIGINT NOT NULL DEFAULT 0,
+    total_chat_duration DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    last_active TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- User Blocks (M:N between users)
@@ -198,6 +201,10 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS current_streak INTEGER NOT NU
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS longest_streak INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_streak_date DATE;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS streak_rewards_claimed JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_messages BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_chat_duration DOUBLE PRECISION NOT NULL DEFAULT 0.0;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_active TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 """
 
 

@@ -112,6 +112,10 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
     query = """
         SELECT 
             u.user_id, u.gender, u.age, u.country, u.preferences_bitmask as preferences, u.points,
+            EXTRACT(EPOCH FROM u.created_at) as created_at_ts,
+            COALESCE(p.total_messages, 0) as total_messages,
+            COALESCE(p.total_chat_duration, 0.0) as total_chat_duration,
+            EXTRACT(EPOCH FROM p.last_active) as last_active_ts,
             p.severity_score, p.restricted_until, p.restriction_reason, p.last_severity_decay,
             p.daily_credits_used, p.daily_credits_reset_day,
             p.daily_calls_used, p.daily_calls_reset_day, p.is_banned,
@@ -226,6 +230,10 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                     "longest_streak": row.get("longest_streak") or 0,
                     "last_streak_date": str(row["last_streak_date"]) if row.get("last_streak_date") else None,
                     "streak_rewards_claimed": json.loads(row["streak_rewards_claimed"]) if isinstance(row.get("streak_rewards_claimed"), str) else (row.get("streak_rewards_claimed") if isinstance(row.get("streak_rewards_claimed"), list) else []),
+                    "created_at": row.get("created_at_ts") or time.time(),
+                    "total_messages": int(row.get("total_messages") or 0),
+                    "total_chat_duration": float(row.get("total_chat_duration") or 0.0),
+                    "last_active": row.get("last_active_ts") or time.time(),
                     "partner_id": None, # Session state managed via session_manager
                 }
     except Exception as e:
@@ -301,14 +309,23 @@ async def upsert_user(*args, **kwargs):
                     claimed = []
                 claimed_json = json.dumps(claimed)
 
+                last_active_raw = kwargs.get("last_active")
+                if isinstance(last_active_raw, (int, float)):
+                    last_active_dt = datetime.fromtimestamp(last_active_raw, timezone.utc)
+                elif isinstance(last_active_raw, datetime):
+                    last_active_dt = last_active_raw
+                else:
+                    last_active_dt = datetime.now(timezone.utc)
+
                 await conn.execute("""
                     INSERT INTO user_profiles (
                         user_id, severity_score, restricted_until, restriction_reason,
                         daily_credits_used, daily_credits_reset_day,
                         daily_calls_used, daily_calls_reset_day,
                         is_banned, preferred_gender, preferred_country,
-                        current_streak, longest_streak, last_streak_date, streak_rewards_claimed
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                        current_streak, longest_streak, last_streak_date, streak_rewards_claimed,
+                        total_messages, total_chat_duration, last_active
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET
                         severity_score = COALESCE(EXCLUDED.severity_score, user_profiles.severity_score),
                         restricted_until = EXCLUDED.restricted_until,
@@ -323,7 +340,10 @@ async def upsert_user(*args, **kwargs):
                         current_streak = COALESCE(EXCLUDED.current_streak, user_profiles.current_streak),
                         longest_streak = GREATEST(COALESCE(EXCLUDED.longest_streak, 0), user_profiles.longest_streak),
                         last_streak_date = COALESCE(EXCLUDED.last_streak_date, user_profiles.last_streak_date),
-                        streak_rewards_claimed = COALESCE(EXCLUDED.streak_rewards_claimed, user_profiles.streak_rewards_claimed);
+                        streak_rewards_claimed = COALESCE(EXCLUDED.streak_rewards_claimed, user_profiles.streak_rewards_claimed),
+                        total_messages = COALESCE(EXCLUDED.total_messages, user_profiles.total_messages),
+                        total_chat_duration = COALESCE(EXCLUDED.total_chat_duration, user_profiles.total_chat_duration),
+                        last_active = COALESCE(EXCLUDED.last_active, user_profiles.last_active);
                 """, (
                     user_id,
                     kwargs.get("severity_score", 0),
@@ -340,6 +360,9 @@ async def upsert_user(*args, **kwargs):
                     kwargs.get("longest_streak", 0),
                     streak_date,
                     claimed_json,
+                    kwargs.get("total_messages", 0),
+                    kwargs.get("total_chat_duration", 0.0),
+                    last_active_dt,
                 ))
 
                 # 3. Upsert referrals if referred_by is set
@@ -1178,6 +1201,10 @@ async def load_user_data() -> dict:
             if users_count > 0:
                 query = """
                     SELECT u.user_id, u.gender, u.age, u.country, u.preferences_bitmask as preferences, u.points,
+                           EXTRACT(EPOCH FROM u.created_at) as created_at_ts,
+                           COALESCE(p.total_messages, 0) as total_messages,
+                           COALESCE(p.total_chat_duration, 0.0) as total_chat_duration,
+                           EXTRACT(EPOCH FROM p.last_active) as last_active_ts,
                            COALESCE(p.preferred_gender, 'ANY') as pref_gender,
                            COALESCE(p.preferred_country, 'ANY') as pref_country,
                            p.severity_score, p.restricted_until, p.restriction_reason, p.last_severity_decay,
@@ -1281,6 +1308,10 @@ async def load_user_data() -> dict:
                             "votes": {"up": r.get("votes_up", 0), "down": r.get("votes_down", 0)},
                             "reports": r.get("reports_count", 0),
                             "report_log": rep_log,
+                            "created_at": r.get("created_at_ts") or time.time(),
+                            "total_messages": int(r.get("total_messages") or 0),
+                            "total_chat_duration": float(r.get("total_chat_duration") or 0.0),
+                            "last_active": r.get("last_active_ts") or time.time(),
                         }
             else:
                 data = await _load_legacy_user_data(conn)

@@ -17,7 +17,7 @@ from message import (
     ALREADY_CONNECTED_TO_TARGET_TEXT, ADMIN_HELP_TEXT, BAN_USAGE_TEXT,
     SEVERITY_RANGE_TEXT, CANT_RESTRICT_SELF_TEXT, ADMINS_CANT_BE_RESTRICTED_TEXT,
     SEVERITY_ZERO_NOOP_TEXT, UNBAN_USAGE_TEXT, GIVE_VALID_USER_ID_TEXT, RESTRICTION_LIFTED_TEXT,
-    CHECKUSER_USAGE_TEXT, NOT_RESTRICTED_TEXT, NO_REPORTS_TEXT,
+    CHECKUSER_USAGE_TEXT, NO_RECORD_OF_USER_TEXT, NOT_RESTRICTED_TEXT, NO_REPORTS_TEXT,
     GIVEAWAY_USAGE_TEXT, GIVEAWAY_UNKNOWN_TIER_TEXT, REFERRAL_USAGE_TEXT, REFERRAL_DISABLED_TEXT,
 )
 import subscription
@@ -398,8 +398,41 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(GIVE_VALID_USER_ID_TEXT, parse_mode="HTML")
         return
 
-    from init import ensure_user_loaded
-    details = await ensure_user_loaded(target_id)
+    from saveNload import get_user
+    details = None
+    if target_id in init.user_details:
+        cached = init.user_details[target_id]
+        if cached.get("gender") or cached.get("country") or cached.get("points", 0) > 0 or cached.get("total_messages", 0) > 0:
+            details = cached
+
+    if not details:
+        db_user = await get_user(target_id)
+        if db_user:
+            for key, value in init._default_user().items():
+                db_user.setdefault(key, value)
+            init.user_details[target_id] = db_user
+            details = db_user
+
+    if not details:
+        await update.message.reply_text(NO_RECORD_OF_USER_TEXT, parse_mode="HTML")
+        return
+
+    created_ts = details.get("created_at")
+    created_line = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(created_ts)) if created_ts else "Unknown"
+
+    last_active_ts = details.get("last_active") or init.last_activity.get(target_id)
+    if last_active_ts:
+        diff = max(0.0, time.time() - last_active_ts)
+        last_active_line = "Just now" if diff < 60 else f"{format_duration(diff)} ago"
+    else:
+        last_active_line = "Never"
+
+    total_msgs = details.get("total_messages", 0)
+
+    total_dur = details.get("total_chat_duration", 0.0)
+    if (details.get("partner_id") or target_id in init.active_pairs) and target_id in init.session_start_times:
+        total_dur += max(0.0, time.time() - init.session_start_times[target_id])
+    duration_line = format_duration(total_dur)
 
     restricted_until = details.get("restricted_until")
     if restricted_until and restricted_until > time.time():
@@ -436,8 +469,12 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = (
         f"<b>User</b> <code>{target_id}</code>\n"
+        f"Account Created: <code>{created_line}</code>\n"
+        f"Last Active: {last_active_line}\n"
         f"Points: {details.get('points', 0)}\n"
         f"Votes: {(details.get('votes') or {}).get('up', 0)} 👍 {(details.get('votes') or {}).get('down', 0)} 👎\n"
+        f"Total Messages: {total_msgs}\n"
+        f"Time in Chats: {duration_line}\n"
         f"Subscription: {sub_line}\n"
         f"Status: {partner_line}\n"
         f"\n"

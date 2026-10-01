@@ -70,7 +70,10 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status_command(update, context)
             return
 
-        init.last_activity[user_id] = time.time()
+        now_ts = time.time()
+        init.last_activity[user_id] = now_ts
+        if user_id in init.user_details:
+            init.user_details[user_id]["last_active"] = now_ts
 
         is_free = not is_subscribed(user_id)
 
@@ -176,6 +179,9 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if sent is not None:
                 _remember(user_id, msg.message_id, partner_id, sent.message_id)
+                if user_id in init.user_details:
+                    init.user_details[user_id]["total_messages"] = init.user_details[user_id].get("total_messages", 0) + 1
+                    init.dirty_users.add(user_id)
 
                 # Ephemeral transcript recording for 'Save Conversation'
                 session_id = init.active_sessions.get(user_id)

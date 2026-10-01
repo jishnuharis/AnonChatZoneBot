@@ -231,9 +231,16 @@ async def end_chat_session(
         if partner:
             init.last_activity.pop(partner, None)
 
-        init.session_start_times.pop(user_id, None)
+        session_start = init.session_start_times.pop(user_id, None)
         if partner:
             init.session_start_times.pop(partner, None)
+
+        if session_start:
+            session_dur = max(0.0, time.time() - session_start)
+            if user_id in init.user_details:
+                init.user_details[user_id]["total_chat_duration"] = init.user_details[user_id].get("total_chat_duration", 0.0) + session_dur
+            if partner and partner in init.user_details:
+                init.user_details[partner]["total_chat_duration"] = init.user_details[partner].get("total_chat_duration", 0.0) + session_dur
 
         if user_id in init.user_details:
             init.user_details[user_id]["partner_id"] = None
