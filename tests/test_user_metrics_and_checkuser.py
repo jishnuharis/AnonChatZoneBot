@@ -297,3 +297,48 @@ async def test_end_chat_session_accumulates_duration():
 
     assert u1 in init.dirty_users
     assert u2 in init.dirty_users
+
+
+@pytest.mark.asyncio
+async def test_decimal_support_in_profile_and_checkuser():
+    from decimal import Decimal
+
+    user_id = 999123
+    dec_created = Decimal("1700000000.123")
+    dec_last_active = Decimal(str(time.time() - 120))
+    dec_total_msgs = Decimal("15")
+    dec_duration = Decimal("300.5")
+
+    init.user_details[user_id] = {
+        **init._default_user(),
+        "created_at": dec_created,
+        "last_active": dec_last_active,
+        "total_messages": dec_total_msgs,
+        "total_chat_duration": dec_duration,
+        "gender": "M",
+        "age": 25,
+        "country": "US",
+    }
+
+    # Verify /profile does not crash on Decimal
+    mock_context = MagicMock()
+    profile_text = await _build_profile_text(user_id, mock_context, fallback_name="DecUser")
+    assert "<b>Member Since:</b> 2023-11-14" in profile_text
+    assert "<b>Messages Sent:</b> 15" in profile_text
+    assert "<b>Time in Chats:</b> 5m" in profile_text
+
+    # Verify /checkuser does not crash on Decimal
+    update = MagicMock()
+    update.effective_user.id = 99999
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = [str(user_id)]
+
+    await check_user(update, context)
+    assert update.message.reply_text.called
+    check_text = update.message.reply_text.call_args[0][0]
+    assert "Account Created: <code>2023-11-14 22:13 UTC</code>" in check_text
+    assert "Last Active: 2m ago" in check_text
+    assert "Total Messages: 15" in check_text
+    assert "Time in Chats: 5m" in check_text
+

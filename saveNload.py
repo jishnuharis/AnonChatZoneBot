@@ -230,10 +230,10 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                     "longest_streak": row.get("longest_streak") or 0,
                     "last_streak_date": str(row["last_streak_date"]) if row.get("last_streak_date") else None,
                     "streak_rewards_claimed": json.loads(row["streak_rewards_claimed"]) if isinstance(row.get("streak_rewards_claimed"), str) else (row.get("streak_rewards_claimed") if isinstance(row.get("streak_rewards_claimed"), list) else []),
-                    "created_at": row.get("created_at_ts") or time.time(),
+                    "created_at": float(row["created_at_ts"]) if row.get("created_at_ts") is not None else time.time(),
                     "total_messages": int(row.get("total_messages") or 0),
                     "total_chat_duration": float(row.get("total_chat_duration") or 0.0),
-                    "last_active": row.get("last_active_ts") or time.time(),
+                    "last_active": float(row["last_active_ts"]) if row.get("last_active_ts") is not None else time.time(),
                     "partner_id": None, # Session state managed via session_manager
                 }
     except Exception as e:
@@ -310,10 +310,13 @@ async def upsert_user(*args, **kwargs):
                 claimed_json = json.dumps(claimed)
 
                 last_active_raw = kwargs.get("last_active")
-                if isinstance(last_active_raw, (int, float)):
-                    last_active_dt = datetime.fromtimestamp(last_active_raw, timezone.utc)
-                elif isinstance(last_active_raw, datetime):
+                if isinstance(last_active_raw, datetime):
                     last_active_dt = last_active_raw
+                elif last_active_raw is not None:
+                    try:
+                        last_active_dt = datetime.fromtimestamp(float(last_active_raw), timezone.utc)
+                    except (ValueError, TypeError, OSError):
+                        last_active_dt = datetime.now(timezone.utc)
                 else:
                     last_active_dt = datetime.now(timezone.utc)
 
@@ -360,8 +363,8 @@ async def upsert_user(*args, **kwargs):
                     kwargs.get("longest_streak", 0),
                     streak_date,
                     claimed_json,
-                    kwargs.get("total_messages", 0),
-                    kwargs.get("total_chat_duration", 0.0),
+                    int(kwargs.get("total_messages") or 0),
+                    float(kwargs.get("total_chat_duration") or 0.0),
                     last_active_dt,
                 ))
 
@@ -1308,10 +1311,10 @@ async def load_user_data() -> dict:
                             "votes": {"up": r.get("votes_up", 0), "down": r.get("votes_down", 0)},
                             "reports": r.get("reports_count", 0),
                             "report_log": rep_log,
-                            "created_at": r.get("created_at_ts") or time.time(),
+                            "created_at": float(r["created_at_ts"]) if r.get("created_at_ts") is not None else time.time(),
                             "total_messages": int(r.get("total_messages") or 0),
                             "total_chat_duration": float(r.get("total_chat_duration") or 0.0),
-                            "last_active": r.get("last_active_ts") or time.time(),
+                            "last_active": float(r["last_active_ts"]) if r.get("last_active_ts") is not None else time.time(),
                         }
             else:
                 data = await _load_legacy_user_data(conn)

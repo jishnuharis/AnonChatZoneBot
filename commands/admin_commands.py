@@ -418,20 +418,42 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     created_ts = details.get("created_at")
-    created_line = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(created_ts)) if created_ts else "Unknown"
+    created_line = "Unknown"
+    if created_ts:
+        try:
+            if hasattr(created_ts, "strftime"):
+                created_line = created_ts.strftime("%Y-%m-%d %H:%M UTC")
+            else:
+                created_line = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(float(created_ts)))
+        except Exception:
+            created_line = "Unknown"
 
     last_active_ts = details.get("last_active") or init.last_activity.get(target_id)
-    if last_active_ts:
-        diff = max(0.0, time.time() - last_active_ts)
-        last_active_line = "Just now" if diff < 60 else f"{format_duration(diff)} ago"
+    if last_active_ts is not None:
+        try:
+            diff = max(0.0, time.time() - float(last_active_ts))
+            last_active_line = "Just now" if diff < 60 else f"{format_duration(diff)} ago"
+        except Exception:
+            last_active_line = "Never"
     else:
         last_active_line = "Never"
 
-    total_msgs = details.get("total_messages", 0)
+    try:
+        total_msgs = int(details.get("total_messages") or 0)
+    except (ValueError, TypeError):
+        total_msgs = 0
 
-    total_dur = details.get("total_chat_duration", 0.0)
+    try:
+        total_dur = float(details.get("total_chat_duration") or 0.0)
+    except (ValueError, TypeError):
+        total_dur = 0.0
+
     if (details.get("partner_id") or target_id in init.active_pairs) and target_id in init.session_start_times:
-        total_dur += max(0.0, time.time() - init.session_start_times[target_id])
+        try:
+            start_ts = float(init.session_start_times[target_id])
+            total_dur += max(0.0, time.time() - start_ts)
+        except Exception:
+            pass
     duration_line = format_duration(total_dur)
 
     restricted_until = details.get("restricted_until")

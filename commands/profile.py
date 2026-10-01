@@ -65,13 +65,32 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
     streak_line = f"🔥 <b>Chat Streak:</b> {streak} day{'s' if streak != 1 else ''} <i>(Best: {longest}d)</i>{next_info}\n"
 
     created_ts = user.get("created_at")
-    created_line = time.strftime("%Y-%m-%d", time.gmtime(created_ts)) if created_ts else "Unknown"
+    created_line = "Unknown"
+    if created_ts:
+        try:
+            if hasattr(created_ts, "strftime"):
+                created_line = created_ts.strftime("%Y-%m-%d")
+            else:
+                created_line = time.strftime("%Y-%m-%d", time.gmtime(float(created_ts)))
+        except Exception:
+            created_line = "Unknown"
 
-    total_msgs = user.get("total_messages", 0)
+    try:
+        total_msgs = int(user.get("total_messages") or 0)
+    except (ValueError, TypeError):
+        total_msgs = 0
 
-    total_dur = user.get("total_chat_duration", 0.0)
+    try:
+        total_dur = float(user.get("total_chat_duration") or 0.0)
+    except (ValueError, TypeError):
+        total_dur = 0.0
+
     if (user.get("partner_id") or user_id in init.active_pairs) and user_id in init.session_start_times:
-        total_dur += max(0.0, time.time() - init.session_start_times[user_id])
+        try:
+            start_ts = float(init.session_start_times[user_id])
+            total_dur += max(0.0, time.time() - start_ts)
+        except Exception:
+            pass
     duration_line = format_duration(total_dur)
 
     return (
