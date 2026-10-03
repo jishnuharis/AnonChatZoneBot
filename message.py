@@ -17,8 +17,8 @@ PARTNER_SKIPPED_TEXT = "🔁 <b>Partner skipped...</b>\nYou're added to the wait
 NOT_IN_CHAT_USE_FIND_TEXT = "❗ <b>You're not in a chat.</b>\nUse /find to connect."
 DAILY_NEXT_LIMIT_REACHED_TEXT = (
     "⏳ <b>You've used all {limit} of your daily credits.</b>\n"
-    "Credits are spent on /next skips and (for free-tier users) media files sends.\n\n"
-    "Your count resets at midnight UTC, or /subscribe for more credits + unlimited media files."
+    "Credits are spent on finding partners and media files sends for free-tier users.\n\n"
+    "Your credits reset at midnight UTC, or /subscribe for more credits + unlimited media files."
 )
 
 # ---------------------------------------------------------------------------
@@ -28,10 +28,11 @@ SUBSCRIBE_INTRO_TEXT = (
     "⭐ <b>Chat Zone Subscription</b>\n\n"
     "{status}\n\n"
     "<b>Perks on any active plan:</b>\n"
-    "• Higher daily credit limit (more skips)\n"
-    "• Send unlimited photos, videos, voice & video notes — free-tier media sends cost 1 daily credit each\n"
-    "• Unlimited anonymous voice calls — free accounts are limited to 3 calls/day\n"
-    "• Higher active block capacity (up to 32 blocks vs 3 on free accounts)\n"
+    "• Search by gender (M/F) and country (Same / Any)\n"
+    "• Higher daily credit limit (more chats per day)\n"
+    "• Send unlimited photos, videos, voice & video notes\n"
+    "• Unlimited anonymous voice calls\n"
+    "• Higher active block capacity (up to 32 blocks)\n"
     "• Unlock /private (Privacy Mode) for photos/videos/voice notes\n"
     "• Get a peek at your partner's details when matched\n\n"
     "<b>Pick a plan:</b>"
@@ -39,13 +40,13 @@ SUBSCRIBE_INTRO_TEXT = (
 SUBSCRIBE_INVOICE_TITLE = "Chat Zone — {label} Plan"
 SUBSCRIBE_INVOICE_DESCRIPTION = (
     "{label} subscription: daily credit limit of {limit}, unlimited media sends, unlimited voice calls, "
-    "Privacy Mode access, partner details on match, and {points} bonus points."
+    "Gender and Country based search, Privacy Mode access, partner details on match, and {points} bonus points."
 )
 SUBSCRIBE_PAYMENT_SUCCESS_TEXT = (
     "✅ <b>{label} plan activated!</b>\n"
     "<i>Active until:</i> <code>{expires}</code>\n"
     "<b>+{points}</b> points added to your account 🎉\n"
-    "Daily credit limit is now <b>{limit}</b> — and your voice calls & media sends are unlimited & free."
+    "Daily credit limit is now <b>{limit}</b> — and your voice calls & media sends are now unlimited."
 )
 
 # ---------------------------------------------------------------------------
@@ -65,8 +66,8 @@ PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT = (
     "Your media will be sent as a normal message instead. Use /subscribe to unlock Privacy Mode."
 )
 MEDIA_DAILY_LIMIT_REACHED_TEXT = (
-    "📷 <b>You've used all {limit} of your daily credits, so this {kind} wasn't sent.</b>\n"
-    "Your count resets at midnight UTC, or /subscribe for unlimited media sends."
+    "📷 <b>You've used all of your daily credits, so this {kind} wasn't sent.</b>\n"
+    "Your credits reset at midnight UTC, or /subscribe for unlimited media sends."
 )
 
 # ---------------------------------------------------------------------------
@@ -93,22 +94,22 @@ HELP_TEXT = (
     "/status — <i>Check your partner's connection status</i>\n"
     "/friendreq — <i>Add your partner to your Anonymous Friends</i>\n"
     "/friends — <i>Open your friends list & reconnect</i>\n"
-    "/call — <i>Start a private voice call (3 calls/day on free, unlimited on VIP)</i>\n"
+    "/call — <i>Start a private voice call</i>\n"
     "/games — <i>Challenge your partner to a mini-game</i>\n"
     "/private — <i>Send media with view protection</i>\n"
     "/profile — <i>View & customize your profile and interests</i>\n"
-    "/top — <i>Weekly Leaderboard (streaks, karma, games)</i>\n"
-    "/gift — <i>Send a Telegram Stars gift to your partner</i>\n"
-    "/link — <i>Share your Telegram profile</i>\n"
+    "/top — <i>Weekly Leaderboard</i>\n"
+    "/gift — <i>Send a gift to your partner</i>\n"
+    "/link — <i>Share your Telegram profile link to your partner</i>\n"
     "/block — <i>Block partner from matching with you again</i>\n"
-    "/subscribe — <i>Explore VIP perks & credit upgrades</i>\n"
+    "/subscribe — <i>Explore VIP perks & credit upgrades or buy subscriptions</i>\n"
     "/help — <i>Open this user guide</i>\n\n"
     "<b>⭐ Anonymous Friends:</b>\n"
     "Hit it off with someone? Send a friend request with /friendreq. Once accepted, you'll find them in your /friends list. You can customize their nickname, keep private notes, and invite them to chat again anytime without ever exchanging usernames or phone numbers.\n\n"
     "<b>↩️ Accidental Disconnects & Memories:</b>\n"
     "Skipped or ended a chat by mistake? Use the instant Undo button to pick up right where you left off. When a memorable chat comes to an end, you can also export a private transcript to keep in your Saved Messages.\n\n"
     "<b>⚡ Credits & VIP Perks:</b>\n"
-    "Free accounts receive daily credits that refresh every midnight UTC, 3 voice calls per day, and up to 3 active 24-hour blocks. VIP members enjoy higher credit limits, unlimited voice calls, up to 32 active blocks, unlimited media sharing, and an exclusive peek at their partner's gender upon matching. Check /subscribe to upgrade.\n\n"
+    "Free accounts receive daily credits that refresh every midnight UTC, 3 voice calls per day, and up to 3 active blocks at a time. Subscribers enjoy higher credit limits, unlimited voice calls, up to 32 active blocks, unlimited media sharing, and a glimpse of their partner's gender upon matching. Check /subscribe to upgrade.\n\n"
     "<b>🛡️ Safety & Respect:</b>\n"
     "You are in total control of your experience. At the end of every chat, you can rate or report your partner. Repeated misconduct is handled automatically to keep the community safe and friendly.\n\n"
     "<b>🌐 Community & Announcements:</b>\n"
@@ -215,23 +216,23 @@ NOT_IN_CHAT_USE_FIND_INLINE_TEXT = "❗ <b>You're not in a chat.</b>\nUse /find 
 
 LINK_RESTRICTED_TEXT = (
     "🔒 <b>Links and usernames cannot be shared in chat.</b>\n\n"
-    "• <i>To share your profile safely, use</i> <code>/link</code>\n"
+    "• <i>To share your profile safely, use</i> /link\n"
     "• <i>Or upgrade to VIP with /subscribe to send links freely!</i>"
 )
 MEDIA_WARMUP_LOCKED_TEXT = (
     "⏳ <b>Media sharing unlocks after the first minute of chat.</b>\n"
-    "<i>Available in</i> <b>{remaining}s</b> <i>(or upgrade to VIP with /subscribe to send immediately).</i>"
+    "<i>Available in</i> <b>{remaining}s</b> <i>(or buy a subscription with /subscribe to send immediately).</i>"
 )
 LINK_COMMAND_WARMUP_LOCKED_TEXT = (
     "⏳ <b>Profile sharing unlocks after the first minute of chat.</b>\n"
-    "<i>Available in</i> <b>{remaining}s</b> <i>(or upgrade to VIP to share anytime).</i>"
+    "<i>Available in</i> <b>{remaining}s</b> <i>(or buy a subscription with /subscribe to share anytime).</i>"
 )
 LINK_NO_USERNAME_TEXT = (
     "⚠️ <b>You don't have a Telegram username set!</b>\n\n"
     "<i>To share your profile safely, you must set a username in your Telegram settings:</i>\n"
     "1. Open Telegram <b>Settings</b>\n"
     "2. Tap <b>Edit Profile</b> → <b>Username</b>\n"
-    "3. Set a username, then try <code>/link</code> again!"
+    "3. Set a username, then try /link again!"
 )
 LINK_SENT_TO_PARTNER_ALERT = "🔗 <b>Your chat partner shared their Telegram profile with you!</b>"
 LINK_SENT_SUCCESS_TEXT = "✅ <i>Your profile link has been shared with your partner.</i>"
