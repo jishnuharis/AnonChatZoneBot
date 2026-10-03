@@ -268,7 +268,7 @@ Admins can manage sponsor promotions live without modifying bot code:
 
 AnonChatZoneBot v2.0 features real-time presence indicators to eliminate ghosting anxiety and keep conversations engaging:
 
-- **Docked Typing Area Keyboard**: Features dynamic in-chat and idle keyboards (`resize_keyboard=True`, `is_persistent=False` for seamless Android back-button collapsing):
+- **Docked Typing Area Keyboard**: Features dynamic in-chat and idle keyboards (`resize_keyboard=True`, `is_persistent=True` so buttons are always accessible and never lost):
   - **In-Chat**: `👋 Nudge your partner!`, `🛑 Stop`, `🎁 Gift`, `⏭️ Next`, `⭐ Subscription`, `🎮 Games`.
   - **Idle (Out-of-Chat)**: `🔍 Find Partner`, `⭐ Subscription`, `👤 Profile`.
 - **"Nudge your partner!" Button & `/nudge` Command**: Gentle ping with a 15-second anti-spam cooldown that sends a notification (`"👋 *NUDGE!* Your partner is nudging you!"`) and triggers typing actions on the partner's screen.
