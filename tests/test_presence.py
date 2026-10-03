@@ -131,14 +131,14 @@ async def test_in_chat_keyboard_and_relay_interceptions():
     assert [b.text for b in IN_CHAT_KEYBOARD.keyboard[1]] == ["🛑 Stop", "🎁 Gift", "⏭️ Next"]
     assert [b.text for b in IN_CHAT_KEYBOARD.keyboard[2]] == ["⭐ Subscription", "🎮 Games"]
     assert IN_CHAT_KEYBOARD.resize_keyboard is True
-    assert IN_CHAT_KEYBOARD.is_persistent is True
+    assert IN_CHAT_KEYBOARD.is_persistent is False
 
     # 2. Idle keyboard verification
     assert len(IDLE_KEYBOARD.keyboard) == 2
     assert [b.text for b in IDLE_KEYBOARD.keyboard[0]] == ["🔍 Find Partner"]
     assert [b.text for b in IDLE_KEYBOARD.keyboard[1]] == ["⭐ Subscription", "👤 Profile"]
     assert IDLE_KEYBOARD.resize_keyboard is True
-    assert IDLE_KEYBOARD.is_persistent is True
+    assert IDLE_KEYBOARD.is_persistent is False
 
     # 3. Relay interception verification: Nudge
     u1, u2 = 9981, 9982

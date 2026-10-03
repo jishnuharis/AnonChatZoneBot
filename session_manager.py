@@ -39,7 +39,7 @@ IN_CHAT_KEYBOARD = ReplyKeyboardMarkup(
         ["⭐ Subscription", "🎮 Games"],
     ],
     resize_keyboard=True,
-    is_persistent=True,
+    is_persistent=False,
 )
 
 # Idle keyboard below typing area when outside active chat
@@ -49,7 +49,7 @@ IDLE_KEYBOARD = ReplyKeyboardMarkup(
         ["⭐ Subscription", "👤 Profile"],
     ],
     resize_keyboard=True,
-    is_persistent=True,
+    is_persistent=False,
 )
 
 
