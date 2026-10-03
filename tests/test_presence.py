@@ -120,16 +120,27 @@ async def test_channel_broadcast(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_in_chat_keyboard_nudge_only_and_relay():
-    """Verify that in-chat keyboard contains ONLY 'Nudge your partner!' to prevent accidental skips, and relay intercepts it."""
-    from session_manager import IN_CHAT_KEYBOARD
+async def test_in_chat_keyboard_and_relay_interceptions():
+    """Verify that in-chat keyboard has 3 rows (Nudge, Stop/Gift/Next, Subscription/Games) with is_persistent=False, and relay intercepts buttons."""
+    from session_manager import IN_CHAT_KEYBOARD, IDLE_KEYBOARD
     from relay import relay_message
 
     # 1. Keyboard verification
-    assert len(IN_CHAT_KEYBOARD.keyboard) == 1
+    assert len(IN_CHAT_KEYBOARD.keyboard) == 3
     assert [b.text for b in IN_CHAT_KEYBOARD.keyboard[0]] == ["👋 Nudge your partner!"]
+    assert [b.text for b in IN_CHAT_KEYBOARD.keyboard[1]] == ["🛑 Stop", "🎁 Gift", "⏭️ Next"]
+    assert [b.text for b in IN_CHAT_KEYBOARD.keyboard[2]] == ["⭐ Subscription", "🎮 Games"]
+    assert IN_CHAT_KEYBOARD.resize_keyboard is True
+    assert IN_CHAT_KEYBOARD.is_persistent is False
 
-    # 2. Relay interception verification
+    # 2. Idle keyboard verification
+    assert len(IDLE_KEYBOARD.keyboard) == 2
+    assert [b.text for b in IDLE_KEYBOARD.keyboard[0]] == ["🔍 Find Partner"]
+    assert [b.text for b in IDLE_KEYBOARD.keyboard[1]] == ["⭐ Subscription", "👤 Profile"]
+    assert IDLE_KEYBOARD.resize_keyboard is True
+    assert IDLE_KEYBOARD.is_persistent is False
+
+    # 3. Relay interception verification: Nudge
     u1, u2 = 9981, 9982
     init.user_details[u1] = init._default_user()
     init.user_details[u2] = init._default_user()
@@ -176,6 +187,80 @@ async def test_in_chat_keyboard_nudge_only_and_relay():
     # Clean up
     init.active_pairs.pop(u1, None)
     init.active_pairs.pop(u2, None)
+
+
+@pytest.mark.asyncio
+async def test_in_chat_and_idle_buttons_intercepted():
+    """Verify in-chat buttons (Stop, Gift, Next, Sub, Games) and idle buttons (Find, Sub, Profile) are intercepted."""
+    from relay import relay_message
+    from unittest.mock import patch
+
+    u1, u2 = 9983, 9984
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_context = MagicMock()
+
+    from security import _user_msg_times
+
+    # 1. In-chat buttons
+    with patch("commands.stop.stop", new_callable=AsyncMock) as mock_stop:
+        _user_msg_times[u1].clear()
+        mock_update.message.text = "🛑 Stop"
+        await relay_message(mock_update, mock_context)
+        mock_stop.assert_called_once()
+
+    with patch("commands.gift.gift_command", new_callable=AsyncMock) as mock_gift:
+        _user_msg_times[u1].clear()
+        mock_update.message.text = "🎁 Gift"
+        await relay_message(mock_update, mock_context)
+        mock_gift.assert_called_once()
+
+    with patch("commands.next.skip_partner", new_callable=AsyncMock) as mock_next:
+        _user_msg_times[u1].clear()
+        mock_update.message.text = "⏭️ Next"
+        await relay_message(mock_update, mock_context)
+        mock_next.assert_called_once()
+
+    with patch("commands.subscribe.show_subscribe_menu", new_callable=AsyncMock) as mock_sub:
+        _user_msg_times[u1].clear()
+        mock_update.message.text = "⭐ Subscription"
+        await relay_message(mock_update, mock_context)
+        mock_sub.assert_called_once()
+
+    with patch("commands.games.games_menu", new_callable=AsyncMock) as mock_games:
+        _user_msg_times[u1].clear()
+        mock_update.message.text = "🎮 Games"
+        await relay_message(mock_update, mock_context)
+        mock_games.assert_called_once()
+
+    # Disconnect pair -> now user is idle
+    init.active_pairs.pop(u1, None)
+    init.active_pairs.pop(u2, None)
+
+    # 2. Idle buttons
+    with patch("commands.find.find", new_callable=AsyncMock) as mock_find:
+        _user_msg_times[u1].clear()
+        mock_update.message.text = "🔍 Find Partner"
+        await relay_message(mock_update, mock_context)
+        mock_find.assert_called_once()
+
+    with patch("commands.subscribe.show_subscribe_menu", new_callable=AsyncMock) as mock_sub_idle:
+        _user_msg_times[u1].clear()
+        mock_update.message.text = "⭐ Subscription"
+        await relay_message(mock_update, mock_context)
+        mock_sub_idle.assert_called_once()
+
+    with patch("commands.profile.show_profile", new_callable=AsyncMock) as mock_prof:
+        _user_msg_times[u1].clear()
+        mock_update.message.text = "👤 Profile"
+        await relay_message(mock_update, mock_context)
+        mock_prof.assert_called_once()
+
 
 
 @pytest.mark.asyncio

@@ -31,14 +31,27 @@ logger = logging.getLogger(__name__)
 # Mutex to ensure session teardown runs exactly once even if both users /next or /stop concurrently
 _teardown_lock = asyncio.Lock()
 
-# Persistent keyboard below typing area during active chats
+# In-Chat keyboard below typing area during active chats
 IN_CHAT_KEYBOARD = ReplyKeyboardMarkup(
     [
-        ["👋 Nudge your partner!"]
+        ["👋 Nudge your partner!"],
+        ["🛑 Stop", "🎁 Gift", "⏭️ Next"],
+        ["⭐ Subscription", "🎮 Games"],
     ],
     resize_keyboard=True,
-    is_persistent=True
+    is_persistent=False,
 )
+
+# Idle keyboard below typing area when outside active chat
+IDLE_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        ["🔍 Find Partner"],
+        ["⭐ Subscription", "👤 Profile"],
+    ],
+    resize_keyboard=True,
+    is_persistent=False,
+)
+
 
 
 def is_in_chat(user_id: int) -> bool:
@@ -307,7 +320,7 @@ async def end_chat_session(
             chat_id=partner,
             text=PARTNER_LEFT_CHAT_TEXT,
             parse_mode="HTML",
-            reply_markup=ReplyKeyboardRemove(),
+            reply_markup=IDLE_KEYBOARD,
         )
         kb_p = _build_end_keyboard(user_id, is_initiator=False)
         if kb_p:
@@ -325,7 +338,7 @@ async def end_chat_session(
             chat_id=user_id,
             text=CHAT_ENDED_TEXT,
             parse_mode="HTML",
-            reply_markup=ReplyKeyboardRemove(),
+            reply_markup=IDLE_KEYBOARD,
         )
         kb_u = _build_end_keyboard(partner, is_initiator=True)
         if kb_u:

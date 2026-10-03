@@ -65,6 +65,31 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_nudge(update, context)
             return
 
+        if msg.text in ("🛑 Stop", "Stop", "🛑 /stop"):
+            from commands.stop import stop
+            await stop(update, context)
+            return
+
+        if msg.text in ("🎁 Gift", "Gift", "🎁 /gift"):
+            from commands.gift import gift_command
+            await gift_command(update, context)
+            return
+
+        if msg.text in ("⏭️ Next", "Next", "⏭️ /next"):
+            from commands.next import skip_partner
+            await skip_partner(update, context)
+            return
+
+        if msg.text in ("⭐ Subscription", "Subscription", "⭐ /subscribe"):
+            from commands.subscribe import show_subscribe_menu
+            await show_subscribe_menu(update, context)
+            return
+
+        if msg.text in ("🎮 Games", "Games", "🎮 /games"):
+            from commands.games import games_menu
+            await games_menu(update, context)
+            return
+
         if msg.text in ("⏱️ /status", "⏱️ Status"):
             from commands.nudge import status_command
             await status_command(update, context)
@@ -199,7 +224,25 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Error relaying message from {user_id} to {partner_id}: {e}")
             await safe_tele_func_call(update.message.reply_text, text=FAILED_TO_SEND_MESSAGE_TEXT, parse_mode="HTML")
     else:
-        await safe_tele_func_call(update.message.reply_text, text=NOT_IN_CHAT_USE_FIND_INLINE_TEXT, parse_mode="HTML")
+        msg = update.message
+        if msg and msg.text:
+            if msg.text in ("🔍 Find Partner", "Find Partner", "🔍 /find", "/find"):
+                from commands.find import find
+                await find(update, context)
+                return
+
+            if msg.text in ("⭐ Subscription", "Subscription", "⭐ /subscribe", "/subscribe"):
+                from commands.subscribe import show_subscribe_menu
+                await show_subscribe_menu(update, context)
+                return
+
+            if msg.text in ("👤 Profile", "Profile", "👤 /profile", "/profile", "👤 My Profile", "My Profile"):
+                from commands.profile import show_profile
+                await show_profile(update, context)
+                return
+
+        from session_manager import IDLE_KEYBOARD
+        await safe_tele_func_call(update.message.reply_text, text=NOT_IN_CHAT_USE_FIND_INLINE_TEXT, reply_markup=IDLE_KEYBOARD, parse_mode="HTML")
 
 
 async def relay_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
