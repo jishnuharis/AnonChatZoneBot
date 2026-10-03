@@ -87,7 +87,7 @@ async def handle_check_channel_status(update: Update, context: ContextTypes.DEFA
         ])
         text = (
             "🎉 <b>Membership verified! Welcome to Chat Zone.</b>\n\n"
-            "You're all set! Use <b>/find</b> to start chatting with anonymous partners."
+            "You're all set! Use /find to start chatting with anonymous partners."
         )
         await safe_tele_func_call(query.edit_message_text, text=text, reply_markup=keyboard, parse_mode="HTML")
     else:

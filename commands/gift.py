@@ -79,7 +79,7 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_in_chat(user_id):
         await safe_tele_func_call(
             update.message.reply_text,
-            text="❌ <i>You can only send gifts during an active chat! Use /next to find someone.</i>",
+            text="❌ <i>You can only send gifts during an active chat! Use</i> /next <i>to find someone.</i>",
             parse_mode="HTML"
         )
         return

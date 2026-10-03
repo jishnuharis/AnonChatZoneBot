@@ -243,6 +243,6 @@ def status_text(user_id: int) -> str:
         f"✅ <b>{tier['label']}</b> <i>plan active</i> — "
         f"<i>{time_left_str}</i>\n"
         f"<i>Daily credit limit:</i> {daily_credit_limit(user_id)} "
-        f"<i>(/next skips; voice calls & media sends are free & unlimited on your plan)</i>"
+        f"(/next <i>skips; voice calls & media sends are free & unlimited on your plan</i>)"
     )
 

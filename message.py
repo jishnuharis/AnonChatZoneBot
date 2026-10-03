@@ -122,22 +122,22 @@ HELP_TEXT = (
 # commands/admin_commands.py
 # ---------------------------------------------------------------------------
 GIVE_BROADCAST_MESSAGE_TEXT = "<b>Give me a message to broadcast!</b>"
-GIVE_VALID_CONNECT_USER_ID_TEXT = "<b>Give me a valid user id to connect.</b>"
+GIVE_VALID_CONNECT_USER_ID_TEXT = "<b>Give me a valid user id to connect.</b>\n<i>Usage:</i> <code>/connect &lt;user_id&gt;</code>"
 TARGET_NOT_IN_DB_TEXT = "<b>The target user isn't in our database.</b>"
 ALREADY_CONNECTED_TO_TARGET_TEXT = "<b>You are already connected to the target.</b>"
 
 ADMIN_HELP_TEXT = (
     "<b>Admin commands:</b>\n"
-    "\t\t<i>/stats</i> - <code>Bot user and performance statistics</code>\n"
-    "\t\t<i>/queue</i> - <code>Queue and matchmaking status</code>\n"
-    "\t\t<i>/checkuser</i> - <code>/checkuser &lt;user_id&gt;</code>\n"
-    "\t\t<i>/ban</i> - <code>/ban &lt;user_id&gt; &lt;severity 0-10&gt; [reason]</code>\n"
-    "\t\t<i>/unban</i> - <code>/unban &lt;user_id&gt;</code>\n"
-    "\t\t<i>/giveaway</i> - <code>/giveaway &lt;user_id&gt; &lt;tier&gt;</code>\n"
-    "\t\t<i>/referral</i> - <code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt;</code>\n"
-    "\t\t<i>/broadcast</i> - <code>/broadcast &lt;message&gt;</code>\n"
-    "\t\t<i>/campaign</i> - <code>Manage sponsor promotions</code>\n"
-    "\t\t<i>/connect</i> - <code>/connect &lt;user_id&gt;</code>"
+    "• <code>/stats</code> — <i>Bot user and performance statistics</i>\n"
+    "• <code>/queue</code> — <i>Queue and matchmaking status</i>\n"
+    "• <code>/checkuser &lt;user_id&gt;</code>\n"
+    "• <code>/ban &lt;user_id&gt; &lt;severity 0-10&gt; [reason]</code>\n"
+    "• <code>/unban &lt;user_id&gt;</code>\n"
+    "• <code>/giveaway &lt;user_id&gt; &lt;tier&gt;</code>\n"
+    "• <code>/referral &lt;required_referrals&gt; &lt;promo_duration_days&gt;</code>\n"
+    "• <code>/broadcast &lt;message&gt;</code>\n"
+    "• <code>/campaign</code> — <i>Manage sponsor promotions</i>\n"
+    "• <code>/connect &lt;user_id&gt;</code>"
 )
 
 BAN_USAGE_TEXT = "<i>Usage:</i> <code>/ban &lt;user_id&gt; &lt;severity 0-10&gt; [reason]</code>"
@@ -217,15 +217,15 @@ NOT_IN_CHAT_USE_FIND_INLINE_TEXT = "❗ <b>You're not in a chat.</b>\nUse /find 
 LINK_RESTRICTED_TEXT = (
     "🔒 <b>Links and usernames cannot be shared in chat.</b>\n\n"
     "• <i>To share your profile safely, use</i> /link\n"
-    "• <i>Or upgrade to VIP with /subscribe to send links freely!</i>"
+    "• <i>Or upgrade to VIP with</i> /subscribe <i>to send links freely!</i>"
 )
 MEDIA_WARMUP_LOCKED_TEXT = (
     "⏳ <b>Media sharing unlocks after the first minute of chat.</b>\n"
-    "<i>Available in</i> <b>{remaining}s</b> <i>(or buy a subscription with /subscribe to send immediately).</i>"
+    "<i>Available in</i> <b>{remaining}s</b> <i>(or buy a subscription with</i> /subscribe <i>to send immediately).</i>"
 )
 LINK_COMMAND_WARMUP_LOCKED_TEXT = (
     "⏳ <b>Profile sharing unlocks after the first minute of chat.</b>\n"
-    "<i>Available in</i> <b>{remaining}s</b> <i>(or buy a subscription with /subscribe to share anytime).</i>"
+    "<i>Available in</i> <b>{remaining}s</b> <i>(or buy a subscription with</i> /subscribe <i>to share anytime).</i>"
 )
 LINK_NO_USERNAME_TEXT = (
     "⚠️ <b>You don't have a Telegram username set!</b>\n\n"
@@ -291,7 +291,7 @@ NOTHING_TO_CANCEL_TEXT = "<b>You don't have an active game or pending game reque
 # ---------------------------------------------------------------------------
 ALREADY_CHOSE_TEXT = "<b>You already chose.</b> Chill 😭"
 CHOICE_LOCKED_IN_TEXT = "<b>Your choice has been locked in 🔒.</b>"
-OPPONENT_MOVED_TEXT = "<b>Your opponent made their move...<\b> Do you trust them? 👀"
+OPPONENT_MOVED_TEXT = "<b>Your opponent made their move...</b> Do you trust them? 👀"
 MUTUAL_SAVE_NO_STREAK_TEXT = "<b>You guys really trusted each other!</b> 👀\nGood job saving your coins for now 😏"
 BOTH_STOLE_TEXT = "<b>Both chose greed over the other and stole.</b>\nNow no one wins 😏."
 GOT_STOLEN_FROM_TEXT = "<b>You shouldn't have done that to them 💀.</b>\nThey tried to save their coin and you just stole it..."

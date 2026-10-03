@@ -635,9 +635,9 @@ async def campaign_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not args or args[0] == "help":
         await update.message.reply_text(
             "📢 <b>Campaign Management</b>\n\n"
-            "<i>/campaign list</i> — View all active campaigns\n"
-            "<i>/campaign create Sponsor | Title | Text [| ButtonText | ButtonURL [| PhotoURL]]</i>\n\n"
-            "💡 <i>Tip: You can also attach a photo or reply to a photo when running /campaign create!</i>",
+            "• <code>/campaign list</code> — <i>View all active campaigns</i>\n"
+            "• <code>/campaign create Sponsor | Title | Text [| ButtonText | ButtonURL [| PhotoURL]]</code>\n\n"
+            "💡 <i>Tip: You can also attach a photo or reply to a photo when running <code>/campaign create</code>!</i>",
             parse_mode="HTML"
         )
         return
@@ -660,8 +660,8 @@ async def campaign_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = [part.strip() for part in full_text.split("|")]
         if len(parts) < 3:
             await update.message.reply_text(
-                "<i>Usage: /campaign create Sponsor | Title | Text [| ButtonText | ButtonURL [| PhotoURL]]</i>\n\n"
-                "💡 <i>Tip: You can also attach a photo or reply to a photo when running /campaign create!</i>",
+                "<i>Usage:</i> <code>/campaign create Sponsor | Title | Text [| ButtonText | ButtonURL [| PhotoURL]]</code>\n\n"
+                "💡 <i>Tip: You can also attach a photo or reply to a photo when running <code>/campaign create</code>!</i>",
                 parse_mode="HTML"
             )
             return
