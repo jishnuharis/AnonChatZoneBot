@@ -209,6 +209,15 @@ async def start_chat_session(
         await end_chat_session(context, user2, reason="transport_disconnect", notify_initiator=False, notify_partner=True)
         return False
 
+    # Record chat streak progress upon successful matching (both users searched and paired)
+    try:
+        from streaks import record_chat_interaction
+        bot_inst = getattr(context, "bot", None)
+        record_chat_interaction(user1, bot=bot_inst)
+        record_chat_interaction(user2, bot=bot_inst)
+    except Exception as e:
+        logger.debug(f"Streak record on match error: {e}")
+
     return True
 
 
@@ -291,17 +300,6 @@ async def end_chat_session(
     already_friends = await are_friends_db(user_id, partner) if partner else False
     has_transcript = bool(session_id and session_id in init.session_messages and len(init.session_messages[session_id]) >= 2)
 
-    # Process Daily Chat Streaks for active participants
-    if has_transcript:
-        try:
-            from streaks import update_streak_on_chat, claim_milestone_reward
-            for uid in (user_id, partner):
-                if uid:
-                    new_streak, inc, rew = update_streak_on_chat(uid)
-                    if inc and rew:
-                        asyncio.create_task(claim_milestone_reward(context.bot, uid, new_streak, rew))
-        except Exception as e:
-            logger.debug(f"Streak update notice on session end: {e}")
 
     def _build_end_keyboard(target_pid, is_initiator=False):
         btns = []

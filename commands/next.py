@@ -17,6 +17,12 @@ async def skip_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     if is_in_chat(user_id):
+        try:
+            from streaks import record_chat_interaction
+            record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+        except Exception as e:
+            pass
+
         # Gracefully end session using unified session manager
         partner_id = await end_chat_session(
             context,

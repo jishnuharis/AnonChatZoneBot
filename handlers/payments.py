@@ -99,6 +99,12 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
             user_id, f"gift_{gift_id}", gift["stars"], charge_id=payment.telegram_payment_charge_id
         )
 
+        try:
+            from streaks import record_chat_interaction
+            record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+        except Exception as e:
+            pass
+
         await safe_tele_func_call(
             update.message.reply_text,
             text=(

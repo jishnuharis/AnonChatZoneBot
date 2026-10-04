@@ -208,6 +208,13 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     init.user_details[user_id]["total_messages"] = init.user_details[user_id].get("total_messages", 0) + 1
                     init.dirty_users.add(user_id)
 
+                # Record streak for the active sender only (receivers never get passive updates)
+                try:
+                    from streaks import record_chat_interaction
+                    record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+                except Exception as e:
+                    logger.debug(f"Streak record on message send error: {e}")
+
                 # Ephemeral transcript recording for 'Save Conversation'
                 session_id = init.active_sessions.get(user_id)
                 if session_id:
@@ -266,6 +273,11 @@ async def relay_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_id=partner_msg_id,
         reaction=reaction.new_reaction,
     )
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        logger.debug(f"Streak record on reaction error: {e}")
 
 
 async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -316,4 +328,10 @@ async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYP
             )
     except Exception as e:
         logger.debug(f"Notice on relay_edited_message from {user_id} to {partner_id}: {e}")
+    else:
+        try:
+            from streaks import record_chat_interaction
+            record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+        except Exception as e:
+            logger.debug(f"Streak record on edit error: {e}")
 

@@ -123,6 +123,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = game["questions"][game["round"]]
     picked_text = q["options"][pick]
 
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
     if msg_id:
         await safe_tele_func_call(
             context.bot.edit_message_text,

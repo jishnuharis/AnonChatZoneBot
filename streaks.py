@@ -154,6 +154,39 @@ def update_streak_on_chat(
     return new_streak, True, unlocked_reward
 
 
+def record_chat_interaction(
+    user_id: int, bot=None, target_date: Optional[date] = None
+) -> Tuple[int, bool, Optional[Dict[str, Any]]]:
+    """
+    Records an active chat interaction by a user (matching via /find, sending messages/media,
+    using chat controls /next or /stop, playing games, nudging, etc.).
+    
+    If the user has already recorded activity today (UTC), returns immediately with zero DB overhead.
+    If this is the user's first interaction of the day, updates streak and asynchronously claims
+    any unlocked milestone rewards.
+    """
+    if not user_id:
+        return 0, False, None
+
+    today = target_date or datetime.now(timezone.utc).date()
+    today_str = str(today)
+
+    user = init.user_details.get(user_id)
+    if user and str(user.get("last_streak_date")) == today_str:
+        return user.get("current_streak", 0) or 0, False, None
+
+    new_streak, inc, rew = update_streak_on_chat(user_id, target_date=today)
+    if inc and rew and bot:
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(claim_milestone_reward(bot, user_id, new_streak, rew))
+        except RuntimeError:
+            pass
+
+    return new_streak, inc, rew
+
+
 async def claim_milestone_reward(bot, user_id: int, milestone: int, reward: Dict[str, Any]):
     """
     Applies streak milestone rewards (points or VIP days) and sends a congratulatory Telegram message.

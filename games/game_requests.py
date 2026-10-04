@@ -84,6 +84,12 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE, game_
     await safe_tele_func_call(update.effective_message.reply_text, text=WAITING_FOR_PARTNER_ACCEPT_TEXT, parse_mode="HTML")
     init.game_requests[partner_id] = {"from": user_id, "game": game_type, "timestamp": time.time()}
 
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
 
 async def handle_game_request_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -119,4 +125,11 @@ async def handle_game_request_response(update: Update, context: ContextTypes.DEF
     await safe_tele_func_call(context.bot.send_message, chat_id=requester_id, text=f"<b>Your request has been accepted!\nStarting {label}...</b>", parse_mode="HTML")
 
     session_id = module.create_session(requester_id, user_id)
+
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
     await module.send_round(context, session_id)

@@ -125,6 +125,12 @@ async def handle_choice(context: ContextTypes.DEFAULT_TYPE, user_id, choice):
 
     game["choices"][user_id] = choice
 
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
     choice_text = "Steal 😈" if choice == "steal" else "Save 🤝"
     other_user = registry.other_player(game, user_id)
     await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=f"<i>You chose to</i> <b>{choice_text}</b>.", parse_mode="HTML")

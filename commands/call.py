@@ -62,6 +62,12 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "status": "pending",
     }
 
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
     call_keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📞 Accept Call", callback_data=f"call_acc|{session_id}"),
@@ -137,6 +143,12 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
         consume_daily_call(initiator)
 
         call_data["status"] = "active"
+
+        try:
+            from streaks import record_chat_interaction
+            record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+        except Exception as e:
+            pass
 
         # Construct anonymous WebApp URLs with ephemeral room token
         init_call_url = f"{VOICE_CALL_BASE_URL}/room/{session_id}?peer=1"

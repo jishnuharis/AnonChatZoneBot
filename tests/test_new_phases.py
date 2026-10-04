@@ -186,13 +186,14 @@ async def test_streak_extended_milestones_and_rewards(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_session_end_triggers_streak_when_messages_exchanged(monkeypatch):
+async def test_active_interaction_streak_rules(monkeypatch):
     monkeypatch.setattr("saveNload.end_chat_session_db", AsyncMock())
     monkeypatch.setattr("saveNload.are_friends_db", AsyncMock(return_value=False))
     monkeypatch.setattr("handlers.rating.ask_for_rating", AsyncMock())
 
     context = MagicMock()
-    context.bot.send_message = AsyncMock()
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
+    context.bot.send_chat_action = AsyncMock()
 
     u1, u2 = 3010, 3011
     init.user_details[u1] = init._default_user()
@@ -203,15 +204,87 @@ async def test_session_end_triggers_streak_when_messages_exchanged(monkeypatch):
     init.active_sessions[u1] = "sess-streak-test"
     init.active_sessions[u2] = "sess-streak-test"
 
-    # 2 messages exchanged
-    init.session_messages["sess-streak-test"] = [
-        (u1, "Hello partner", time.time()),
-        (u2, "Hey there!", time.time()),
-    ]
+    # User 1 sends a message -> u1's streak increments, u2 (receiver) gets zero
+    from relay import relay_message
+    update_u1 = MagicMock()
+    update_u1.effective_user.id = u1
+    update_u1.message.text = "Hello partner"
+    update_u1.message.photo = None
+    update_u1.message.video = None
+    update_u1.message.voice = None
+    update_u1.message.video_note = None
+    update_u1.message.sticker = None
+    update_u1.message.animation = None
+    update_u1.message.document = None
+    update_u1.message.audio = None
+    update_u1.message.dice = None
+    update_u1.message.caption = None
+    update_u1.message.message_id = 101
 
-    await end_chat_session(context, u1)
+    await relay_message(update_u1, context)
 
     assert init.user_details[u1]["current_streak"] == 1
+    assert init.user_details[u2]["current_streak"] == 0  # Receiving partner did NOT update!
+
+    # Ending chat does NOT passively update the silent receiver u2
+    await end_chat_session(context, u1)
+    assert init.user_details[u1]["current_streak"] == 1
+    assert init.user_details[u2]["current_streak"] == 0
+
+
+@pytest.mark.asyncio
+async def test_match_creation_updates_streak(monkeypatch):
+    monkeypatch.setattr("saveNload.create_chat_session_db", AsyncMock(return_value="sess-match-1"))
+    monkeypatch.setattr("saveNload.is_blocked_pairwise", AsyncMock(return_value=False))
+    monkeypatch.setattr("session_manager.create_chat_session_db", AsyncMock(return_value="sess-match-1"))
+
+    context = MagicMock()
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=888))
+
+    m1, m2 = 3020, 3021
+    init.user_details[m1] = init._default_user()
+    init.user_details[m2] = init._default_user()
+
+    from session_manager import start_chat_session
+    success = await start_chat_session(context, m1, m2)
+    assert success is True
+    assert init.user_details[m1]["current_streak"] == 1
+    assert init.user_details[m2]["current_streak"] == 1
+
+
+@pytest.mark.asyncio
+async def test_game_and_control_interactions_update_streak(monkeypatch):
+    monkeypatch.setattr("saveNload.end_chat_session_db", AsyncMock())
+    monkeypatch.setattr("saveNload.are_friends_db", AsyncMock(return_value=False))
+    monkeypatch.setattr("handlers.rating.ask_for_rating", AsyncMock())
+
+    context = MagicMock()
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=777))
+
+    u1, u2 = 3030, 3031
+    init.user_details[u1] = {**init._default_user(), "gender": "M", "age": 25, "country": "US"}
+    init.user_details[u2] = {**init._default_user(), "gender": "F", "age": 24, "country": "US"}
+
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.active_sessions[u1] = "sess-game-test"
+    init.active_sessions[u2] = "sess-game-test"
+
+    from games.coin_steal import create_session, handle_choice, games
+    sid = create_session(u1, u2)
+    games[sid]["timeout_job"] = MagicMock()
+    context.job_queue = MagicMock()
+
+    await handle_choice(context, u1, "steal")
+    assert init.user_details[u1]["current_streak"] == 1
+    assert init.user_details[u2]["current_streak"] == 0  # u2 did not play yet
+
+    # u2 stops the chat
+    from commands.stop import stop
+    update_u2 = MagicMock()
+    update_u2.effective_user.id = u2
+    update_u2.message.reply_text = AsyncMock()
+    await stop(update_u2, context)
     assert init.user_details[u2]["current_streak"] == 1
 
 

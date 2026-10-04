@@ -113,6 +113,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     game["board"][cell] = game["symbols"][user_id]
+
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
     result = _check_winner(game["board"])
 
     if result is None:

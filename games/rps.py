@@ -92,6 +92,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_tele_func_call(context.bot.edit_message_text, chat_id=user_id, message_id=msg_id, text=f"<i>Locked in:</i> {EMOJI[choice]}", parse_mode="HTML")
 
     game["choices"][user_id] = choice
+
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
     other = registry.other_player(game, user_id)
 
     if len(game["choices"]) == 1:

@@ -103,6 +103,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     guess = int(data)
     game["guessed"].add(guess)
+
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
     other = registry.other_player(game, user_id)
     if other is None:
         return

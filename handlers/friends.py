@@ -89,6 +89,12 @@ async def send_friend_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         "created_at": time.time(),
     }
 
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
     # Notify partner with Accept/Decline buttons
     keyboard = InlineKeyboardMarkup([
         [
@@ -169,6 +175,12 @@ async def handle_friend_request_response(update: Update, context: ContextTypes.D
             parse_mode="HTML",
         )
         return
+
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
 
     # Pick initial default names from random pool
     base_name1 = random.choice(DEFAULT_NICKNAMES)

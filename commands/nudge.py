@@ -62,6 +62,12 @@ async def handle_nudge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+    try:
+        from streaks import record_chat_interaction
+        record_chat_interaction(user_id, bot=getattr(context, "bot", None))
+    except Exception as e:
+        pass
+
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
