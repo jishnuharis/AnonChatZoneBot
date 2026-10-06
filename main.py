@@ -33,7 +33,7 @@ from commands.admin_commands import (
     giveaway_subscription, referral_scheme_command, admin_stats, queue_stats, campaign_command
 )
 from commands.subscribe import show_subscribe_menu, handle_tier_selection
-from commands.top import show_top_leaderboard, handle_top_callback
+from commands.leaderboard import show_top_leaderboard, handle_top_callback
 from commands.gift import gift_command, handle_gift_callback
 from handlers.payments import handle_pre_checkout, handle_successful_payment
 from referral import handle_referral_link_button

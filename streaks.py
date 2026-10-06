@@ -129,8 +129,8 @@ def update_streak_on_chat(
     current = user.get("current_streak", 0) or 0
     claimed = user.setdefault("streak_rewards_claimed", [])
 
-    # Already recorded for today
-    if last_date == today:
+    # Already recorded for today (only if active streak >= 1)
+    if last_date == today and current > 0:
         return current, False, None
 
     if last_date == yesterday:
@@ -172,7 +172,7 @@ def record_chat_interaction(
     today_str = str(today)
 
     user = init.user_details.get(user_id)
-    if user and str(user.get("last_streak_date")) == today_str:
+    if user and str(user.get("last_streak_date")) == today_str and (user.get("current_streak", 0) or 0) > 0:
         return user.get("current_streak", 0) or 0, False, None
 
     new_streak, inc, rew = update_streak_on_chat(user_id, target_date=today)

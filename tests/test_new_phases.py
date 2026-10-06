@@ -20,7 +20,7 @@ from streaks import (
     get_streak_info,
     STREAK_REWARDS,
 )
-from commands.top import (
+from commands.leaderboard import (
     render_leaderboard_text,
     anonymize_id,
     show_top_leaderboard,
@@ -286,6 +286,22 @@ async def test_game_and_control_interactions_update_streak(monkeypatch):
     update_u2.message.reply_text = AsyncMock()
     await stop(update_u2, context)
     assert init.user_details[u2]["current_streak"] == 1
+
+
+def test_new_user_zero_streak_advances_to_one():
+    """Verify that a brand-new user with 0 streak always advances to 1 on interaction."""
+    from datetime import date
+    from streaks import record_chat_interaction
+    u = 99912
+    init.user_details[u] = init._default_user()
+    init.user_details[u]["current_streak"] = 0
+    init.user_details[u]["last_streak_date"] = str(date.today())
+
+    # Even if last_streak_date was somehow set to today, 0 streak MUST advance to 1
+    new_streak, inc, _ = record_chat_interaction(u)
+    assert new_streak == 1
+    assert inc is True
+    assert init.user_details[u]["current_streak"] == 1
 
 
 # ============================================================================

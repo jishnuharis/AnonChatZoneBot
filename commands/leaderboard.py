@@ -1,5 +1,5 @@
 """
-Weekly Leaderboard (/top, /leaderboard) for AnonChatZoneBot.
+Weekly Leaderboard (/leaderboard, /top) for AnonChatZoneBot.
 
 Displays anonymized rankings with Telegram blockquote styling:
 - Top Streaks (🔥)
@@ -140,7 +140,9 @@ async def fetch_leaderboard(category: str, viewer_id: int) -> Tuple[List[Dict[st
                     # Viewer stats
                     await cur.execute("SELECT current_streak FROM user_profiles WHERE user_id = %s;", (viewer_id,))
                     row = await cur.fetchone()
-                    v_score = row["current_streak"] if row and row["current_streak"] else 0
+                    db_score = row["current_streak"] if row and row["current_streak"] else 0
+                    mem_score = init.user_details.get(viewer_id, {}).get("current_streak", 0) or 0
+                    v_score = max(db_score, mem_score)
 
                     await cur.execute("""
                         SELECT COUNT(*) + 1 as rank FROM user_profiles
@@ -196,7 +198,9 @@ async def fetch_leaderboard(category: str, viewer_id: int) -> Tuple[List[Dict[st
 
                     await cur.execute("SELECT points FROM users WHERE user_id = %s;", (viewer_id,))
                     row = await cur.fetchone()
-                    v_score = row["points"] if row and row["points"] else 0
+                    db_score = row["points"] if row and row["points"] else 0
+                    mem_score = init.user_details.get(viewer_id, {}).get("points", 0) or 0
+                    v_score = max(db_score, mem_score)
 
                     v_rank = None
                     if v_score > 0:
