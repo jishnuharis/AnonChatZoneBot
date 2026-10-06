@@ -51,7 +51,7 @@ async def handle_nudge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_tele_func_call(
         context.bot.send_message,
         chat_id=partner_id,
-        text="👋 <b>Nudge!</b> Your partner is nudging you! Say hi 👋",
+        text="👋 <b>NUDGE!</b>\nYour partner is nudging you! Say hi 👋",
         parse_mode="HTML"
     )
 
