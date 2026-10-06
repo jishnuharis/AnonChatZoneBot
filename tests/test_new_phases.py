@@ -350,6 +350,9 @@ async def test_show_top_leaderboard_command(monkeypatch):
     assert "Daily Chat Streaks" in kwargs["text"]
     assert kwargs["reply_markup"] is not None
 
+    import message
+    assert "/leaderboard" in message.HELP_TEXT
+
 
 @pytest.mark.asyncio
 async def test_handle_top_callback(monkeypatch):

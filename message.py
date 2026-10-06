@@ -98,7 +98,7 @@ HELP_TEXT = (
     "/games — <i>Challenge your partner to a mini-game</i>\n"
     "/private — <i>Send media with view protection</i>\n"
     "/profile — <i>View & customize your profile and interests</i>\n"
-    "/top — <i>Weekly Leaderboard</i>\n"
+    "/leaderboard — <i>Weekly Leaderboard</i>\n"
     "/gift — <i>Send a gift to your partner</i>\n"
     "/link — <i>Share your Telegram profile link to your partner</i>\n"
     "/block — <i>Block partner from matching with you again</i>\n"

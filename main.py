@@ -94,7 +94,7 @@ async def set_commands(application):
         BotCommand("games", "Play a mini-game with partner"),
         BotCommand("private", "Arm Privacy Mode for next media"),
         BotCommand("subscribe", "View/purchase subscription"),
-        BotCommand("top", "Show weekly leaderboard"),
+        BotCommand("leaderboard", "Show weekly leaderboard"),
         BotCommand("gift", "Send a gift to your chat partner"),
         BotCommand("link", "Share your Telegram profile"),
     ]
