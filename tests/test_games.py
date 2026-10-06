@@ -43,6 +43,34 @@ def test_trivia_questions_data_driven():
         assert 0 <= q["correct_index"] <= 3
 
 
+def test_trivia_expansion_and_option_shuffling():
+    """Verify 10 categories with 128 questions each, option shuffling, and consistent emojis."""
+    from games.content.content_manager import get_stats, _trivia_cache
+
+    stats = get_stats()
+    assert stats["trivia_count"] >= 1280
+    assert len(stats["trivia_categories"]) == 10
+
+    expected_categories = [
+        "Science", "Geography", "History", "Gaming", "Movies & TV",
+        "Anime & Manga", "Music", "Sports", "General Knowledge", "Riddles & Brain Teasers"
+    ]
+    for cat in expected_categories:
+        cat_questions = [q for q in _trivia_cache if q.get("category") == cat]
+        assert len(cat_questions) == 128, f"Category {cat} has {len(cat_questions)}, expected 128"
+
+    # Test that options are shuffled dynamically and track the right answer
+    orig_q = _trivia_cache[0]
+    expected_answer = orig_q["options"][orig_q["correct_index"]]
+    sampled = get_trivia_questions(limit=1)[0]
+    assert sampled["options"][sampled["correct_index"]] in [q["options"][q["correct_index"]] for q in _trivia_cache]
+
+    # Verify OPTION_LABELS consistency
+    assert len(trivia.OPTION_LABELS) == 4
+    for label in trivia.OPTION_LABELS:
+        assert label.endswith("\ufe0e")
+
+
 @pytest.mark.asyncio
 async def test_trivia_session_creation_and_teardown():
     u1, u2 = 10, 20

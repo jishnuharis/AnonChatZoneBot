@@ -97,6 +97,8 @@ def get_wyr_prompts(user1_prefs: int = 0, user2_prefs: int = 0, limit: int = 5) 
 def get_trivia_questions(category: Optional[str] = None, limit: int = 5) -> List[Dict[str, Any]]:
     """
     Selects random trivia questions, optionally filtered by category.
+    Shuffles options for each selected question and recalculates correct_index,
+    ensuring answer positions vary unpredictably in every round/session.
     """
     pool = _trivia_cache
     if category:
@@ -106,7 +108,19 @@ def get_trivia_questions(category: Optional[str] = None, limit: int = 5) -> List
         pool = _trivia_cache
 
     sampled = random.sample(pool, min(limit, len(pool)))
-    return sampled
+    prepared = []
+    for q in sampled:
+        options = list(q["options"])
+        correct_answer = options[q["correct_index"]]
+        random.shuffle(options)
+        new_correct_idx = options.index(correct_answer)
+        prepared.append({
+            "category": q.get("category", "General"),
+            "question": q["question"],
+            "options": options,
+            "correct_index": new_correct_idx,
+        })
+    return prepared
 
 
 # ============================================================================
