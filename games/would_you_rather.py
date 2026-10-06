@@ -18,6 +18,8 @@ from games.content.content_manager import get_wyr_prompts
 TIMEOUT = 180
 GAME_TYPE = "wyr"
 TOTAL_ROUNDS = 5
+LABEL_A = "\U0001f170\ufe0e"
+LABEL_B = "\U0001f171\ufe0e"
 
 
 def create_session(user1, user2):
@@ -62,8 +64,8 @@ async def send_round(context: ContextTypes.DEFAULT_TYPE, session_id):
     game["timeout_job"] = context.job_queue.run_once(timeout_job, when=TIMEOUT, data={"session_id": session_id})
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"🅰️ {a}", callback_data="wyr|A")],
-        [InlineKeyboardButton(f"🅱️ {b}", callback_data="wyr|B")],
+        [InlineKeyboardButton(f"{LABEL_A} {a}", callback_data="wyr|A")],
+        [InlineKeyboardButton(f"{LABEL_B} {b}", callback_data="wyr|B")],
     ])
 
     for user in game["players"]:
@@ -91,7 +93,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg_id = game["messages"].pop(user_id, None)
     if msg_id:
-        await safe_tele_func_call(context.bot.edit_message_text, chat_id=user_id, message_id=msg_id, text=f"<i>You picked</i> {'🅰️' if pick == 'A' else '🅱️'}. <i>Waiting on your partner...</i>", parse_mode="HTML")
+        await safe_tele_func_call(context.bot.edit_message_text, chat_id=user_id, message_id=msg_id, text=f"<i>You picked</i> {LABEL_A if pick == 'A' else LABEL_B}. <i>Waiting on your partner...</i>", parse_mode="HTML")
 
     game["choices"][user_id] = pick
 
@@ -117,7 +119,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for user in game["players"]:
         my_pick = game["choices"][user]
         their_pick = game["choices"][other if user == user_id else user_id]
-        summary = f"<i>You picked</i> {'🅰️ ' + a if my_pick == 'A' else '🅱️ ' + b}\n<i>They picked</i> {'🅰️ ' + a if their_pick == 'A' else '🅱️ ' + b}"
+        summary = f"<i>You picked</i> {LABEL_A + ' ' + a if my_pick == 'A' else LABEL_B + ' ' + b}\n<i>They picked</i> {LABEL_A + ' ' + a if their_pick == 'A' else LABEL_B + ' ' + b}"
         outcome = "💞 <b>You matched!</b>" if matched else "🤷 <b>Different picks this time.</b>"
         await safe_tele_func_call(context.bot.send_message, chat_id=user, text=f"{outcome}\n{summary}", parse_mode="HTML")
 

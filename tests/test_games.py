@@ -105,3 +105,32 @@ async def test_wyr_session_creation():
     assert registry.get_active(u1) == "wyr"
     assert registry.get_active(u2) == "wyr"
     assert len(wyr.games[session_id]["prompts"]) == 5
+
+
+def test_wyr_expansion_and_option_randomization():
+    """Verify 8 WYR categories with 128 questions each, option randomization, and consistent labels."""
+    from games.content.content_manager import get_stats, _wyr_cache
+
+    stats = get_stats()
+    assert stats["wyr_count"] >= 1024
+    assert len(stats["wyr_categories"]) == 8
+
+    expected_categories = [
+        "Life & Superpowers", "Relationships", "Gaming", "Anime",
+        "Movies & Pop Culture", "Philosophy & Deep Thoughts", "Tech & Future", "Memes & Absurd"
+    ]
+    for cat in expected_categories:
+        cat_prompts = [q for q in _wyr_cache if q.get("category") == cat]
+        assert len(cat_prompts) == 128, f"Category {cat} has {len(cat_prompts)}, expected 128"
+
+    # Verify labels consistency
+    assert wyr.LABEL_A.endswith("\ufe0e")
+    assert wyr.LABEL_B.endswith("\ufe0e")
+
+    # Verify prompts generation and randomization
+    prompts = get_wyr_prompts(limit=10)
+    assert len(prompts) == 10
+    for a, b in prompts:
+        assert isinstance(a, str) and len(a) > 0
+        assert isinstance(b, str) and len(b) > 0
+        assert a != b

@@ -56,6 +56,7 @@ def get_wyr_prompts(user1_prefs: int = 0, user2_prefs: int = 0, limit: int = 5) 
     """
     Selects balanced, diverse WYR questions. Prioritizes shared user interests
     when available, falling back to general/life questions.
+    Randomizes option order (A vs B) for each prompt so choices vary unpredictably.
     """
     import init
 
@@ -65,12 +66,24 @@ def get_wyr_prompts(user1_prefs: int = 0, user2_prefs: int = 0, limit: int = 5) 
         if (user1_prefs & user2_prefs) & (1 << i):
             shared_categories.add(label)
 
+    def _matches_shared(cat: str) -> bool:
+        if not cat or not shared_categories:
+            return False
+        if cat in shared_categories:
+            return True
+        cat_lower = cat.lower()
+        for s in shared_categories:
+            s_lower = s.lower()
+            if s_lower in cat_lower or cat_lower in s_lower:
+                return True
+        return False
+
     matching_prompts = []
     generic_prompts = []
 
     for item in _wyr_cache:
         pair = (item["prompt_a"], item["prompt_b"])
-        if item.get("category") in shared_categories:
+        if _matches_shared(item.get("category", "")):
             matching_prompts.append(pair)
         else:
             generic_prompts.append(pair)
@@ -87,7 +100,15 @@ def get_wyr_prompts(user1_prefs: int = 0, user2_prefs: int = 0, limit: int = 5) 
     if len(selected) < limit and selected:
         selected = (selected * 3)[:limit]
 
-    return selected
+    # Randomize option orientation (A vs B) for each round
+    randomized = []
+    for a, b in selected:
+        if random.random() < 0.5:
+            randomized.append((b, a))
+        else:
+            randomized.append((a, b))
+
+    return randomized
 
 
 # ============================================================================
