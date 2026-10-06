@@ -66,9 +66,7 @@ def test_trivia_expansion_and_option_shuffling():
     assert sampled["options"][sampled["correct_index"]] in [q["options"][q["correct_index"]] for q in _trivia_cache]
 
     # Verify OPTION_LABELS consistency
-    assert len(trivia.OPTION_LABELS) == 4
-    for label in trivia.OPTION_LABELS:
-        assert label.endswith("\ufe0e")
+    assert trivia.OPTION_LABELS == ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
 
 
 @pytest.mark.asyncio
@@ -124,8 +122,8 @@ def test_wyr_expansion_and_option_randomization():
         assert len(cat_prompts) == 128, f"Category {cat} has {len(cat_prompts)}, expected 128"
 
     # Verify labels consistency
-    assert wyr.LABEL_A.endswith("\ufe0e")
-    assert wyr.LABEL_B.endswith("\ufe0e")
+    assert wyr.LABEL_A == "Option A"
+    assert wyr.LABEL_B == "Option B"
 
     # Verify prompts generation and randomization
     prompts = get_wyr_prompts(limit=10)

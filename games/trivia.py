@@ -28,7 +28,7 @@ user_to_session: Dict[int, str] = {}
 TIMEOUT = 120
 GAME_TYPE = "trivia"
 TOTAL_ROUNDS = 5
-OPTION_LABELS = ["\U0001f170\ufe0e", "\U0001f171\ufe0e", "\U0001f172\ufe0e", "\U0001f173\ufe0e"]
+OPTION_LABELS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
 
 
 def create_session(user1: int, user2: int) -> str:

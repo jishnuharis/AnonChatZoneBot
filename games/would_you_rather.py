@@ -18,8 +18,8 @@ from games.content.content_manager import get_wyr_prompts
 TIMEOUT = 180
 GAME_TYPE = "wyr"
 TOTAL_ROUNDS = 5
-LABEL_A = "\U0001f170\ufe0e"
-LABEL_B = "\U0001f171\ufe0e"
+LABEL_A = "Option A"
+LABEL_B = "Option B"
 
 
 def create_session(user1, user2):
@@ -64,12 +64,22 @@ async def send_round(context: ContextTypes.DEFAULT_TYPE, session_id):
     game["timeout_job"] = context.job_queue.run_once(timeout_job, when=TIMEOUT, data={"session_id": session_id})
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"{LABEL_A} {a}", callback_data="wyr|A")],
-        [InlineKeyboardButton(f"{LABEL_B} {b}", callback_data="wyr|B")],
+        [
+            InlineKeyboardButton(LABEL_A, callback_data="wyr|A"),
+            InlineKeyboardButton(LABEL_B, callback_data="wyr|B"),
+        ]
     ])
 
+    round_num = game["round"] + 1
+    total_rounds = len(game["prompts"])
+
     for user in game["players"]:
-        text = f"🤔 <b>Would You Rather</b> — Round {game['round'] + 1}/{len(game['prompts'])}\n\n<i>Would you rather...</i>"
+        text = (
+            f"🤔 <b>Would You Rather</b> — Round {round_num}/{total_rounds}\n\n"
+            f"<i>Would you rather...</i>\n\n"
+            f"<b>Option A:</b>\n{a}\n\n"
+            f"<b>Option B:</b>\n{b}"
+        )
         msg = await safe_tele_func_call(context.bot.send_message, chat_id=user, text=text, reply_markup=keyboard, parse_mode="HTML")
         if msg:
             game["messages"][user] = msg.message_id
@@ -93,7 +103,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg_id = game["messages"].pop(user_id, None)
     if msg_id:
-        await safe_tele_func_call(context.bot.edit_message_text, chat_id=user_id, message_id=msg_id, text=f"<i>You picked</i> {LABEL_A if pick == 'A' else LABEL_B}. <i>Waiting on your partner...</i>", parse_mode="HTML")
+        picked_label = LABEL_A if pick == "A" else LABEL_B
+        await safe_tele_func_call(
+            context.bot.edit_message_text,
+            chat_id=user_id,
+            message_id=msg_id,
+            text=f"<i>You picked:</i> <b>{picked_label}</b>\n<i>Waiting on your partner...</i>",
+            parse_mode="HTML"
+        )
 
     game["choices"][user_id] = pick
 
@@ -119,9 +136,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for user in game["players"]:
         my_pick = game["choices"][user]
         their_pick = game["choices"][other if user == user_id else user_id]
-        summary = f"<i>You picked</i> {LABEL_A + ' ' + a if my_pick == 'A' else LABEL_B + ' ' + b}\n<i>They picked</i> {LABEL_A + ' ' + a if their_pick == 'A' else LABEL_B + ' ' + b}"
+        my_text = a if my_pick == "A" else b
+        their_text = a if their_pick == "A" else b
+
+        summary = (
+            f"<i>You picked:</i> <b>Option {my_pick}</b> — {my_text}\n"
+            f"<i>They picked:</i> <b>Option {their_pick}</b> — {their_text}"
+        )
         outcome = "💞 <b>You matched!</b>" if matched else "🤷 <b>Different picks this time.</b>"
-        await safe_tele_func_call(context.bot.send_message, chat_id=user, text=f"{outcome}\n{summary}", parse_mode="HTML")
+        await safe_tele_func_call(context.bot.send_message, chat_id=user, text=f"{outcome}\n\n{summary}", parse_mode="HTML")
 
     game["round"] += 1
     await send_round(context, session_id)
