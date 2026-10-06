@@ -271,7 +271,7 @@ AnonChatZoneBot v2.0 features real-time presence indicators to eliminate ghostin
 - **Docked Typing Area Keyboard**: Features dynamic in-chat and idle keyboards (`resize_keyboard=True`, `is_persistent=False` with `⊞` toggle button support):
   - **In-Chat**: `👋 Nudge your partner!`, `🛑 Stop`, `🎁 Gift`, `⏭️ Next`, `⭐ Subscription`, `🎮 Games`.
   - **Idle (Out-of-Chat)**: `🔍 Find Partner`, `⭐ Subscription`, `👤 Profile`.
-- **"Nudge your partner!" Button & `/nudge` Command**: Gentle ping with a 15-second anti-spam cooldown that sends a notification (`"👋 *NUDGE!* Your partner is nudging you!"`) and triggers typing actions on the partner's screen.
+- **"Nudge your partner!" Button & `/nudge` Command**: Gentle ping with a 15-second anti-spam cooldown that sends a notification (`"👋 Nudge! Your partner is nudging you!"`) and triggers typing actions on the partner's screen.
 - **`/status` Command**: Displays partner connection status and relative last activity (`Active right now`, `25s ago`, `2m ago`).
 - **Dynamic Media Chat Actions**: Automatically sends native Telegram chat actions (`upload_photo`, `upload_video`, `record_voice`, `record_video_note`, `upload_document`, `typing`) as media relays, keeping partners visually aware while media transfers.
 
