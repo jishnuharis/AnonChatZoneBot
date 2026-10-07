@@ -74,7 +74,7 @@ async def send_round(context: ContextTypes.DEFAULT_TYPE, session_id, note=""):
     for user in game["players"]:
         is_turn = (user == game["turn"])
         status = "<i>Your turn — pick a number!</i>" if is_turn else "<i>Waiting for your opponent's guess...</i>"
-        text = f"🔢 <b>Guess It</b> — Round {game['round']}\n<i>Secret number is between 1 and {RANGE_MAX}.</i>\n{status}{note}"
+        text = f"🔢 <b>Guess It</b> — Round {game['round']}\n\n<i>Secret number is between 1 and {RANGE_MAX}.</i>\n{status}{note}"
         markup = _keyboard(game, interactive=is_turn)
         msg_id = game["messages"].get(user)
         if msg_id:
@@ -120,7 +120,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             tag = "🎉 <i>You guessed it!</i>" if user == user_id else "😔 <i>Your opponent got it.</i>"
             note = f"\n\n🎯 <b>{guess} was it!</b> " + ("You win this round." if user == user_id else "They win this round.")
             opp_score = game["score"][registry.other_player(game, user)]
-            text = f"🔢 <b>Guess It</b>\n{tag}\n<i>The number was</i> <b>{game['secret']}</b>.{note}\n\n<b>Score:</b> You {game['score'][user]} — Opponent {opp_score}"
+            text = f"🔢 <b>Guess It</b>\n\n{tag}\n<i>The number was</i> <b>{game['secret']}</b>.{note}\n\n<b>Score:</b> You {game['score'][user]} — Opponent {opp_score}"
             await safe_tele_func_call(context.bot.send_message, chat_id=user, text=text, parse_mode="HTML")
 
         if game["score"][user_id] >= ROUNDS_TO_WIN or game["score"][other] >= ROUNDS_TO_WIN:

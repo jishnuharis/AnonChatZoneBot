@@ -109,7 +109,7 @@ async def credit_referral(context, user_id: int):
             context.bot.send_message,
             chat_id=inviter_id,
             text=(
-                f"🎉 <b>Referral reward unlocked!</b>\n"
+                f"🎉 <b>Referral reward unlocked!</b>\n\n"
                 f"<i>You've referred {required * rewards_granted} friends who joined and finished setting up their profile.</i>\n"
                 f"<i>+{total_days} {day_word} of VIP subscription granted, active until</i> <code>{expires_str}</code> 🎁"
             ),
@@ -132,7 +132,7 @@ async def maybe_announce(bot, user_id: int):
         bot.send_message,
         chat_id=user_id,
         text=(
-            f"🎁 <b>Referral bonus is live right now!</b>\n"
+            f"🎁 <b>Referral bonus is live right now!</b>\n\n"
             f"<i>Refer {required} friends who join and finish setting up their profile, and you'll get a free "
             f"{reward_days} {day_word} of VIP subscription — repeatable every {required} referrals, for as long as the promo runs.</i>"
         ),

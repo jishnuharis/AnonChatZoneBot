@@ -69,7 +69,7 @@ async def send_board(context: ContextTypes.DEFAULT_TYPE, session_id, extra_note=
         is_turn = (user == game["turn"])
         symbol = game["symbols"][user]
         status = f"<i>Your move! You're</i> {symbol}" if is_turn else f"<i>Waiting on your opponent...</i> (<i>you're</i> {symbol})"
-        text = f"⭕❌ <b>Tic Tac Toe</b>\n{status}{extra_note}"
+        text = f"⭕❌ <b>Tic Tac Toe</b>\n\n{status}{extra_note}"
         markup = _board_markup(game, session_id, interactive=is_turn)
         existing_msg_id = game["messages"].get(user)
         if existing_msg_id:
@@ -142,11 +142,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = game["symbols"][user]
         markup = _board_markup(game, session_id, interactive=False)
         if result == "draw":
-            text = f"⭕❌ <b>Tic Tac Toe</b>\n<i>You're</i> {symbol}{note}"
+            text = f"⭕❌ <b>Tic Tac Toe</b>\n\n<i>You're</i> {symbol}{note}"
         elif user == user_id:
-            text = f"⭕❌ <b>Tic Tac Toe</b>\n<i>You're</i> {symbol}{note}\n🎉 <i>You won! +8 points.</i>"
+            text = f"⭕❌ <b>Tic Tac Toe</b>\n\n<i>You're</i> {symbol}{note}\n\n🎉 <i>You won! +8 points.</i>"
         else:
-            text = f"⭕❌ <b>Tic Tac Toe</b>\n<i>You're</i> {symbol}{note}\n😔 <i>You lost this one.</i>"
+            text = f"⭕❌ <b>Tic Tac Toe</b>\n\n<i>You're</i> {symbol}{note}\n\n😔 <i>You lost this one.</i>"
         msg_id = game["messages"].get(user)
         if msg_id:
             await safe_tele_func_call(context.bot.edit_message_text, chat_id=user, message_id=msg_id, text=text, reply_markup=markup, parse_mode="HTML")

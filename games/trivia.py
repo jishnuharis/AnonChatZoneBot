@@ -134,7 +134,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.bot.edit_message_text,
             chat_id=user_id,
             message_id=msg_id,
-            text=f"<i>You locked in:</i> <b>{OPTION_LABELS[pick]} {picked_text}</b>\n<i>Waiting for your partner...</i>",
+            text=f"<i>You locked in:</i> <b>{OPTION_LABELS[pick]} {picked_text}</b>\n\n<i>Waiting for your partner...</i>",
             parse_mode="HTML"
         )
 

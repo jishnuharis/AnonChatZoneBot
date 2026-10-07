@@ -76,7 +76,7 @@ async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE, game_
     await safe_tele_func_call(
         context.bot.send_message,
         chat_id=partner_id,
-        text=f"🎮 <i>Your partner wants to play</i> <b>{label}</b>\n<i>Do you accept?</i>",
+        text=f"🎮 <i>Your partner wants to play</i> <b>{label}</b>\n\n<i>Do you accept?</i>",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="HTML",
     )

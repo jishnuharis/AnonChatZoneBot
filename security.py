@@ -148,7 +148,7 @@ async def restriction_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         remaining_str = format_duration(remaining or 0)
         await safe_reply(
             update,
-            "⛔ <b>You are restricted from using this bot.</b>\n"
+            "⛔ <b>You are restricted from using this bot.</b>\n\n"
             f"<i>Reason:</i> <code>{esc(str(reason))}</code>\n"
             f"<i>Time left:</i> <code>{esc(remaining_str)}</code>\n\n"
             "<i>If you think this is a mistake, reach out to a bot admin to sort it out.</i>",

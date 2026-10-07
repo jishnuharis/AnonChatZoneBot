@@ -53,7 +53,7 @@ async def send_friend_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             if update.message:
                 await safe_tele_func_call(
                     update.message.reply_text,
-                    text="⚠️ <b>You are not in a chat right now.</b>\nUse /friendreq while in a chat to add your partner!",
+                    text="⚠️ <b>You are not in a chat right now.</b>\n\nUse /friendreq while in a chat to add your partner!",
                     parse_mode="HTML",
                 )
             return
@@ -66,7 +66,7 @@ async def send_friend_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_count = await get_friend_count_db(user_id)
     user_limit = get_friend_limit(user_id)
     if user_count >= user_limit:
-        msg_text = f"⚠️ <b>Friends list full ({user_count}/{user_limit}).</b>\nUpgrade your tier for +16 more friend slots!"
+        msg_text = f"⚠️ <b>Friends list full ({user_count}/{user_limit}).</b>\n\nUpgrade your tier for +16 more friend slots!"
         if update.callback_query:
             await safe_tele_func_call(update.callback_query.answer, text="Friends list full!", show_alert=True)
             await safe_tele_func_call(update.callback_query.edit_message_text, text=msg_text, parse_mode="HTML")
@@ -106,7 +106,7 @@ async def send_friend_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     sent_msg = await safe_tele_func_call(
         context.bot.send_message,
         chat_id=target_id,
-        text="⭐ <b>Your partner wants to add you to their Anonymous Friends List!</b>\n<i>You can chat again anytime without revealing usernames or phone numbers. Accept?</i>",
+        text="⭐ <b>Your partner wants to add you to their Anonymous Friends List!</b>\n\n<i>You can chat again anytime without revealing usernames or phone numbers. Accept?</i>",
         parse_mode="HTML",
         reply_markup=keyboard,
     )
@@ -193,13 +193,13 @@ async def handle_friend_request_response(update: Update, context: ContextTypes.D
     if success:
         await safe_tele_func_call(
             query.edit_message_text,
-            text=f"🎉 <b>Friend request accepted!</b>\nYour partner is saved as <b>{name_for_target}</b>.\nGo to /friends to customize their nickname or note anytime!",
+            text=f"🎉 <b>Friend request accepted!</b>\n\nYour partner is saved as <b>{name_for_target}</b>.\n\nGo to /friends to customize their nickname or note anytime!",
             parse_mode="HTML",
         )
         await safe_tele_func_call(
             context.bot.send_message,
             chat_id=sender_id,
-            text=f"🎉 <b>Your partner accepted your friend request!</b>\nSaved as <b>{name_for_sender}</b>.\nGo to /friends to view your friends list!",
+            text=f"🎉 <b>Your partner accepted your friend request!</b>\n\nSaved as <b>{name_for_sender}</b>.\n\nGo to /friends to view your friends list!",
             parse_mode="HTML",
         )
     else:
@@ -355,7 +355,7 @@ async def handle_friend_card_actions(update: Update, context: ContextTypes.DEFAU
         init.edit_stage[user_id] = f"friend_name|{friend_id}|{page}"
         await safe_tele_func_call(
             query.edit_message_text,
-            text="✏️ <b>Enter new nickname for your friend:</b>\n<i>Send your reply as a text message below.</i>",
+            text="✏️ <b>Enter new nickname for your friend:</b>\n\n<i>Send your reply as a text message below.</i>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data=f"fcard|{friend_id}|{page}")]])
         )
@@ -365,7 +365,7 @@ async def handle_friend_card_actions(update: Update, context: ContextTypes.DEFAU
         init.edit_stage[user_id] = f"friend_note|{friend_id}|{page}"
         await safe_tele_func_call(
             query.edit_message_text,
-            text="📝 <b>Enter a private note about this friend:</b>\n<i>Send your reply as a text message below.</i>",
+            text="📝 <b>Enter a private note about this friend:</b>\n\n<i>Send your reply as a text message below.</i>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data=f"fcard|{friend_id}|{page}")]])
         )
@@ -389,7 +389,7 @@ async def initiate_friend_connect(update: Update, context: ContextTypes.DEFAULT_
     if is_in_chat(user_id):
         await safe_tele_func_call(
             query.edit_message_text,
-            text="⚠️ <b>You are already in an active chat!</b>\nUse /stop or /next before connecting with a friend.",
+            text="⚠️ <b>You are already in an active chat!</b>\n\nUse /stop or /next before connecting with a friend.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Friend Card", callback_data=f"fcard|{friend_id}|{page}")]])
         )
@@ -446,7 +446,7 @@ async def initiate_friend_connect(update: Update, context: ContextTypes.DEFAULT_
 
     await safe_tele_func_call(
         query.edit_message_text,
-        text=f"🔔 <b>Chat request sent to {name_for_a}!</b>\n<i>Waiting for them to respond (2 min)...</i>",
+        text=f"🔔 <b>Chat request sent to {name_for_a}!</b>\n\n<i>Waiting for them to respond (2 min)...</i>",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Friend Card", callback_data=f"fcard|{friend_id}|{page}")]])
     )
@@ -491,7 +491,7 @@ async def handle_connect_response(update: Update, context: ContextTypes.DEFAULT_
     if is_in_chat(sender_id):
         await safe_tele_func_call(
             query.edit_message_text,
-            text="<b>Chat request expired</b>\n<i>Your friend entered another chat in the meantime.</i>",
+            text="<b>Chat request expired</b>\n\n<i>Your friend entered another chat in the meantime.</i>",
             parse_mode="HTML"
         )
         return

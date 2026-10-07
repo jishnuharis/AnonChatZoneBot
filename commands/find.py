@@ -22,7 +22,7 @@ async def find(update: Update, context: ContextTypes.DEFAULT_TYPE, charge: bool 
         remaining_str = format_duration(remaining or 0)
         await safe_reply(
             update,
-            text=f"⛔ <b>You are restricted from matchmaking.</b>\n<i>Reason:</i> <code>{reason}</code>\n<i>Time left:</i> <code>{remaining_str}</code>",
+            text=f"⛔ <b>You are restricted from matchmaking.</b>\n\n<i>Reason:</i> <code>{reason}</code>\n<i>Time left:</i> <code>{remaining_str}</code>",
             context=context,
         )
         return

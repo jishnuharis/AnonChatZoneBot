@@ -62,7 +62,7 @@ async def handle_export_transcript(update: Update, context: ContextTypes.DEFAULT
         chat_id=user_id,
         document=bio,
         filename=bio.name,
-        caption="📜 <b>Here is your saved conversation transcript!</b>\n<i>Keep this memory safe in your Saved Messages.</i>",
+        caption="📜 <b>Here is your saved conversation transcript!</b>\n\n<i>Keep this memory safe in your Saved Messages.</i>",
         parse_mode="HTML",
     )
 

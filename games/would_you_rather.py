@@ -108,7 +108,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.bot.edit_message_text,
             chat_id=user_id,
             message_id=msg_id,
-            text=f"<i>You picked:</i> <b>{picked_label}</b>\n<i>Waiting on your partner...</i>",
+            text=f"<i>You picked:</i> <b>{picked_label}</b>\n\n<i>Waiting on your partner...</i>",
             parse_mode="HTML"
         )
 

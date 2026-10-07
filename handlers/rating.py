@@ -89,7 +89,7 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_tele_func_call(
             query.edit_message_text,
             text=(
-                f"⚠️ <b>Are you sure you want to block this user?</b>\n"
+                f"⚠️ <b>Are you sure you want to block this user?</b>\n\n"
                 f"Neither of you will match with each other for the next 24 hours.\n"
                 f"Active blocks: <b>{count}/{limit}</b>"
             ),

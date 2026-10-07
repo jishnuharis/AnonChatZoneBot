@@ -360,7 +360,7 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     remaining = format_duration(until - time.time())
     await update.message.reply_text(f"⛔ <i>User</i> <code>{target_id}</code> <i>restricted for</i> <b>{esc(remaining)}</b> <i>(severity {severity}).</i>\n<i>Reason:</i> <code>{esc(reason)}</code>", parse_mode="HTML")
-    await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=f"⛔ <b>You've been restricted by an admin.</b>\n<i>Reason:</i> <code>{esc(reason)}</code>\n<i>Time:</i> <code>{esc(remaining)}</code>", parse_mode="HTML")
+    await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=f"⛔ <b>You've been restricted by an admin.</b>\n\n<i>Reason:</i> <code>{esc(reason)}</code>\n<i>Time:</i> <code>{esc(remaining)}</code>", parse_mode="HTML")
 
 
 async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):

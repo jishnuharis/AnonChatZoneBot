@@ -22,7 +22,7 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_in_chat(user_id):
         await safe_tele_func_call(
             update.message.reply_text,
-            text="⚠️ <b>You must be in an active chat to start a call.</b>\nUse /find to match with someone first!",
+            text="⚠️ <b>You must be in an active chat to start a call.</b>\n\nUse /find to match with someone first!",
             parse_mode="HTML",
         )
         return
@@ -87,7 +87,7 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=call_keyboard,
     )
 
-    call_msg = "📞 <b>Calling partner...</b>\n<i>Waiting for them to accept your call request...</i>"
+    call_msg = "📞 <b>Calling partner...</b>\n\n<i>Waiting for them to accept your call request...</i>"
     if not is_subscribed(user_id):
         remaining = max(0, limit - used)
         call_msg += f"\n\n<i>Daily free calls remaining today: {remaining}/{limit}</i>"
@@ -165,7 +165,7 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await safe_tele_func_call(
             query.edit_message_text,
-            text="🎉 <b>Call Connected!</b>\nTap below to open the secure audio room:",
+            text="🎉 <b>Call Connected!</b>\n\nTap below to open the secure audio room:",
             parse_mode="HTML",
             reply_markup=recv_markup,
         )
@@ -173,7 +173,7 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
         await safe_tele_func_call(
             context.bot.send_message,
             chat_id=initiator,
-            text="🎉 <b>Partner accepted the call!</b>\nTap below to join the audio room:",
+            text="🎉 <b>Partner accepted the call!</b>\n\nTap below to join the audio room:",
             parse_mode="HTML",
             reply_markup=init_markup,
         )

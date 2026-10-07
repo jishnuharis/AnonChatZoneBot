@@ -65,7 +65,7 @@ async def send_round(context: ContextTypes.DEFAULT_TYPE, session_id):
         s1 = game["score"][user]
         opp = registry.other_player(game, user)
         s2 = game["score"][opp] if opp is not None else 0
-        text = f"🪨📄✂️ <b>Rock Paper Scissors</b> — Round {game['round']}\n<i>Score:</i> You <b>{s1}</b> — Opponent <b>{s2}</b>\n<i>First to {WINS_NEEDED} wins.</i>"
+        text = f"🪨📄✂️ <b>Rock Paper Scissors</b> — Round {game['round']}\n\n<i>Score:</i> You <b>{s1}</b> — Opponent <b>{s2}</b>\n<i>First to {WINS_NEEDED} wins.</i>"
         msg = await safe_tele_func_call(context.bot.send_message, chat_id=user, text=text, reply_markup=_keyboard(), parse_mode="HTML")
         if msg:
             game["messages"][user] = msg.message_id
