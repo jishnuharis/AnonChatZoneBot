@@ -166,10 +166,10 @@ async def test_free_user_media_warmup_lock():
     mock_context.bot.send_sticker.assert_not_called()
     reply_text = mock_update.message.reply_text.call_args[1]["text"]
     assert "Media sharing unlocks" in reply_text
-    assert "39s" in reply_text or "40s" in reply_text
+    assert "69s" in reply_text or "70s" in reply_text
 
-    # 2. After 60 seconds (elapsed = 70s) -> Allowed
-    init.session_start_times[u1] = time.time() - 70
+    # 2. After 90 seconds (elapsed = 100s) -> Allowed
+    init.session_start_times[u1] = time.time() - 100
     mock_update.message.reply_text.reset_mock()
     mock_context.bot.send_sticker = AsyncMock(return_value=MagicMock(message_id=1001))
 
@@ -252,7 +252,7 @@ async def test_link_command():
     init.active_pairs[u1] = u2
     init.active_pairs[u2] = u1
 
-    # 1. 1-minute warmup lock for free user
+    # 1. 90-second warmup lock for free user
     init.session_start_times[u1] = time.time() - 30
     mock_update = MagicMock()
     mock_update.effective_user.id = u1
@@ -266,8 +266,8 @@ async def test_link_command():
     mock_update.message.reply_text.assert_called_once()
     assert "Profile sharing unlocks" in mock_update.message.reply_text.call_args[1]["text"]
 
-    # 2. No username set after 60s
-    init.session_start_times[u1] = time.time() - 70
+    # 2. No username set after 90s
+    init.session_start_times[u1] = time.time() - 100
     mock_update.effective_user.username = None
     mock_update.message.reply_text.reset_mock()
 
@@ -294,3 +294,149 @@ async def test_link_command():
     # Sender received confirmation
     mock_update.message.reply_text.assert_called_once()
     assert "shared with your partner" in mock_update.message.reply_text.call_args[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_document_and_audio_consume_credits():
+    from subscription import daily_credits_used
+    u1, u2 = 8013, 8014
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100  # Past 90s warmup
+
+    # 1. Send Document
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_update.message.text = None
+    mock_update.message.caption = "my_doc"
+    mock_update.message.entities = None
+    mock_update.message.caption_entities = None
+    mock_update.message.photo = None
+    mock_update.message.video = None
+    mock_update.message.voice = None
+    mock_update.message.video_note = None
+    mock_update.message.sticker = None
+    mock_update.message.animation = None
+    mock_update.message.document = MagicMock(file_id="doc_123")
+    mock_update.message.audio = None
+    mock_update.message.dice = None
+    mock_update.message.reply_to_message = None
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.send_document = AsyncMock(return_value=MagicMock(message_id=3001))
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    assert daily_credits_used(u1) == 0
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_document.assert_called_once()
+    assert daily_credits_used(u1) == 1
+
+    # 2. Send Audio
+    mock_update.message.document = None
+    mock_update.message.audio = MagicMock(file_id="audio_456")
+    mock_context.bot.send_audio = AsyncMock(return_value=MagicMock(message_id=3002))
+
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_audio.assert_called_once()
+    assert daily_credits_used(u1) == 2
+
+
+@pytest.mark.asyncio
+async def test_document_and_audio_blocked_when_credits_exhausted():
+    u1, u2 = 8015, 8016
+    u1_data = init._default_user()
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    u1_data["daily_credits_reset_day"] = today
+    u1_data["daily_credits_used"] = 32  # Free limit reached
+    init.user_details[u1] = u1_data
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100  # Past 90s warmup
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_update.message.text = None
+    mock_update.message.caption = None
+    mock_update.message.entities = None
+    mock_update.message.caption_entities = None
+    mock_update.message.photo = None
+    mock_update.message.video = None
+    mock_update.message.voice = None
+    mock_update.message.video_note = None
+    mock_update.message.sticker = None
+    mock_update.message.animation = None
+    mock_update.message.document = MagicMock(file_id="doc_blocked")
+    mock_update.message.audio = None
+    mock_update.message.dice = None
+    mock_update.message.reply_to_message = None
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.send_document = AsyncMock()
+    mock_context.bot.send_audio = AsyncMock()
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    # Blocked document
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_document.assert_not_called()
+    assert "file" in mock_update.message.reply_text.call_args[1]["text"]
+
+    # Blocked audio
+    mock_update.message.document = None
+    mock_update.message.audio = MagicMock(file_id="audio_blocked")
+    mock_update.message.reply_text.reset_mock()
+
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_audio.assert_not_called()
+    assert "audio file" in mock_update.message.reply_text.call_args[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_dice_and_non_text_blocked_during_warmup():
+    from subscription import daily_credits_used
+    u1, u2 = 8017, 8018
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 30  # 30s into chat (< 90s)
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_update.message.text = None
+    mock_update.message.caption = None
+    mock_update.message.entities = None
+    mock_update.message.caption_entities = None
+    mock_update.message.photo = None
+    mock_update.message.video = None
+    mock_update.message.voice = None
+    mock_update.message.video_note = None
+    mock_update.message.sticker = None
+    mock_update.message.animation = None
+    mock_update.message.document = None
+    mock_update.message.audio = None
+    mock_update.message.dice = MagicMock(emoji="🎲")
+    mock_update.message.reply_to_message = None
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.send_dice = AsyncMock()
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    # 1. Dice blocked during 90s warmup
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_dice.assert_not_called()
+    assert "Media sharing unlocks" in mock_update.message.reply_text.call_args[1]["text"]
+
+    # 2. Dice allowed after 90s warmup without consuming credits
+    init.session_start_times[u1] = time.time() - 100
+    mock_context.bot.send_dice = AsyncMock(return_value=MagicMock(message_id=4001))
+    mock_update.message.reply_text.reset_mock()
+
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_dice.assert_called_once()
+    assert daily_credits_used(u1) == 0

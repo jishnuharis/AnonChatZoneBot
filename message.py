@@ -30,7 +30,7 @@ SUBSCRIBE_INTRO_TEXT = (
     "<b>Perks on any active plan:</b>\n"
     "• Search by gender (M/F) and country (Same / Any)\n"
     "• Higher daily credit limit (more chats per day)\n"
-    "• Send unlimited photos, videos, voice & video notes\n"
+    "• Send unlimited photos, videos, voice notes, audio & files\n"
     "• Unlimited anonymous voice calls\n"
     "• Higher active block capacity (up to 32 blocks)\n"
     "• Unlock /private (Privacy Mode) for photos/videos/voice notes\n"
@@ -220,11 +220,11 @@ LINK_RESTRICTED_TEXT = (
     "• <i>Or upgrade to VIP with</i> /subscribe <i>to send links freely!</i>"
 )
 MEDIA_WARMUP_LOCKED_TEXT = (
-    "⏳ <b>Media sharing unlocks after the first minute of chat.</b>\n\n"
+    "⏳ <b>Media sharing unlocks after the first 90 seconds of chat.</b>\n\n"
     "<i>Available in</i> <b>{remaining}s</b> <i>(or buy a subscription with</i> /subscribe <i>to send immediately).</i>"
 )
 LINK_COMMAND_WARMUP_LOCKED_TEXT = (
-    "⏳ <b>Profile sharing unlocks after the first minute of chat.</b>\n\n"
+    "⏳ <b>Profile sharing unlocks after the first 90 seconds of chat.</b>\n\n"
     "<i>Available in</i> <b>{remaining}s</b> <i>(or buy a subscription with</i> /subscribe <i>to share anytime).</i>"
 )
 LINK_NO_USERNAME_TEXT = (

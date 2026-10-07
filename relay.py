@@ -21,7 +21,16 @@ logger = logging.getLogger(__name__)
 
 MAX_MAP_ENTRIES = 300
 
-_KIND_LABELS = {"photo": "photo", "video": "video", "voice": "voice note", "video_note": "video note"}
+_KIND_LABELS = {
+    "photo": "photo",
+    "video": "video",
+    "voice": "voice note",
+    "video_note": "video note",
+    "document": "file",
+    "audio": "audio file",
+}
+
+WARMUP_PERIOD_SECONDS = 90
 
 
 def _remember(a_id: int, a_msg_id: int, b_id: int, b_msg_id: int):
@@ -114,9 +123,10 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # Enforce 1-minute warmup lock on all media & stickers for free tier
-        is_media_or_sticker = bool(
-            msg.photo
+        # Enforce 90-second warmup lock on all non-text messages for free tier
+        is_non_text = bool(
+            not msg.text
+            or msg.photo
             or msg.video
             or msg.voice
             or msg.video_note
@@ -124,12 +134,13 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             or msg.animation
             or msg.document
             or msg.audio
+            or msg.dice
         )
-        if is_free and is_media_or_sticker:
+        if is_free and is_non_text:
             session_start = init.session_start_times.get(user_id, time.time())
             elapsed = time.time() - session_start
-            if elapsed < 60:
-                remaining = max(1, int(60 - elapsed))
+            if elapsed < WARMUP_PERIOD_SECONDS:
+                remaining = max(1, int(WARMUP_PERIOD_SECONDS - elapsed))
                 await safe_tele_func_call(
                     update.message.reply_text,
                     text=MEDIA_WARMUP_LOCKED_TEXT.format(remaining=remaining),
@@ -147,10 +158,21 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             _, caption = split_private_caption(caption)
 
-        if kind in SUPPORTED_KINDS and not is_subscribed(user_id) and not has_daily_credit(user_id):
+        credit_kind = None
+        if kind in SUPPORTED_KINDS:
+            credit_kind = kind
+        elif msg.document:
+            credit_kind = "document"
+        elif msg.audio:
+            credit_kind = "audio"
+
+        if credit_kind and not is_subscribed(user_id) and not has_daily_credit(user_id):
             await safe_tele_func_call(
                 update.message.reply_text,
-                text=MEDIA_DAILY_LIMIT_REACHED_TEXT.format(limit=daily_credit_limit(user_id), kind=_KIND_LABELS.get(kind, "media")),
+                text=MEDIA_DAILY_LIMIT_REACHED_TEXT.format(
+                    limit=daily_credit_limit(user_id),
+                    kind=_KIND_LABELS.get(credit_kind, "media"),
+                ),
                 parse_mode="HTML",
             )
             return
@@ -164,6 +186,8 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.RECORD_VOICE)
         elif kind == "video_note":
             await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.RECORD_VIDEO_NOTE)
+        elif msg.audio:
+            await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.UPLOAD_DOCUMENT)
         elif msg.document:
             await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.UPLOAD_DOCUMENT)
         elif msg.text:
@@ -195,8 +219,12 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sent = await safe_tele_func_call(context.bot.send_sticker, chat_id=partner_id, sticker=msg.sticker.file_id, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
             elif msg.audio:
                 sent = await safe_tele_func_call(context.bot.send_audio, chat_id=partner_id, audio=msg.audio.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
+                if sent and not is_subscribed(user_id):
+                    consume_daily_credit(user_id)
             elif msg.document:
                 sent = await safe_tele_func_call(context.bot.send_document, chat_id=partner_id, document=msg.document.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
+                if sent and not is_subscribed(user_id):
+                    consume_daily_credit(user_id)
             elif msg.animation:
                 sent = await safe_tele_func_call(context.bot.send_animation, chat_id=partner_id, animation=msg.animation.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
             elif msg.dice:
@@ -218,7 +246,8 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Ephemeral transcript recording for 'Save Conversation'
                 session_id = init.active_sessions.get(user_id)
                 if session_id:
-                    text_content = msg.text or (f"[{kind.upper() if kind else 'MEDIA'}] {caption or ''}").strip()
+                    media_type = kind.upper() if kind else ("AUDIO" if msg.audio else ("DOCUMENT" if msg.document else "MEDIA"))
+                    text_content = msg.text or f"[{media_type}] {caption or ''}".strip()
                     buf = init.session_messages.setdefault(session_id, [])
                     buf.append((user_id, text_content, time.time()))
                     if len(buf) > 300:

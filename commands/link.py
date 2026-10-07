@@ -20,7 +20,7 @@ async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with their partner as an inline URL button, keeping their raw username hidden
     from chat logs and preventing link-spam bypasses.
     
-    Free tier users are subject to a 1-minute warm-up lock from the start of the chat.
+    Free tier users are subject to a 90-second warm-up lock from the start of the chat.
     Subscribed (VIP) users can share immediately.
     """
     if not update.effective_user or not update.message:
@@ -37,12 +37,12 @@ async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # 2. Free tier 1-minute warmup lock
+    # 2. Free tier 90-second warmup lock
     if not is_subscribed(user_id):
         session_start = init.session_start_times.get(user_id, time.time())
         elapsed = time.time() - session_start
-        if elapsed < 60:
-            remaining = max(1, int(60 - elapsed))
+        if elapsed < 90:
+            remaining = max(1, int(90 - elapsed))
             await safe_tele_func_call(
                 update.message.reply_text,
                 text=LINK_COMMAND_WARMUP_LOCKED_TEXT.format(remaining=remaining),
