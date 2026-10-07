@@ -182,8 +182,8 @@ async def start_chat_session(
         text1 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b> Say hi!\n👋{starter_section}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
         text2 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b> Say hi!\n👋{starter_section}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
     else:
-        text1 = f"🎯 <b>Found someone.... Say hi!!</b>\n\n<i>Rating:</i> {uv2.get('up', 0)} 👍 {uv2.get('down', 0)}\n👎{starter_section}{details1}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
-        text2 = f"🎯 <b>Found someone.... Say hi!!</b>\n\n<i>Rating:</i> {uv1.get('up', 0)} 👍 {uv1.get('down', 0)}\n👎{starter_section}{details2}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text1 = f"🎯 <b>Found someone.... Say hi!!</b>\n\n<i>Rating:</i> {uv2.get('up', 0)} 👍 {uv2.get('down', 0)}👎\n{starter_section}{details1}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text2 = f"🎯 <b>Found someone.... Say hi!!</b>\n\n<i>Rating:</i> {uv1.get('up', 0)} 👍 {uv1.get('down', 0)}👎\n{starter_section}{details2}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
 
     msg1 = await safe_tele_func_call(
         context.bot.send_message, chat_id=user1,
