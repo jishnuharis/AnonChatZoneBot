@@ -6,11 +6,11 @@ from telegram.error import Forbidden
 from telegram.ext import ContextTypes
 
 from handlers.setup import handle_user_setup
-from security import safe_tele_func_call, check_rate_limit, contains_link
+from security import safe_tele_func_call, check_rate_limit, contains_link, safe_reply
 from media_privacy import extract_media, maybe_send_private, split_private_caption, SUPPORTED_KINDS
 from message import (
     FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, MEDIA_DAILY_LIMIT_REACHED_TEXT,
-    LINK_RESTRICTED_TEXT, MEDIA_WARMUP_LOCKED_TEXT,
+    LINK_RESTRICTED_TEXT, MEDIA_WARMUP_LOCKED_TEXT, ALREADY_IN_CHAT_TEXT,
 )
 from subscription import is_subscribed, has_daily_credit, consume_daily_credit, daily_credit_limit
 from session_manager import handle_transport_disconnect
@@ -87,6 +87,18 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if msg.text in ("⏭️ Next", "Next", "⏭️ /next"):
             from commands.next import skip_partner
             await skip_partner(update, context)
+            return
+
+        if msg.text and (
+            msg.text in ("🔍 Find Partner", "Find Partner", "🔍 Find a partner", "Find a partner", "🔍 /find", "/find")
+            or msg.text.strip().lower() in ("find partner", "find a partner", "🔍 find partner", "🔍 find a partner", "/find", "🔍 /find")
+        ):
+            await safe_reply(update, text=ALREADY_IN_CHAT_TEXT, context=context)
+            return
+
+        if msg.text in ("👤 Profile", "Profile", "👤 /profile", "/profile", "👤 My Profile", "My Profile"):
+            from commands.profile import show_profile
+            await show_profile(update, context)
             return
 
         if msg.text in ("⭐ Subscription", "Subscription", "⭐ /subscribe"):
@@ -262,9 +274,19 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg = update.message
         if msg and msg.text:
-            if msg.text in ("🔍 Find Partner", "Find Partner", "🔍 /find", "/find"):
+            if msg.text in ("🔍 Find Partner", "Find Partner", "🔍 Find a partner", "Find a partner", "🔍 /find", "/find"):
                 from commands.find import find
                 await find(update, context)
+                return
+
+            if msg.text in ("⏭️ Next", "Next", "⏭️ /next"):
+                from commands.next import skip_partner
+                await skip_partner(update, context)
+                return
+
+            if msg.text in ("🛑 Stop", "Stop", "🛑 /stop"):
+                from commands.stop import stop
+                await stop(update, context)
                 return
 
             if msg.text in ("⭐ Subscription", "Subscription", "⭐ /subscribe", "/subscribe"):

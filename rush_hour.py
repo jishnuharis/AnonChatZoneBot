@@ -58,7 +58,7 @@ RUSH_HOUR_END_TEXT = (
 RUSH_HOUR_WINNER_NOTIFICATION = (
     "🎉 <b>BOOM! You're one of the first 5 users!</b> ⚡\n\n"
     "You've unlocked <b>1 Hour of Free VIP Premium</b> for tonight's Rush Hour! 👑\n"
-    "• Unlimited skips (/next)\n"
+    "• Unlimited chat connections (/find & /next)\n"
     "• Priority matchmaking\n"
     "• Unlimited voice calls & media\n\n"
     "Enjoy your chat session! 💬"

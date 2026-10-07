@@ -16,9 +16,9 @@ PARTNER_LEFT_CHAT_TEXT = "⛔ <b>Your partner left the chat.</b>"
 PARTNER_SKIPPED_TEXT = "🔁 <b>Partner skipped...</b>\n\nYou're added to the waiting queue, finding a new one..."
 NOT_IN_CHAT_USE_FIND_TEXT = "❗ <b>You're not in a chat.</b>\n\nUse /find to connect."
 DAILY_NEXT_LIMIT_REACHED_TEXT = (
-    "⏳ <b>You've used all {limit} of your daily credits.</b>\n\n"
-    "Credits are spent on finding partners and media files sends for free-tier users.\n\n"
-    "Your credits reset at midnight UTC, or /subscribe for more credits + unlimited media files."
+    "⏳ <b>You've reached your daily chat limit ({limit} credits used).</b>\n\n"
+    "Daily credits limit how many users you can chat with each day (used by /find and /next) as well as media sends for free accounts.\n\n"
+    "Your daily limit resets at midnight UTC, or /subscribe to chat with more partners + unlock unlimited media sends!"
 )
 
 # ---------------------------------------------------------------------------

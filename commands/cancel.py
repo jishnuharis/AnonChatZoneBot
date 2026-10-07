@@ -36,4 +36,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await safe_tele_func_call(update.message.reply_text, text=GAME_REQUEST_CANCELLED_TEXT, parse_mode="HTML")
             return
 
+    if user_id in init.waiting_users:
+        from matchmaking import dequeue_user
+        from message import REMOVED_FROM_QUEUE_TEXT
+        from session_manager import IDLE_KEYBOARD
+        await dequeue_user(user_id)
+        await safe_tele_func_call(update.message.reply_text, text=REMOVED_FROM_QUEUE_TEXT, reply_markup=IDLE_KEYBOARD, parse_mode="HTML")
+        return
+
     await safe_tele_func_call(update.message.reply_text, text=NOTHING_TO_CANCEL_TEXT, parse_mode="HTML")

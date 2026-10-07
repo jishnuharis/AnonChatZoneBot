@@ -1074,5 +1074,209 @@ async def test_custom_referral_reward_days():
     assert exp > time.time() + 86400 * 1.5  # at least ~2 days granted
 
 
+@pytest.mark.asyncio
+async def test_next_command_works_when_not_in_chat():
+    """Verify /next invokes find with charge=False when user is not in a chat."""
+    from commands.next import skip_partner
+
+    user_id = 918273
+    init.user_details[user_id] = {**init._default_user(), "gender": "M", "age": 22, "country": "US"}
+    init.active_pairs.pop(user_id, None)
+
+    mock_find = AsyncMock()
+    with patch("commands.next.find", mock_find):
+        mock_update = MagicMock()
+        mock_update.effective_user.id = user_id
+        mock_update.message.reply_text = AsyncMock()
+        mock_context = MagicMock()
+
+        await skip_partner(mock_update, mock_context)
+        mock_find.assert_awaited_once_with(mock_update, mock_context, charge=True)
+
+
+@pytest.mark.asyncio
+async def test_find_command_charges_credits_and_enforces_limit():
+    """Verify /find charges daily credits and blocks matchmaking when daily credits are exhausted."""
+    from commands.find import find
+    from subscription import daily_credits_used, FREE_DAILY_CREDIT_LIMIT
+
+    user_id = 928374
+    init.user_details[user_id] = {**init._default_user(), "gender": "M", "age": 25, "country": "US"}
+    init.active_pairs.pop(user_id, None)
+    init.waiting_users.clear()
+
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    with patch("commands.find.enqueue_and_match", new_callable=AsyncMock) as mock_match:
+        # First call charges 1 credit
+        await find(update, context)
+        assert daily_credits_used(user_id) == 1
+        mock_match.assert_called_once()
+
+    # Now simulate user reaching their daily credit limit
+    init.user_details[user_id]["daily_credits_used"] = FREE_DAILY_CREDIT_LIMIT
+    init.waiting_users.clear()
+    update.message.reply_text.reset_mock()
+
+    with patch("commands.find.enqueue_and_match", new_callable=AsyncMock) as mock_match:
+        await find(update, context)
+        # Matchmaking blocked due to credit limit
+        mock_match.assert_not_called()
+        update.message.reply_text.assert_called_once()
+        reply_text = update.message.reply_text.call_args[1]["text"]
+        assert "daily chat limit" in reply_text.lower()
+
+
+@pytest.mark.asyncio
+async def test_find_partner_button_in_chat_intercepted():
+    """Verify sending '🔍 Find Partner' during active chat replies ALREADY_IN_CHAT_TEXT and does not relay."""
+    from relay import relay_message
+    from message import ALREADY_IN_CHAT_TEXT
+    from security import _user_msg_times
+
+    u1, u2 = 61111, 62222
+    init.user_details[u1] = {**init._default_user(), "gender": "M", "age": 25, "country": "US"}
+    init.user_details[u2] = {**init._default_user(), "gender": "F", "age": 24, "country": "US"}
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_msg = MagicMock()
+    mock_msg.text = "🔍 Find Partner"
+    mock_msg.reply_text = AsyncMock()
+    mock_msg.photo = None
+    mock_msg.video = None
+    mock_msg.voice = None
+    mock_msg.video_note = None
+    mock_msg.document = None
+    mock_msg.audio = None
+    mock_msg.animation = None
+    mock_msg.sticker = None
+    mock_msg.dice = None
+    mock_update.message = mock_msg
+
+    mock_bot = MagicMock()
+    mock_bot.send_message = AsyncMock()
+    mock_context = MagicMock()
+    mock_context.bot = mock_bot
+
+    _user_msg_times[u1].clear()
+    await relay_message(mock_update, mock_context)
+
+    # u1 gets ALREADY_IN_CHAT_TEXT
+    mock_msg.reply_text.assert_called_once()
+    assert mock_msg.reply_text.call_args[1]["text"] == ALREADY_IN_CHAT_TEXT
+    # Partner u2 never received anything
+    mock_bot.send_message.assert_not_called()
+
+    # Test lowercase and text variants like "find partner" and "Find a partner"
+    for variant in ["find partner", "Find a partner", "🔍 /find", "/find"]:
+        mock_msg.reply_text.reset_mock()
+        mock_msg.text = variant
+        _user_msg_times[u1].clear()
+        await relay_message(mock_update, mock_context)
+        mock_msg.reply_text.assert_called_once()
+        assert mock_msg.reply_text.call_args[1]["text"] == ALREADY_IN_CHAT_TEXT
+        mock_bot.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_start_find_callback_while_in_chat():
+    """Verify inline 'Find Partner' callback while in chat pops alert and sends ALREADY_IN_CHAT_TEXT."""
+    from channel_gate import handle_start_find_callback
+    from message import ALREADY_IN_CHAT_TEXT
+
+    u1, u2 = 73333, 74444
+    init.user_details[u1] = {**init._default_user(), "gender": "M", "age": 25, "country": "US"}
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+
+    update = MagicMock()
+    update.message = None
+    update.effective_user.id = u1
+    update.effective_chat.id = u1
+
+    query = MagicMock()
+    query.from_user.id = u1
+    query.answer = AsyncMock()
+    query.edit_message_reply_markup = AsyncMock()
+    query_msg = MagicMock()
+    query_msg.reply_text = AsyncMock()
+    query.message = query_msg
+    update.callback_query = query
+    update.effective_message = query_msg
+
+    context = MagicMock()
+    with patch("commands.find.find", new_callable=AsyncMock) as mock_find:
+        await handle_start_find_callback(update, context)
+        mock_find.assert_not_called()
+
+    query.answer.assert_called_once_with("⚠️ You're already in a chat! Use /stop or /next first.", show_alert=True)
+    query.edit_message_reply_markup.assert_not_called()
+    query_msg.reply_text.assert_called_once()
+    assert query_msg.reply_text.call_args[1]["text"] == ALREADY_IN_CHAT_TEXT
+
+
+@pytest.mark.asyncio
+async def test_find_or_next_while_in_waiting_queue():
+    """Verify calling find or /next while already in waiting queue informs the user without double-charging."""
+    from commands.find import find
+    from commands.next import skip_partner
+
+    user_id = 81111
+    init.user_details[user_id] = {**init._default_user(), "gender": "M", "age": 28, "country": "US"}
+    init.active_pairs.pop(user_id, None)
+    init.waiting_users.clear()
+    init.waiting_users.append(user_id)
+
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    with patch("commands.find.enqueue_and_match", new_callable=AsyncMock) as mock_match:
+        await find(update, context)
+        mock_match.assert_called_once()
+
+    update.message.reply_text.assert_called_once()
+    assert "already in the waiting queue" in update.message.reply_text.call_args[1]["text"]
+
+    # Calling skip_partner (/next) while in waiting queue also informs user
+    update.message.reply_text.reset_mock()
+    with patch("commands.find.enqueue_and_match", new_callable=AsyncMock) as mock_match:
+        await skip_partner(update, context)
+        mock_match.assert_called_once()
+
+    update.message.reply_text.assert_called_once()
+    assert "already in the waiting queue" in update.message.reply_text.call_args[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_cancel_command_removes_from_waiting_queue():
+    """Verify /cancel removes waiting user from queue with friendly feedback."""
+    from commands.cancel import cancel
+    from message import REMOVED_FROM_QUEUE_TEXT
+
+    user_id = 82222
+    init.user_details[user_id] = {**init._default_user(), "gender": "F", "age": 23, "country": "US"}
+    init.active_pairs.pop(user_id, None)
+    init.waiting_users.clear()
+    init.waiting_users.append(user_id)
+
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    await cancel(update, context)
+    assert user_id not in init.waiting_users
+    update.message.reply_text.assert_called_once()
+    assert update.message.reply_text.call_args[1]["text"] == REMOVED_FROM_QUEUE_TEXT
+
+
 
 

@@ -15,8 +15,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not all([init.user_details[user_id].get("gender"), init.user_details[user_id].get("age"), init.user_details[user_id].get("country")]):
         return
 
-    # Deep-link support: if user clicked https://t.me/Bot?start=find from a channel or group
-    if context.args and context.args[0].lower() == "find":
+    # Deep-link support: if user clicked https://t.me/Bot?start=find or start=next
+    if context.args and context.args[0].lower() in ("find", "next"):
         from commands.find import find
         return await find(update, context)
 

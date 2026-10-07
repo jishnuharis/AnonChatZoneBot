@@ -48,7 +48,7 @@ async def skip_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await find(update, context, charge=True)
     else:
-        await safe_reply(update, text=NOT_IN_CHAT_USE_FIND_TEXT, context=context)
+        await find(update, context, charge=True)
 
 
 async def handle_undo_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):

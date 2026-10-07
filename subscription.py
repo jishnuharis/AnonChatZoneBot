@@ -228,7 +228,7 @@ def status_text(user_id: int) -> str:
         return (
             "❌ <i>No active subscription. Use</i> /subscribe <i>to unlock perks.</i>\n"
             f"<i>Daily voice calls:</i> <b>{rem_calls}/{FREE_DAILY_CALL_LIMIT} remaining today</b>\n"
-            f"<i>Daily credit limit:</i> {FREE_DAILY_CREDIT_LIMIT} (/next skips & media sends)"
+            f"<i>Daily credit limit:</i> {FREE_DAILY_CREDIT_LIMIT} (limits how many users you can chat with per day via /find & /next + media sends)"
         )
     expires = init.user_details[user_id]["subscription_expires"]
     rem_secs = max(0, (expires - time.time()))
@@ -243,6 +243,6 @@ def status_text(user_id: int) -> str:
         f"✅ <b>{tier['label']}</b> <i>plan active</i> — "
         f"<i>{time_left_str}</i>\n"
         f"<i>Daily credit limit:</i> {daily_credit_limit(user_id)} "
-        f"(/next <i>skips; voice calls & media sends are free & unlimited on your plan</i>)"
+        f"(daily chat limit for /find & /next; voice calls & media sends are free & unlimited on your plan)"
     )
 

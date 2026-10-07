@@ -179,8 +179,8 @@ async def start_chat_session(
         text1 = f"🎯 <b>Connected to target user! Say hi!</b> 👋\n\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
         text2 = f"🎯 <b>Someone found you.... Say hi!!</b>\n\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
     elif is_friend_connection:
-        text1 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b> Say hi!\n👋{starter_section}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
-        text2 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b> Say hi!\n👋{starter_section}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text1 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b>\n\nSay hi!👋\n{starter_section}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text2 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b>\n\nSay hi!👋\n{starter_section}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
     else:
         text1 = f"🎯 <b>Found someone.... Say hi!!</b>\n\n<i>Rating:</i> {uv2.get('up', 0)} 👍 {uv2.get('down', 0)}👎\n{starter_section}{details1}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
         text2 = f"🎯 <b>Found someone.... Say hi!!</b>\n\n<i>Rating:</i> {uv1.get('up', 0)} 👍 {uv1.get('down', 0)}👎\n{starter_section}{details2}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
@@ -281,6 +281,13 @@ async def end_chat_session(
     clear_pending_requests(user_id)
     if partner:
         clear_pending_requests(partner)
+
+    try:
+        from commands.call import active_voice_calls
+        if session_id:
+            active_voice_calls.pop(session_id, None)
+    except Exception:
+        pass
 
     # Persist session termination in PostgreSQL
     if session_id:

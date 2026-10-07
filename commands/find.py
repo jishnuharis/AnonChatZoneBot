@@ -13,7 +13,7 @@ import init
 
 
 @check_user_profile
-async def find(update: Update, context: ContextTypes.DEFAULT_TYPE, charge: bool = False):
+async def find(update: Update, context: ContextTypes.DEFAULT_TYPE, charge: bool = True):
     user_id = update.effective_user.id
 
     # Layer 1: Strict Ban & Restriction check
@@ -57,5 +57,11 @@ async def find(update: Update, context: ContextTypes.DEFAULT_TYPE, charge: bool 
         if is_rush_hour_active():
             status_text += "\n\n🔥 <b>Rush Hour is ACTIVE! Instant matchmaking in progress...</b>"
         await safe_reply(update, text=status_text, context=context)
+    else:
+        await safe_reply(
+            update,
+            text="⏳ <b>You're already in the waiting queue!</b>\n\nStill searching for a partner for you...",
+            context=context,
+        )
 
     await enqueue_and_match(context, user_id)

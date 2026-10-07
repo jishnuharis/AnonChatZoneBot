@@ -4,7 +4,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 import init
-from security import safe_tele_func_call
+from security import safe_tele_func_call, safe_reply
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,18 @@ async def handle_start_find_callback(update: Update, context: ContextTypes.DEFAU
     """Callback when user clicks 'Find Partner' after verifying channel membership."""
     query = update.callback_query
     if query:
+        user_id = query.from_user.id
+        from session_manager import is_in_chat
+        from message import ALREADY_IN_CHAT_TEXT
+        if is_in_chat(user_id):
+            await safe_tele_func_call(
+                query.answer,
+                "⚠️ You're already in a chat! Use /stop or /next first.",
+                show_alert=True
+            )
+            await safe_reply(update, text=ALREADY_IN_CHAT_TEXT, context=context)
+            return
+
         await safe_tele_func_call(query.answer)
         await safe_tele_func_call(query.edit_message_reply_markup, reply_markup=None)
         from commands.find import find
