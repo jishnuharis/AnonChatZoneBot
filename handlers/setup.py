@@ -75,8 +75,13 @@ def check_user_profile(handler_func):
 
 
 async def handle_user_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update or not update.effective_user:
+        return
     user_id = update.effective_user.id
-    text = update.message.text.strip() if update.message.text else ""
+    msg = update.message or update.effective_message
+    if not msg:
+        return
+    text = (msg.text or "").strip()
 
     if user_id in init.edit_stage and init.edit_stage[user_id].startswith("friend_"):
         from handlers.friends import handle_friend_input_text
@@ -90,13 +95,13 @@ async def handle_user_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raise ValueError
             init.user_details[user_id]["age"] = age
             del init.edit_stage[user_id]
-            await safe_tele_func_call(update.message.reply_text, text=f"✅ <i>Age updated to</i> <b>{age}</b>.", parse_mode="HTML")
+            await safe_reply(update, text=f"✅ <i>Age updated to</i> <b>{age}</b>.", parse_mode="HTML", context=context)
             init.dirty_users.add(user_id)
 
             from commands.profile import send_profile_menu
             await send_profile_menu(context, user_id)
         except ValueError:
-            await safe_tele_func_call(update.message.reply_text, text=INVALID_AGE_TEXT, parse_mode="HTML")
+            await safe_reply(update, text=INVALID_AGE_TEXT, parse_mode="HTML", context=context)
         return
 
     if user_id not in init.user_input_stage:
@@ -110,11 +115,11 @@ async def handle_user_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raise ValueError
             init.user_details[user_id]["age"] = age
             init.user_input_stage[user_id] = "country"
-            await safe_tele_func_call(update.message.reply_text, text=f"✅ <i>Age set to</i> <b>{age}</b>.\n\n🌍 <b>Great! Now, please select your country:</b>", parse_mode="HTML")
+            await safe_reply(update, text=f"✅ <i>Age set to</i> <b>{age}</b>.\n\n🌍 <b>Great! Now, please select your country:</b>", parse_mode="HTML", context=context)
             await send_country_selection(user_id, context)
         except ValueError:
-            await safe_tele_func_call(update.message.reply_text, text=INVALID_AGE_TEXT, parse_mode="HTML")
+            await safe_reply(update, text=INVALID_AGE_TEXT, parse_mode="HTML", context=context)
     elif stage == "preferences":
-        await safe_tele_func_call(update.message.reply_text, text=PREFERENCES_BUTTONS_NUDGE_TEXT, parse_mode="HTML")
+        await safe_reply(update, text=PREFERENCES_BUTTONS_NUDGE_TEXT, parse_mode="HTML", context=context)
 
     init.dirty_users.add(user_id)

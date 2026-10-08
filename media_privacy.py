@@ -4,7 +4,7 @@ import uuid
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from security import safe_tele_func_call
+from security import safe_tele_func_call, safe_reply
 from handlers.setup import check_user_profile
 from message import (
     NOT_IN_CHAT_TEXT, SENT_PRIVACY_MODE_TEXT, PRIVACY_MODE_PLACEHOLDER_TEXT,
@@ -73,7 +73,7 @@ async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE,
         return False
 
     if not is_subscribed(user_id):
-        await safe_tele_func_call(update.message.reply_text, text=PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT, parse_mode="HTML")
+        await safe_reply(update, text=PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT, parse_mode="HTML", context=context)
         return False
 
     token = str(uuid.uuid4())
@@ -87,7 +87,7 @@ async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE,
         "created_at": time.time(),
         "opened": False,
     }
-    await safe_tele_func_call(update.message.reply_text, text=SENT_PRIVACY_MODE_TEXT, parse_mode="HTML")
+    await safe_reply(update, text=SENT_PRIVACY_MODE_TEXT, parse_mode="HTML", context=context)
 
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔒 Tap to view (once)", callback_data=f"viewonce|{token}")]])
     placeholder = await safe_tele_func_call(
@@ -108,17 +108,18 @@ async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE,
 async def handle_private_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_subscribed(user_id):
-        await safe_tele_func_call(update.message.reply_text, text=PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT, parse_mode="HTML")
+        await safe_reply(update, text=PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT, parse_mode="HTML", context=context)
         return
     if user_id not in init.active_pairs:
-        await safe_tele_func_call(update.message.reply_text, text=NOT_IN_CHAT_TEXT, parse_mode="HTML")
+        await safe_reply(update, text=NOT_IN_CHAT_TEXT, parse_mode="HTML", context=context)
         return
     arm_private_flag(user_id)
     minutes = PRIVATE_FLAG_WINDOW // 60
-    await safe_tele_func_call(
-        update.message.reply_text,
+    await safe_reply(
+        update,
         text=f"🔒 <b>Privacy Mode armed.</b>\n<i>Send a photo, video, voice or video note within the next {minutes} minutes and it'll go out in Privacy Mode.</i>",
         parse_mode="HTML",
+        context=context,
     )
 
 

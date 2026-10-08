@@ -1365,5 +1365,42 @@ async def test_transcript_html_with_emojis_encoding():
     assert "100% Anonymized" in decoded_text
 
 
+@pytest.mark.asyncio
+async def test_relay_message_none_message_and_user_safety():
+    """Verify relay_message handles updates where message or effective_user is None without raising AttributeError."""
+    from relay import relay_message
+
+    mock_context = MagicMock()
+    mock_context.bot = MagicMock()
+
+    # 1. Update with no effective_user
+    up_no_user = MagicMock()
+    up_no_user.effective_user = None
+    up_no_user.message = None
+    up_no_user.effective_message = None
+    await relay_message(up_no_user, mock_context)  # Should not raise
+
+    # 2. Update with user but no message (e.g. User 8556811075)
+    up_no_msg = MagicMock()
+    up_no_msg.effective_user = MagicMock(id=8556811075)
+    up_no_msg.message = None
+    up_no_msg.effective_message = None
+    await relay_message(up_no_msg, mock_context)  # Should not raise AttributeError: 'NoneType' object has no attribute 'reply_text'
+
+    # 3. Update with user not in chat, message is None, but effective_message is present
+    eff_msg = MagicMock()
+    eff_msg.reply_text = AsyncMock()
+    eff_msg.text = "Hello there"
+    up_eff_only = MagicMock()
+    up_eff_only.effective_user = MagicMock(id=8556811075)
+    up_eff_only.message = None
+    up_eff_only.effective_message = eff_msg
+    up_eff_only.callback_query = None
+
+    await relay_message(up_eff_only, mock_context)
+    eff_msg.reply_text.assert_called_once()
+    assert "NOT_IN_CHAT" in str(eff_msg.reply_text.call_args) or "find" in str(eff_msg.reply_text.call_args).lower()
+
+
 
 

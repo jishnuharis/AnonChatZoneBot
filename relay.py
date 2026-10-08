@@ -53,7 +53,13 @@ def _resolve_reply(user_id: int, partner_id: int, msg):
 
 
 async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update or not update.effective_user:
+        return
     user_id = update.effective_user.id
+
+    msg = update.message or update.effective_message
+    if not msg:
+        return
 
     if not check_rate_limit(user_id):
         return  # Silently throttle spam
@@ -64,9 +70,6 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id in init.active_pairs:
         partner_id = init.active_pairs[user_id]
-        msg = update.message
-        if not msg:
-            return
 
         # Intercept In-Chat Button taps from keyboard
         if msg.text in ("👋 Nudge your partner!", "👋Nudge your partner!", "Nudge your partner!", "👋 Nudge"):
@@ -125,13 +128,14 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Enforce zero links for free tier
         if is_free and contains_link(msg):
-            await safe_tele_func_call(
-                update.message.reply_text,
+            await safe_reply(
+                update,
                 text=LINK_RESTRICTED_TEXT,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
                 ]),
                 parse_mode="HTML",
+                context=context,
             )
             return
 
@@ -153,13 +157,14 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elapsed = time.time() - session_start
             if elapsed < WARMUP_PERIOD_SECONDS:
                 remaining = max(1, int(WARMUP_PERIOD_SECONDS - elapsed))
-                await safe_tele_func_call(
-                    update.message.reply_text,
+                await safe_reply(
+                    update,
                     text=MEDIA_WARMUP_LOCKED_TEXT.format(remaining=remaining),
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
                     ]),
                     parse_mode="HTML",
+                    context=context,
                 )
                 return
 
@@ -179,13 +184,14 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             credit_kind = "audio"
 
         if credit_kind and not is_subscribed(user_id) and not has_daily_credit(user_id):
-            await safe_tele_func_call(
-                update.message.reply_text,
+            await safe_reply(
+                update,
                 text=MEDIA_DAILY_LIMIT_REACHED_TEXT.format(
                     limit=daily_credit_limit(user_id),
                     kind=_KIND_LABELS.get(credit_kind, "media"),
                 ),
                 parse_mode="HTML",
+                context=context,
             )
             return
 
@@ -270,10 +276,9 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_transport_disconnect(context, partner_id)
         except Exception as e:
             logger.error(f"Error relaying message from {user_id} to {partner_id}: {e}")
-            await safe_tele_func_call(update.message.reply_text, text=FAILED_TO_SEND_MESSAGE_TEXT, parse_mode="HTML")
+            await safe_reply(update, text=FAILED_TO_SEND_MESSAGE_TEXT, parse_mode="HTML", context=context)
     else:
-        msg = update.message
-        if msg and msg.text:
+        if msg.text:
             if msg.text in ("🔍 Find Partner", "Find Partner", "🔍 Find a partner", "Find a partner", "🔍 /find", "/find"):
                 from commands.find import find
                 await find(update, context)
@@ -300,7 +305,7 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
         from session_manager import IDLE_KEYBOARD
-        await safe_tele_func_call(update.message.reply_text, text=NOT_IN_CHAT_USE_FIND_INLINE_TEXT, reply_markup=IDLE_KEYBOARD, parse_mode="HTML")
+        await safe_reply(update, text=NOT_IN_CHAT_USE_FIND_INLINE_TEXT, reply_markup=IDLE_KEYBOARD, parse_mode="HTML", context=context)
 
 
 async def relay_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
