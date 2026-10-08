@@ -674,9 +674,9 @@
     "category": "Science",
     "question": "What is the smallest bone in the human body?",
     "options": [
-      "Stapes (stirrup)",
-      "Incus (anvil)",
-      "Malleus (hammer)",
+      "Stapes",
+      "Incus",
+      "Malleus",
       "Hyoid"
     ],
     "correct_index": 0
@@ -685,9 +685,9 @@
     "category": "Science",
     "question": "What type of blood cells fight infections in the human body?",
     "options": [
-      "Erythrocytes (Red)",
-      "Leukocytes (White)",
-      "Thrombocytes (Platelets)",
+      "Erythrocytes",
+      "Leukocytes",
+      "Thrombocytes",
       "Plasma"
     ],
     "correct_index": 1
@@ -752,7 +752,7 @@
     "question": "What kind of organism produces penicillin?",
     "options": [
       "Bacteria",
-      "Fungus (Mold)",
+      "Fungus",
       "Virus",
       "Algae"
     ],
@@ -1346,7 +1346,7 @@
     "question": "What is the term for animals that maintain a constant body temperature?",
     "options": [
       "Poikilothermic",
-      "Endothermic (warm-blooded)",
+      "Endothermic",
       "Ectothermic",
       "Exothermic"
     ],
@@ -1721,7 +1721,7 @@
     "options": [
       "India",
       "Bhutan",
-      "China (Tibet)",
+      "China",
       "Pakistan"
     ],
     "correct_index": 2
@@ -1754,7 +1754,7 @@
     "options": [
       "Mount Whitney",
       "Mount Logan",
-      "Denali (Mount McKinley)",
+      "Denali",
       "Mount Rainier"
     ],
     "correct_index": 2
@@ -1995,7 +1995,7 @@
     "question": "Which ocean surrounds the continent of Antarctica?",
     "options": [
       "Indian Ocean",
-      "Southern (Antarctic) Ocean",
+      "Southern Ocean",
       "South Pacific",
       "South Atlantic"
     ],
@@ -2467,7 +2467,7 @@
     "category": "Geography",
     "question": "What is the name of the famous clock tower at the north end of the Houses of Parliament in London?",
     "options": [
-      "Big Ben (Elizabeth Tower)",
+      "Big Ben",
       "Victoria Tower",
       "Clock Tower",
       "London Eye"
@@ -2556,7 +2556,7 @@
     "question": "What underwater tunnel connects Britain and France beneath the English Channel?",
     "options": [
       "Eurostar Tunnel",
-      "Channel Tunnel (Chunnel)",
+      "Channel Tunnel",
       "Severn Tunnel",
       "Dover Tunnel"
     ],
@@ -2710,7 +2710,7 @@
     "question": "What is the capital of Singapore?",
     "options": [
       "Kuala Lumpur",
-      "Singapore (City-state)",
+      "Singapore",
       "Jakarta",
       "Manila"
     ],
@@ -3205,7 +3205,7 @@
     "question": "Which devastating pandemic struck Europe between 1346 and 1353, killing millions?",
     "options": [
       "The Spanish Flu",
-      "The Black Death (Bubonic Plague)",
+      "The Black Death",
       "The Justinian Plague",
       "Cholera pandemic"
     ],
@@ -3249,7 +3249,7 @@
     "question": "Which warrior people from Scandinavia raided and colonized coastal Europe from the late 8th to 11th century?",
     "options": [
       "Normans",
-      "Vikings (Norsemen)",
+      "Vikings",
       "Saxons",
       "Celts"
     ],
@@ -3270,7 +3270,7 @@
     "category": "History",
     "question": "Which Muslim military leader recaptured Jerusalem from the Crusaders in 1187?",
     "options": [
-      "Saladin (Salah ad-Din)",
+      "Saladin",
       "Baybars",
       "Harun al-Rashid",
       "Suleiman the Magnificent"
@@ -3976,7 +3976,7 @@
     "options": [
       "Laozi",
       "Mencius",
-      "Confucius (Kong Fuzi)",
+      "Confucius",
       "Han Feizi"
     ],
     "correct_index": 2
@@ -4097,7 +4097,7 @@
     "options": [
       "Emperor Meiji",
       "Emperor Taisho",
-      "Emperor Hirohito (Showa)",
+      "Emperor Hirohito",
       "Emperor Akihito"
     ],
     "correct_index": 2
@@ -4392,7 +4392,7 @@
     "category": "Gaming",
     "question": "What was Nintendo's first home video game console capable of 3D polygonal graphics?",
     "options": [
-      "Super Nintendo (SNES)",
+      "Super Nintendo",
       "Nintendo 64",
       "GameCube",
       "Wii"
@@ -4415,7 +4415,7 @@
     "question": "What is the name of Sonic the Hedgehog's two-tailed flying fox companion?",
     "options": [
       "Knuckles",
-      "Tails (Miles Prower)",
+      "Tails",
       "Shadow",
       "Silver"
     ],
@@ -4581,7 +4581,7 @@
     "options": [
       "Yennefer",
       "Triss",
-      "Ciri (Cirilla)",
+      "Ciri",
       "Keira"
     ],
     "correct_index": 2
@@ -4602,7 +4602,7 @@
     "question": "In 'The Elder Scrolls V: Skyrim', what is the term for an individual born with the soul of a dragon?",
     "options": [
       "Dragon Priest",
-      "Dovahkiin (Dragonborn)",
+      "Dovahkiin",
       "Greybeard",
       "Jarl"
     ],
@@ -4767,7 +4767,7 @@
     "question": "What open-world game series developed by Rockstar Games features cities like Los Santos, Liberty City, and Vice City?",
     "options": [
       "Red Dead Redemption",
-      "Grand Theft Auto (GTA)",
+      "Grand Theft Auto",
       "Max Payne",
       "Bully"
     ],
@@ -4790,7 +4790,7 @@
     "options": [
       "Los Santos",
       "Liberty City",
-      "Vice City (Miami-inspired)",
+      "Vice City",
       "San Fierro"
     ],
     "correct_index": 2
@@ -5218,7 +5218,7 @@
     "question": "Which battle royale game pioneered the modern genre on PC with maps like Erangel and Miramar?",
     "options": [
       "H1Z1",
-      "PlayerUnknown's Battlegrounds (PUBG)",
+      "PlayerUnknown's Battlegrounds",
       "Apex Legends",
       "Blackout"
     ],
@@ -6383,7 +6383,7 @@
     "category": "Movies & TV",
     "question": "What fast-food fried chicken chain does drug kingpin Gus Fring operate as a front in 'Breaking Bad'?",
     "options": [
-      "Pollos Hermanos (Los Pollos Hermanos)",
+      "Los Pollos Hermanos",
       "Cluckin' Bell",
       "Chamino's",
       "El Pollo Loco"
@@ -6527,7 +6527,7 @@
     "question": "What is the name of the telekinetic girl who loves Eggo waffles in 'Stranger Things'?",
     "options": [
       "Max",
-      "Eleven (El)",
+      "Eleven",
       "Nancy",
       "Robin"
     ],
@@ -6691,7 +6691,7 @@
     "category": "Movies & TV",
     "question": "In 'Peaky Blinders', what is the name of the Birmingham gang family led by Tommy Shelby?",
     "options": [
-      "The Shelbys (Peaky Blinders)",
+      "The Shelbys",
       "The Krays",
       "The Sabinis",
       "The Changrettas"
@@ -6890,7 +6890,7 @@
     "question": "In 'The Wizard of Oz' (1939), what color are Dorothy's magical slippers?",
     "options": [
       "Silver",
-      "Ruby (Red)",
+      "Ruby",
       "Gold",
       "Emerald"
     ],
@@ -6923,7 +6923,7 @@
     "question": "What classic monster was awakened by radioactive testing in Tokyo Bay in Ishirō Honda's 1954 film?",
     "options": [
       "King Kong",
-      "Godzilla (Gojira)",
+      "Godzilla",
       "Mothra",
       "Rodan"
     ],
@@ -7066,7 +7066,7 @@
     "question": "What Devil Fruit gave Monkey D. Luffy his rubber body in 'One Piece'?",
     "options": [
       "Mera Mera no Mi",
-      "Gomu Gomu no Mi (Hito Hito no Mi, Model: Nika)",
+      "Gomu Gomu no Mi",
       "Ope Ope no Mi",
       "Gura Gura no Mi"
     ],
@@ -7078,7 +7078,7 @@
     "options": [
       "One-Sword Style",
       "Two-Sword Style",
-      "Three-Sword Style (Santoryu)",
+      "Three-Sword Style",
       "Four-Sword Style"
     ],
     "correct_index": 2
@@ -7121,7 +7121,7 @@
     "question": "In 'Naruto', what demon beast was sealed inside Naruto Uzumaki on the day he was born?",
     "options": [
       "One-Tailed Shukaku",
-      "Nine-Tailed Fox (Kurama)",
+      "Nine-Tailed Fox",
       "Eight-Tailed Gyuki",
       "Ten-Tails"
     ],
@@ -7132,7 +7132,7 @@
     "question": "What village is Naruto Uzumaki from in the shinobi world?",
     "options": [
       "Hidden Sand Village",
-      "Hidden Leaf Village (Konohagakure)",
+      "Hidden Leaf Village",
       "Hidden Mist Village",
       "Hidden Cloud Village"
     ],
@@ -7187,7 +7187,7 @@
     "question": "In 'Bleach', what type of spiritual warrior is protagonist Ichigo Kurosaki recruited to be?",
     "options": [
       "Quincy",
-      "Soul Reaper (Shinigami)",
+      "Soul Reaper",
       "Hollow",
       "Fullbringer"
     ],
@@ -7319,7 +7319,7 @@
     "question": "What is Spike Spiegel's occupation in 'Cowboy Bebop'?",
     "options": [
       "Space Pirate",
-      "Bounty Hunter (Cowboy)",
+      "Bounty Hunter",
       "Federation Police",
       "Smuggler"
     ],
@@ -7385,7 +7385,7 @@
     "question": "What is Eren Yeager's childhood dream and military branch he vows to join?",
     "options": [
       "Garrison",
-      "Scout Regiment (Survey Corps)",
+      "Scout Regiment",
       "Military Police",
       "City Guard"
     ],
@@ -7395,7 +7395,7 @@
     "category": "Anime & Manga",
     "question": "What gear allows soldiers to swing through the air and fight Titans in 'Attack on Titan'?",
     "options": [
-      "Vertical Maneuvering Gear (ODMG)",
+      "Vertical Maneuvering Gear",
       "Jet Propulsion Harness",
       "Grapple Rig",
       "Acrobatic Gear"
@@ -7495,7 +7495,7 @@
     "question": "What is Satoru Gojo's signature Domain Expansion called in 'Jujutsu Kaisen'?",
     "options": [
       "Malevolent Shrine",
-      "Unlimited Void (Infinite Void)",
+      "Unlimited Void",
       "Chimera Shadow Garden",
       "Self-Embodiment of Perfection"
     ],
@@ -7561,7 +7561,7 @@
     "question": "In 'Fullmetal Alchemist: Brotherhood', what taboo did the Elric brothers commit that cost them their bodies?",
     "options": [
       "Making a Philosopher's Stone",
-      "Human Transmutation (trying to revive their mother)",
+      "Human Transmutation",
       "Opening the Gate of Truth for wealth",
       "Transmuting gold"
     ],
@@ -7627,7 +7627,7 @@
     "question": "What villainous group of 13 thieves led by Chrollo Lucilfer is targeted by Kurapika?",
     "options": [
       "Akatsuki",
-      "Phantom Troupe (Genei Ryodan)",
+      "Phantom Troupe",
       "League of Villains",
       "Ten Commandments"
     ],
@@ -7649,7 +7649,7 @@
     "question": "Who is the Quirkless protagonist who inherits One For All in 'My Hero Academia'?",
     "options": [
       "Katsuki Bakugo",
-      "Izuku Midoriya (Deku)",
+      "Izuku Midoriya",
       "Shoto Todoroki",
       "Eijiro Kirishima"
     ],
@@ -7660,7 +7660,7 @@
     "question": "Who was the former #1 Pro Hero known as the 'Symbol of Peace' in 'My Hero Academia'?",
     "options": [
       "Endeavor",
-      "All Might (Toshinori Yagi)",
+      "All Might",
       "Eraser Head",
       "Hawks"
     ],
@@ -7693,7 +7693,7 @@
     "question": "In 'Spy x Family', what is the secret ability of the adopted telepathic daughter Anya Forger?",
     "options": [
       "Super strength",
-      "Telepathy (Mind reading)",
+      "Telepathy",
       "Future vision",
       "Invisibility"
     ],
@@ -7715,7 +7715,7 @@
     "question": "What is Yor Forger's secret profession when she is not working at city hall?",
     "options": [
       "Diplomat",
-      "Assassin (Thorn Princess)",
+      "Assassin",
       "Sniper",
       "Counter-intelligence agent"
     ],
@@ -7781,7 +7781,7 @@
     "question": "What is the white-haired mercenary leader and main antagonist of 'Berserk' who leads the Band of the Hawk?",
     "options": [
       "Nosferatu Zodd",
-      "Griffith (Femto)",
+      "Griffith",
       "Skull Knight",
       "Void"
     ],
@@ -7869,7 +7869,7 @@
     "question": "What is the name of the cyborg disciple who lives with Saitama and records his teachings?",
     "options": [
       "Speed-o'-Sound Sonic",
-      "Genos (Demon Cyborg)",
+      "Genos",
       "Bang",
       "Mumen Rider"
     ],
@@ -8001,7 +8001,7 @@
     "question": "In 'Princess Mononoke', what was San raised by in the great forest?",
     "options": [
       "Boar gods",
-      "Wolf gods (Moro)",
+      "Wolf gods",
       "Apes",
       "Bears"
     ],
@@ -8023,7 +8023,7 @@
     "question": "What anime romance film directed by Makoto Shinkai in 2016 features body-swapping teenagers Taki and Mitsuha?",
     "options": [
       "Weathering With You",
-      "Your Name (Kimi no Na wa)",
+      "Your Name",
       "Suzume",
       "5 Centimeters per Second"
     ],
@@ -8067,7 +8067,7 @@
     "question": "Who was the leader of the Akatsuki who destroyed the Hidden Leaf Village with the Almighty Push (Shinra Tensei)?",
     "options": [
       "Itachi Uchiha",
-      "Pain (Nagato)",
+      "Pain",
       "Kisame Hoshigaki",
       "Deidara"
     ],
@@ -8100,7 +8100,7 @@
     "question": "What marine admiral killed Ace during the historic Marineford War in 'One Piece'?",
     "options": [
       "Aokiji",
-      "Akainu (Sakazuki)",
+      "Akainu",
       "Kizaru",
       "Fujitora"
     ],
@@ -8111,7 +8111,7 @@
     "question": "What is the highest bounty rank in 'One Piece' held by the legendary four ruling pirate emperors of the sea?",
     "options": [
       "Warlords of the Sea",
-      "Four Emperors (Yonko)",
+      "Four Emperors",
       "Supernovas",
       "Worst Generation"
     ],
@@ -8155,7 +8155,7 @@
     "question": "What vehicle is humorously credited in anime memes as the primary cause of isekai reincarnations?",
     "options": [
       "Bicycle",
-      "Truck-kun (a speeding truck)",
+      "Truck-kun",
       "Subway train",
       "Airplane"
     ],
@@ -8177,7 +8177,7 @@
     "question": "In 'Re:Zero − Starting Life in Another World', what ability does Subaru Natsuki gain when he dies?",
     "options": [
       "Absolute immortality",
-      "Return by Death (rewinding time)",
+      "Return by Death",
       "Super strength",
       "Teleportation"
     ],
@@ -8188,7 +8188,7 @@
     "question": "In 'Overlord', what is the name of the skeletal guild master trapped inside the virtual reality game YGGDRASIL?",
     "options": [
       "Shalltear Bloodfallen",
-      "Ainz Ooal Gown (Momonga)",
+      "Ainz Ooal Gown",
       "Demiurge",
       "Albedo"
     ],
@@ -8309,7 +8309,7 @@
     "question": "What is the dance performed by Chika Fujiwara at the end of episode 3 of Kaguya-sama that became a viral internet sensation?",
     "options": [
       "Caramelldansen",
-      "The Chika Dance (Chikatto Chika Chika)",
+      "The Chika Dance",
       "Hare Hare Yukai",
       "PonPonPon"
     ],
@@ -8353,7 +8353,7 @@
     "question": "In 'Black Clover', what kind of grimoire does the magicless orphan Asta obtain?",
     "options": [
       "Three-leaf clover",
-      "Five-leaf clover (containing a demon)",
+      "Five-leaf clover",
       "Four-leaf clover",
       "Gold clover"
     ],
@@ -8430,7 +8430,7 @@
     "question": "What is Dio Brando's Stand in Part 3 that has the power to briefly stop time?",
     "options": [
       "King Crimson",
-      "The World (Za Warudo)",
+      "The World",
       "Killer Queen",
       "Gold Experience"
     ],
@@ -8440,7 +8440,7 @@
     "category": "Anime & Manga",
     "question": "In 'Dr. STONE', what scientific compound allows Senku Ishigami to depetrify humans from their stone sleep?",
     "options": [
-      "Nital acid (nitric acid + ethanol)",
+      "Nital acid",
       "Sulfuric acid",
       "Hydrochloric acid",
       "Liquid nitrogen"
@@ -8980,7 +8980,7 @@
     "question": "Which member of the Spice Girls went on to become a high-end fashion designer married to footballer David Beckham?",
     "options": [
       "Mel B",
-      "Victoria Beckham (Posh)",
+      "Victoria Beckham",
       "Emma Bunton",
       "Geri Halliwell"
     ],
@@ -9068,7 +9068,7 @@
     "question": "What DJ and producer is behind global EDM hits like 'Wake Me Up' and 'Levels' before his passing in 2018?",
     "options": [
       "Tiësto",
-      "Avicii (Tim Bergling)",
+      "Avicii",
       "Calvin Harris",
       "David Guetta"
     ],
@@ -9090,7 +9090,7 @@
     "question": "Which Canadian artist holds the hits 'Blinding Lights', 'Starboy', and 'Save Your Tears'?",
     "options": [
       "Drake",
-      "The Weeknd (Abel Tesfaye)",
+      "The Weeknd",
       "Justin Bieber",
       "Shawn Mendes"
     ],
@@ -9145,7 +9145,7 @@
     "question": "Which South Korean boy band became a global musical sensation with hits like 'Dynamite' and 'Butter'?",
     "options": [
       "EXO",
-      "BTS (Bangtan Sonyeondan)",
+      "BTS",
       "Stray Kids",
       "Seventeen"
     ],
@@ -9167,7 +9167,7 @@
     "question": "Who is the Detroit rapper known as Slim Shady who starred in the 2002 film '8 Mile'?",
     "options": [
       "50 Cent",
-      "Eminem (Marshall Mathers)",
+      "Eminem",
       "Dr. Dre",
       "Snoop Dogg"
     ],
@@ -9200,7 +9200,7 @@
     "question": "What Toronto rapper released the critically acclaimed albums 'Take Care', 'Nothing Was the Same', and 'Views'?",
     "options": [
       "Tory Lanez",
-      "Drake (Aubrey Graham)",
+      "Drake",
       "The Weeknd",
       "Nav"
     ],
@@ -9222,7 +9222,7 @@
     "question": "Which Brooklyn rapper founded Roc-A-Fella Records, married Beyoncé, and has won 24 Grammy Awards?",
     "options": [
       "Nas",
-      "Jay-Z (Shawn Carter)",
+      "Jay-Z",
       "The Notorious B.I.G.",
       "Busta Rhymes"
     ],
@@ -9233,7 +9233,7 @@
     "question": "Which legendary West Coast rapper released 'All Eyez on Me' and was gunned down in Las Vegas in 1996?",
     "options": [
       "Snoop Dogg",
-      "Tupac Shakur (2Pac)",
+      "Tupac Shakur",
       "Ice Cube",
       "Eazy-E"
     ],
@@ -9244,7 +9244,7 @@
     "question": "Which East Coast rap legend also known as Biggie Smalls was tragically killed in Los Angeles in 1997?",
     "options": [
       "Tupac Shakur",
-      "The Notorious B.I.G. (Christopher Wallace)",
+      "The Notorious B.I.G.",
       "Big L",
       "Heavy D"
     ],
@@ -9277,7 +9277,7 @@
     "question": "What producer and rapper released the critically acclaimed 2010 album 'My Beautiful Dark Twisted Fantasy'?",
     "options": [
       "Kid Cudi",
-      "Kanye West (Ye)",
+      "Kanye West",
       "Pharrell Williams",
       "Pusha T"
     ],
@@ -9552,7 +9552,7 @@
     "question": "Who was the legendary lead guitarist of Guns N' Roses who wears a tall top hat?",
     "options": [
       "Axl Rose",
-      "Slash (Saul Hudson)",
+      "Slash",
       "Duff McKagan",
       "Izzy Stradlin"
     ],
@@ -9915,7 +9915,7 @@
     "question": "Which Brazilian legend scored over 1,000 goals and is the only player to win three FIFA World Cups?",
     "options": [
       "Ronaldo Nazario",
-      "Pelé (Edson Arantes do Nascimento)",
+      "Pelé",
       "Ronaldinho",
       "Romario"
     ],
@@ -10245,7 +10245,7 @@
     "question": "Which of the four tennis Grand Slam tournaments is played on outdoor grass courts?",
     "options": [
       "Australian Open",
-      "French Open (Roland Garros)",
+      "French Open",
       "Wimbledon",
       "US Open"
     ],
@@ -10256,7 +10256,7 @@
     "question": "Which Grand Slam tennis tournament is famous for its red clay courts in Paris?",
     "options": [
       "Wimbledon",
-      "French Open (Roland Garros)",
+      "French Open",
       "Australian Open",
       "Madrid Open"
     ],
@@ -10345,7 +10345,7 @@
     "options": [
       "Egypt",
       "Italy",
-      "Greece (Olympia)",
+      "Greece",
       "Persia"
     ],
     "correct_index": 2
@@ -10389,7 +10389,7 @@
     "options": [
       "20.0 miles",
       "24.2 miles",
-      "26.2 miles (42.195 km)",
+      "26.2 miles",
       "30.0 miles"
     ],
     "correct_index": 2
@@ -10454,7 +10454,7 @@
     "question": "Who is the legendary heavyweight boxer who declared 'Float like a butterfly, sting like a bee'?",
     "options": [
       "Mike Tyson",
-      "Muhammad Ali (Cassius Clay)",
+      "Muhammad Ali",
       "Joe Frazier",
       "George Foreman"
     ],
@@ -10498,7 +10498,7 @@
     "question": "What combat sport organization is the premier global championship for mixed martial arts (MMA)?",
     "options": [
       "Bellator",
-      "UFC (Ultimate Fighting Championship)",
+      "UFC",
       "ONE Championship",
       "Pride FC"
     ],
@@ -10564,7 +10564,7 @@
     "question": "What famous green jacket is awarded to the champion of which prestigious golf tournament?",
     "options": [
       "US Open",
-      "The Masters (Augusta National)",
+      "The Masters",
       "The Open Championship",
       "PGA Championship"
     ],
@@ -10784,7 +10784,7 @@
     "question": "What sport is played at the prestigious French cycling competition the Tour de France?",
     "options": [
       "Motorcycle racing",
-      "Bicycle racing (Cycling)",
+      "Bicycle racing",
       "Rowing",
       "Horse racing"
     ],
@@ -10795,7 +10795,7 @@
     "question": "What color jersey is worn by the general classification leader of the Tour de France?",
     "options": [
       "Green",
-      "Yellow (Maillot Jaune)",
+      "Yellow",
       "Polka-dot",
       "White"
     ],
@@ -10872,7 +10872,7 @@
     "question": "What is the stadium shared by both AC Milan and Inter Milan commonly called?",
     "options": [
       "Allianz Stadium",
-      "San Siro (Stadio Giuseppe Meazza)",
+      "San Siro",
       "Stadio Olimpico",
       "Diego Armando Maradona"
     ],
@@ -11037,7 +11037,7 @@
     "question": "Which surface is the US Open tennis tournament currently played on?",
     "options": [
       "Natural Grass",
-      "Hard Court (DecoTurf/Laykold)",
+      "Hard Court",
       "Red Clay",
       "Carpet"
     ],
@@ -11059,7 +11059,7 @@
     "question": "How many individual swimming strokes are recognized in competitive swimming?",
     "options": [
       "3",
-      "4 (Freestyle, Backstroke, Breaststroke, Butterfly)",
+      "4",
       "5",
       "6"
     ],
@@ -11070,7 +11070,7 @@
     "question": "Which swimming stroke is generally considered the fastest in competition?",
     "options": [
       "Backstroke",
-      "Freestyle (Front Crawl)",
+      "Freestyle",
       "Butterfly",
       "Breaststroke"
     ],
@@ -11092,7 +11092,7 @@
     "question": "What heavy spherical metal object is thrown for distance in the track and field shot put event?",
     "options": [
       "Discus",
-      "Shot (Metal ball)",
+      "Shot",
       "Javelin",
       "Hammer"
     ],
@@ -11191,7 +11191,7 @@
     "question": "What penalty area does a hockey player sit in when serving a minor penalty?",
     "options": [
       "Dugout",
-      "Penalty Box (Sin Bin)",
+      "Penalty Box",
       "Locker Room",
       "Red Zone"
     ],
@@ -11257,7 +11257,7 @@
     "question": "What is the prestigious trophy awarded to the champion of the annual Tour de France cycling race?",
     "options": [
       "The Green Cup",
-      "The Coupe Omnisports (Trophy)",
+      "The Coupe Omnisports",
       "The Yellow Jersey / Vase de Sèvres",
       "The Golden Bike"
     ],
@@ -11542,10 +11542,10 @@
     "category": "General Knowledge",
     "question": "What is the mathematical constant representing the ratio of a circle's circumference to its diameter?",
     "options": [
-      "Euler's number (e)",
-      "Pi (π)",
-      "Golden ratio (phi)",
-      "Tau (τ)"
+      "Euler's number",
+      "Pi",
+      "Golden ratio",
+      "Tau"
     ],
     "correct_index": 1
   },
@@ -12379,7 +12379,7 @@
     "question": "What is the official language of Iran?",
     "options": [
       "Arabic",
-      "Persian (Farsi)",
+      "Persian",
       "Turkish",
       "Kurdish"
     ],
@@ -12555,7 +12555,7 @@
     "question": "What is the national flower of Japan, celebrated with spring blossom viewing?",
     "options": [
       "Lotus",
-      "Cherry Blossom (Sakura)",
+      "Cherry Blossom",
       "Chrysanthemum",
       "Orchid"
     ],
@@ -12644,7 +12644,7 @@
     "options": [
       "Beef",
       "Pork",
-      "Poultry (Chicken)",
+      "Poultry",
       "Lamb"
     ],
     "correct_index": 1
@@ -13039,7 +13039,7 @@
     "question": "What can you hold in your right hand, but never in your left hand?",
     "options": [
       "A pencil",
-      "Your left hand (or left elbow)",
+      "Your left hand",
       "A glove",
       "A cup"
     ],
@@ -13071,7 +13071,7 @@
     "category": "Riddles & Brain Teasers",
     "question": "How many months in a calendar year have 28 days?",
     "options": [
-      "Only 1 (February)",
+      "Only 1",
       "All 12 months",
       "6 months",
       "4 months"
@@ -13171,7 +13171,7 @@
     "question": "How much dirt is there in a hole that is 3 feet deep, 2 feet wide, and 6 feet long?",
     "options": [
       "36 cubic feet",
-      "None (it's a hole)",
+      "None",
       "18 cubic feet",
       "12 cubic feet"
     ],
@@ -13457,7 +13457,7 @@
     "question": "What weighs more: a pound of feathers or a pound of bricks?",
     "options": [
       "Bricks",
-      "They weigh the exact same (1 pound)",
+      "They weigh the exact same",
       "Feathers",
       "Depends on humidity"
     ],
@@ -13490,7 +13490,7 @@
     "question": "What goes up and down without moving an inch?",
     "options": [
       "An elevator",
-      "The temperature (or stairs)",
+      "The temperature",
       "A ladder",
       "The sun"
     ],
@@ -13544,7 +13544,7 @@
     "category": "Riddles & Brain Teasers",
     "question": "What has a head, but no brain?",
     "options": [
-      "A pin (or cabbage)",
+      "A pin",
       "A snake",
       "A coin",
       "A river"
@@ -13775,7 +13775,7 @@
     "category": "Riddles & Brain Teasers",
     "question": "Forward I am heavy, but backward I am not. What am I?",
     "options": [
-      "The word 'Ton' (not backwards)",
+      "The word 'Ton'",
       "A lead pipe",
       "An anvil",
       "A boulder"
@@ -13798,7 +13798,7 @@
     "question": "What has four legs in the morning, two legs in the afternoon, and three legs in the evening (Riddle of the Sphinx)?",
     "options": [
       "A cat",
-      "Man (a human through life)",
+      "Man",
       "A dog",
       "A centaur"
     ],
@@ -13963,7 +13963,7 @@
     "question": "What can you catch outside, but never see in your hand?",
     "options": [
       "A cold",
-      "Your breath (in winter)",
+      "Your breath",
       "A shadow",
       "The wind"
     ],
