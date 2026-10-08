@@ -305,7 +305,7 @@ async def end_chat_session(
         init.recent_skips[user_id] = (partner, time.time())
 
     already_friends = await are_friends_db(user_id, partner) if partner else False
-    has_transcript = bool(session_id and session_id in init.session_messages and len(init.session_messages[session_id]) >= 2)
+    has_transcript = bool(session_id and session_id in init.session_messages and len(init.session_messages[session_id]) >= 1)
 
 
     def _build_end_keyboard(target_pid, is_initiator=False):

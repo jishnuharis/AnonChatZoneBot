@@ -23,28 +23,14 @@ async def skip_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             pass
 
-        # Gracefully end session using unified session manager
-        partner_id = await end_chat_session(
+        # Gracefully end session using unified session manager with full Chat Options
+        await end_chat_session(
             context,
             user_id,
             reason="skipped",
-            notify_initiator=False,
+            notify_initiator=True,
             notify_partner=True,
         )
-
-        if partner_id:
-            init.recent_skips[user_id] = (partner_id, time.time())
-            undo_keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("↩️ Undo Skip (60s)", callback_data=f"undoskip|{partner_id}")]
-            ])
-            await safe_reply(
-                update,
-                text=f"{PARTNER_SKIPPED_TEXT}\n<i>Did you skip by accident? Tap below within 60s to reconnect!</i>",
-                reply_markup=undo_keyboard,
-                context=context,
-            )
-        else:
-            await safe_reply(update, text=PARTNER_SKIPPED_TEXT, context=context)
 
         await find(update, context, charge=True)
     else:
@@ -112,13 +98,13 @@ async def handle_undo_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         init.recent_skips.pop(user_id, None)
         await safe_tele_func_call(
             query.edit_message_text,
-            text="🔄 <b>Skip undone! You are reconnected with your partner.</b>",
+            text="🔄 <b>Chat reconnected! You are back with your partner.</b>",
             parse_mode="HTML",
         )
         await safe_tele_func_call(
             context.bot.send_message,
             chat_id=partner_id,
-            text="🔄 <b>Your partner undid their skip! You are reconnected.</b>",
+            text="🔄 <b>Your partner reconnected the chat! You are back together.</b>",
             parse_mode="HTML",
             reply_markup=IN_CHAT_KEYBOARD,
         )

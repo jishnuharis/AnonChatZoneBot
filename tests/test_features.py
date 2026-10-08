@@ -1278,5 +1278,92 @@ async def test_cancel_command_removes_from_waiting_queue():
     assert update.message.reply_text.call_args[1]["text"] == REMOVED_FROM_QUEUE_TEXT
 
 
+@pytest.mark.asyncio
+async def test_next_sender_receives_full_chat_options():
+    """Verify /next sender receives full Chat Options (Undo Skip, Add Friend, Save Transcript)."""
+    from commands.next import skip_partner
+    from session_manager import start_chat_session, is_in_chat
+
+    u1, u2 = 93311, 93322
+    init.user_details[u1] = {**init._default_user(), "gender": "M", "age": 22, "country": "US"}
+    init.user_details[u2] = {**init._default_user(), "gender": "F", "age": 21, "country": "US"}
+
+    context = MagicMock()
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
+
+    await start_chat_session(context, u1, u2)
+    assert is_in_chat(u1) and is_in_chat(u2)
+
+    session_id = init.active_sessions[u1]
+    init.session_messages[session_id] = [
+        (u1, "Hello from u1! 👋", time.time() - 10),
+        (u2, "Hey there! 😊", time.time() - 5),
+    ]
+
+    context.bot.send_message.reset_mock()
+
+    update = MagicMock()
+    update.effective_user.id = u1
+    update.message.reply_text = AsyncMock()
+
+    with patch("commands.next.find", new_callable=AsyncMock) as mock_find:
+        await skip_partner(update, context)
+        mock_find.assert_called_once()
+
+    # Verify context.bot.send_message was called to send Chat Ended and Chat Options to u1
+    u1_calls = [c for c in context.bot.send_message.call_args_list if c[1].get("chat_id") == u1]
+    assert any("Chat ended" in (c[1].get("text") or "") for c in u1_calls)
+    
+    options_calls = [c for c in u1_calls if "Chat Options" in (c[1].get("text") or "")]
+    assert len(options_calls) == 1
+    kb = options_calls[0][1]["reply_markup"]
+    btn_labels = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert any("Undo Skip" in b for b in btn_labels)
+    assert any("Add to Anonymous Friends" in b for b in btn_labels)
+    assert any("Save Conversation Transcript" in b for b in btn_labels)
+
+
+@pytest.mark.asyncio
+async def test_transcript_html_with_emojis_encoding():
+    """Verify HTML transcript with emojis is encoded in UTF-8 BOM without Chinese character corruption."""
+    from handlers.transcript import handle_export_transcript
+
+    u1, u2 = 94411, 94422
+    session_id = f"test_emoji_session_{u1}_{u2}"
+
+    init.session_messages[session_id] = [
+        (u1, "Hey! 😂 👋 🔥 Testing emojis!", time.time() - 20),
+        (u2, "Nice! ❤️ ✨ 🚀 Everything works!", time.time() - 10),
+    ]
+
+    query = MagicMock()
+    query.data = f"export_chat|{session_id}"
+    query.answer = AsyncMock()
+    query.edit_message_text = AsyncMock()
+    update = MagicMock()
+    update.effective_user.id = u1
+    update.callback_query = query
+
+    context = MagicMock()
+    context.bot.send_document = AsyncMock()
+
+    await handle_export_transcript(update, context)
+
+    assert context.bot.send_document.called
+    doc_args = context.bot.send_document.call_args[1]
+    assert doc_args["filename"].endswith(".html")
+
+    raw_bytes = doc_args["document"].getvalue()
+    # Verify UTF-8 BOM is present at the beginning
+    assert raw_bytes.startswith(b"\xef\xbb\xbf")
+
+    # Decode and verify emojis and contents
+    decoded_text = raw_bytes.decode("utf-8-sig")
+    assert "😂 👋 🔥" in decoded_text
+    assert "❤️ ✨ 🚀" in decoded_text
+    assert "<meta charset=\"UTF-8\">" in decoded_text
+    assert "100% Anonymized" in decoded_text
+
+
 
 
