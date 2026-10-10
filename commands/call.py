@@ -16,8 +16,126 @@ active_voice_calls = {}
 
 @check_user_profile
 async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Initiates an anonymous voice call request to the current chat partner."""
+    """Initiates an anonymous voice call request to the partner or target in group."""
+    from group_helper import is_group_chat, resolve_target, get_group_redirect_keyboard
     user_id = update.effective_user.id
+
+    if is_group_chat(update):
+        # 1. Resolve target
+        target_res = await resolve_target(update, context)
+        if not target_res:
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text="ℹ️ <i>Reply to a user's message with</i> <code>/call</code> <i>or type</i> <code>/call @username</code> <i>to invite them to an anonymous voice call!</i>",
+                parse_mode="HTML"
+            )
+            return
+
+        target_id, target_name = target_res
+
+        # 2. Check caller presence first
+        if user_id not in init.user_details:
+            await init.ensure_user_loaded(user_id)
+        caller_data = init.user_details.get(user_id)
+        if not caller_data or not all([caller_data.get("gender"), caller_data.get("age"), caller_data.get("country")]):
+            bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text="⚠️ <b>You haven't registered with the bot yet!</b>\n\nStart the bot first in private chat to use this feature.",
+                reply_markup=get_group_redirect_keyboard(bot_username, "start"),
+                parse_mode="HTML"
+            )
+            return
+
+        # 3. Check target presence
+        if not target_id:
+            bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>Target user ({target_name}) has not registered with our bot yet.</b>",
+                reply_markup=get_group_redirect_keyboard(bot_username, "start"),
+                parse_mode="HTML"
+            )
+            return
+
+        if target_id == user_id:
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text="😅 <i>You cannot call yourself!</i>",
+                parse_mode="HTML"
+            )
+            return
+
+        if target_id not in init.user_details:
+            await init.ensure_user_loaded(target_id)
+        target_data = init.user_details.get(target_id)
+        if not target_data or not all([target_data.get("gender"), target_data.get("age"), target_data.get("country")]):
+            bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>Target user ({target_name}) has not registered with our bot yet.</b>",
+                reply_markup=get_group_redirect_keyboard(bot_username, "start"),
+                parse_mode="HTML"
+            )
+            return
+
+        # 4. Check caller call limit
+        from subscription import can_make_call
+        allowed, used, limit = can_make_call(user_id)
+        if not allowed:
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>Daily Voice Call Limit Reached ({used}/{limit}).</b>\nUpgrade to VIP with /subscribe for unlimited voice calls!",
+                parse_mode="HTML"
+            )
+            return
+
+        group_title = update.effective_chat.title or "our community group"
+        caller_tag = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.first_name
+        session_id = f"grpcall_{user_id}_{target_id}_{int(time.time())}"
+
+        active_voice_calls[session_id] = {
+            "initiator": user_id,
+            "receiver": target_id,
+            "created_at": time.time(),
+            "status": "pending",
+        }
+
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📞 Accept Call", callback_data=f"call_acc|{session_id}"),
+                InlineKeyboardButton("❌ Decline", callback_data=f"call_dec|{session_id}"),
+            ]
+        ])
+
+        dm_sent = await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=target_id,
+            text=(
+                f"📞 <b>Incoming Anonymous Voice Call Request!</b>\n\n"
+                f"• <b>Caller:</b> {caller_tag}\n"
+                f"• <b>From Group:</b> {group_title}\n\n"
+                f"<i>Do you want to accept and join the anonymous voice room?</i>"
+            ),
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+
+        if dm_sent:
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"📞 <b>{caller_tag} sent an anonymous voice call request to {target_name} in their DMs!</b>",
+                parse_mode="HTML"
+            )
+        else:
+            bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>Could not reach {target_name} in private DM.</b>\nThey must start the bot first before receiving call requests.",
+                reply_markup=get_group_redirect_keyboard(bot_username, "start"),
+                parse_mode="HTML"
+            )
+        return
 
     if not is_in_chat(user_id):
         await safe_tele_func_call(
@@ -134,7 +252,8 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     if action == "call_acc":
-        if not is_in_chat(user_id) or not is_in_chat(initiator):
+        is_grp = session_id.startswith("grpcall_")
+        if not is_grp and (not is_in_chat(user_id) or not is_in_chat(initiator)):
             active_voice_calls.pop(session_id, None)
             await safe_tele_func_call(query.edit_message_text, text="⚠️ <b>Chat session ended before call connected.</b>", parse_mode="HTML")
             return

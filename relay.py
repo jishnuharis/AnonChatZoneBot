@@ -55,6 +55,9 @@ def _resolve_reply(user_id: int, partner_id: int, msg):
 async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update or not update.effective_user:
         return
+    # In groups/supergroups, the bot does not relay regular chatter
+    if update.effective_chat and update.effective_chat.type in ("group", "supergroup"):
+        return
     user_id = update.effective_user.id
 
     msg = update.message or update.effective_message
@@ -309,6 +312,8 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def relay_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat and update.effective_chat.type in ("group", "supergroup"):
+        return
     reaction = update.message_reaction
     if not reaction or not reaction.user:
         return
@@ -341,6 +346,8 @@ async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYP
     Relays edited messages to the active chat partner by editing the corresponding forwarded message in-place.
     Catches and silences errors cleanly if message is no longer editable.
     """
+    if update.effective_chat and update.effective_chat.type in ("group", "supergroup"):
+        return
     edit_msg = update.edited_message
     if not edit_msg or not update.effective_user:
         return

@@ -217,18 +217,19 @@ async def fetch_leaderboard(category: str, viewer_id: int) -> Tuple[List[Dict[st
     return top_list, viewer_stats
 
 
-def _build_keyboard(current_cat: str) -> InlineKeyboardMarkup:
+def _build_keyboard(current_cat: str, author_id: Optional[int] = None) -> InlineKeyboardMarkup:
     """Builds category tab buttons and refresh control."""
     cats = [
         ("streaks", "🔥 Streaks"),
         ("karma", "⭐ Karma"),
         ("games", "🎮 Mini-Games"),
     ]
+    suffix = f"|{author_id}" if author_id else ""
     row1 = []
     for key, label in cats:
         btn_text = f"{label} ✅" if key == current_cat else label
-        row1.append(InlineKeyboardButton(btn_text, callback_data=f"top|{key}"))
-    row2 = [InlineKeyboardButton("🔄 Refresh", callback_data=f"top|{current_cat}")]
+        row1.append(InlineKeyboardButton(btn_text, callback_data=f"top|{key}{suffix}"))
+    row2 = [InlineKeyboardButton("🔄 Refresh", callback_data=f"top|{current_cat}{suffix}")]
     return InlineKeyboardMarkup([row1, row2])
 
 
@@ -319,10 +320,12 @@ async def render_leaderboard_text(category: str, viewer_id: int) -> str:
 @check_user_profile
 async def show_top_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles /top and /leaderboard commands."""
+    from group_helper import is_group_chat
     user_id = update.effective_user.id
     category = "streaks"
     text = await render_leaderboard_text(category, user_id)
-    keyboard = _build_keyboard(category)
+    author_id = user_id if is_group_chat(update) else None
+    keyboard = _build_keyboard(category, author_id=author_id)
 
     if update.message:
         await safe_tele_func_call(
@@ -338,16 +341,26 @@ async def handle_top_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     if not query or not query.data:
         return
-    await query.answer()
 
     parts = query.data.split("|")
     category = parts[1] if len(parts) > 1 else "streaks"
     if category not in ("streaks", "karma", "games"):
         category = "streaks"
 
+    author_id = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else None
     user_id = update.effective_user.id
+
+    if author_id is not None and query.message and query.message.chat.type in ("group", "supergroup"):
+        from group_helper import is_group_admin
+        is_admin_user = await is_group_admin(context, query.message.chat_id, user_id)
+        if user_id != author_id and not is_admin_user:
+            await query.answer("⚠️ Only the command author or admins can switch tabs!", show_alert=True)
+            return
+
+    await query.answer()
+
     text = await render_leaderboard_text(category, user_id)
-    keyboard = _build_keyboard(category)
+    keyboard = _build_keyboard(category, author_id=author_id)
 
     await safe_tele_func_call(
         query.edit_message_text,

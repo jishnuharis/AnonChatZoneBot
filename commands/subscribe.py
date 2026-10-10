@@ -22,8 +22,34 @@ def _tier_keyboard():
 
 @check_user_profile
 async def show_subscribe_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from group_helper import is_group_chat
     user_id = update.effective_user.id
     text = SUBSCRIBE_INTRO_TEXT.format(status=subscription.status_text(user_id))
+
+    if is_group_chat(update):
+        bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+        user_tag = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.first_name
+        dm_sent = await safe_tele_func_call(
+            context.bot.send_message, chat_id=user_id, text=text, reply_markup=_tier_keyboard(), parse_mode="HTML"
+        )
+        if dm_sent:
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("⭐ View VIP Perks", url=f"https://t.me/{bot_username}?start=subscribe")]])
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"📩 <b>{user_tag}</b>, <i>I have sent the VIP subscription tiers to your private DM!</i>",
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
+        else:
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("🤖 Start Bot in DM", url=f"https://t.me/{bot_username}?start=subscribe")]])
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>{user_tag}</b>, <i>please start the bot in private DM first so I can send the VIP tiers!</i>",
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
+        return
+
     await safe_tele_func_call(
         update.message.reply_text, text=text, reply_markup=_tier_keyboard(), parse_mode="HTML"
     )

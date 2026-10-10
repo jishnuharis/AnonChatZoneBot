@@ -182,6 +182,17 @@ async def rush_hour_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(user_id):
         return
 
+    from group_helper import is_group_chat, delete_admin_command
+    if is_group_chat(update):
+        await delete_admin_command(update, context)
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=user_id,
+            text="⚠️ <b>/rushhour is restricted to private DMs only.</b>",
+            parse_mode="HTML"
+        )
+        return
+
     args = context.args or []
     subcmd = args[0].lower() if args else "status"
 

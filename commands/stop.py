@@ -6,11 +6,15 @@ from security import safe_tele_func_call
 from session_manager import end_chat_session, is_in_chat, IDLE_KEYBOARD
 from message import REMOVED_FROM_QUEUE_TEXT, NOT_IN_CHAT_TEXT
 
+from group_helper import is_group_chat, reply_group_redirect
 import init
 
 
 @check_user_profile
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if is_group_chat(update):
+        return await reply_group_redirect(update, context, start_arg="group")
+
     user_id = update.effective_user.id
 
     if is_in_chat(user_id):

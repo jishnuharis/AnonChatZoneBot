@@ -1,7 +1,9 @@
 import os
 import datetime
 import logging
-from telegram import BotCommand, Update, BotCommandScopeChat
+from telegram import (
+    BotCommand, Update, BotCommandScopeChat, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats
+)
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler,
     TypeHandler, MessageReactionHandler, PreCheckoutQueryHandler,
@@ -27,7 +29,10 @@ from handlers.friends import (
     handle_friend_card_actions, handle_connect_response
 )
 from handlers.transcript import handle_export_transcript
-from commands.games import games_menu, handle_games_menu_selection
+from commands.games import (
+    games_menu, handle_games_menu_selection, handle_group_game_selection,
+    handle_group_challenge_accept, handle_group_challenge_cancel
+)
 from commands.admin_commands import (
     broadcast, connect, ban_user, unban_user, check_user,
     giveaway_subscription, referral_scheme_command, admin_stats, queue_stats, campaign_command
@@ -77,7 +82,7 @@ for _noisy in (
 
 
 async def set_commands(application):
-    commands = [
+    user_commands = [
         BotCommand("start", "Start the bot"),
         BotCommand("find", "Find a new chat partner"),
         BotCommand("next", "Skip your current partner"),
@@ -98,9 +103,10 @@ async def set_commands(application):
         BotCommand("gift", "Send a gift to your chat partner"),
         BotCommand("link", "Share your Telegram profile"),
     ]
-    await application.bot.set_my_commands(commands)
+    # Default fallback: registers all 19 user commands for all chats
+    await application.bot.set_my_commands(user_commands)
 
-    admin_commands = commands + [
+    admin_commands = user_commands + [
         BotCommand("stats", "Bot user and performance statistics"),
         BotCommand("queue", "Queue and matchmaking status"),
         BotCommand("connect", "Connect directly to a user ID"),
@@ -122,6 +128,12 @@ async def set_commands(application):
             await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
         except Exception as e:
             logger.debug(f"Notice setting admin commands for {admin_id}: {e}")
+
+    # Group chats: strictly user commands ONLY! Admin commands NEVER disclosed in group menus!
+    try:
+        await application.bot.set_my_commands(user_commands, scope=BotCommandScopeAllGroupChats())
+    except Exception as e:
+        logger.debug(f"Notice setting group commands: {e}")
 
 
 async def periodic_save(context):
@@ -246,8 +258,8 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_check_channel_status, pattern=r"^check_channel_status$"))
     app.add_handler(CallbackQueryHandler(handle_start_find_callback, pattern=r"^start_find_callback$"))
 
-    app.add_handler(CallbackQueryHandler(handle_top_callback, pattern=r"^top\|\w+$"))
-    app.add_handler(CallbackQueryHandler(handle_gift_callback, pattern=r"^gift\|\w+$"))
+    app.add_handler(CallbackQueryHandler(handle_top_callback, pattern=r"^top\|\w+(?:\|\d+)?$"))
+    app.add_handler(CallbackQueryHandler(handle_gift_callback, pattern=r"^gift\|\w+(?:\|-?\d+\|-?\d+)?$"))
     app.add_handler(CallbackQueryHandler(handle_tier_selection, pattern=r"^sub\|\w+$"))
     app.add_handler(PreCheckoutQueryHandler(handle_pre_checkout))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
@@ -274,6 +286,9 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_referral_link_button, pattern=r"^refgen$"))
 
     # Games
+    app.add_handler(CallbackQueryHandler(handle_group_game_selection, pattern=r"^grpgame\|\w+\|\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_group_challenge_accept, pattern=r"^grp_acc\|\w+$"))
+    app.add_handler(CallbackQueryHandler(handle_group_challenge_cancel, pattern=r"^grp_can\|\w+$"))
     app.add_handler(CallbackQueryHandler(handle_games_menu_selection, pattern=r"^gamemenu\|\w+$"))
     app.add_handler(CallbackQueryHandler(handle_game_request_response, pattern=r"^gamereq\|(accept|decline)$"))
     app.add_handler(CallbackQueryHandler(coin_steal.handle_callback, pattern=r"^cs\|(save|steal)$"))

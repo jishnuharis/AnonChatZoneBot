@@ -9,11 +9,15 @@ from session_manager import end_chat_session, is_in_chat, start_chat_session, IN
 from matchmaking import dequeue_user
 from message import PARTNER_SKIPPED_TEXT, NOT_IN_CHAT_USE_FIND_TEXT
 
+from group_helper import is_group_chat, reply_group_redirect
 import init
 
 
 @check_user_profile
 async def skip_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if is_group_chat(update):
+        return await reply_group_redirect(update, context, start_arg="find")
+
     user_id = update.effective_user.id
 
     if is_in_chat(user_id):

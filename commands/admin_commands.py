@@ -64,6 +64,17 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await relay_message(update, context)
         return
 
+    from group_helper import is_group_chat, delete_admin_command
+    if is_group_chat(update):
+        await delete_admin_command(update, context)
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=update.effective_user.id,
+            text="⚠️ <b>/broadcast is restricted to private DMs only.</b>",
+            parse_mode="HTML"
+        )
+        return
+
     raw_text = (update.message.text or update.message.caption or "") if update.message else ""
 
     replied_msg = None
@@ -260,12 +271,61 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(user_id):
         return
 
+    from group_helper import is_group_chat, delete_admin_command
+    if is_group_chat(update):
+        await delete_admin_command(update, context)
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=user_id,
+            text="⚠️ <b>/connect is restricted to private DMs only.</b>",
+            parse_mode="HTML"
+        )
+        return
+
+    args = context.args or []
+    # If 2 user IDs are passed: connect those 2 users directly!
+    if len(args) >= 2 and args[0].isdigit() and args[1].isdigit():
+        u1 = int(args[0])
+        u2 = int(args[1])
+        if u1 == u2:
+            await update.message.reply_text("<b>Cannot connect a user to themselves.</b>", parse_mode="HTML")
+            return
+
+        if u1 not in init.user_details:
+            await init.ensure_user_loaded(u1)
+        if u2 not in init.user_details:
+            await init.ensure_user_loaded(u2)
+        if u1 not in init.user_details or u2 not in init.user_details:
+            await update.message.reply_text(TARGET_NOT_IN_DB_TEXT, parse_mode="HTML")
+            return
+
+        if is_in_chat(u1) and get_partner(u1) == u2:
+            await update.message.reply_text("<b>Users are already connected to each other.</b>", parse_mode="HTML")
+            return
+
+        async with init.queue_lock:
+            for uid in (u1, u2):
+                if uid in init.waiting_users:
+                    init.waiting_users.remove(uid)
+                    init.wait_started.pop(uid, None)
+
+        for uid in (u1, u2):
+            if is_in_chat(uid):
+                await end_chat_session(context, uid, reason="admin_reconnect", notify_initiator=False, notify_partner=True)
+
+        success = await start_chat_session(context, u1, u2, is_admin_connect=True)
+        if success:
+            await update.message.reply_text(f"✅ <i>Successfully connected user</i> <code>{u1}</code> <i>and</i> <code>{u2}</code>.", parse_mode="HTML")
+        else:
+            await update.message.reply_text("⚠️ <b>Failed to connect users.</b>", parse_mode="HTML")
+        return
+
     message = update.message.text
     if message.lower().startswith("/connect"):
         message = message[len("/connect"):].strip()
     try:
-        target_id = int(message)
-    except ValueError:
+        target_id = int(message.split()[0])
+    except (ValueError, IndexError):
         await update.message.reply_text(GIVE_VALID_CONNECT_USER_ID_TEXT, parse_mode="HTML")
         return
 
@@ -327,39 +387,78 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(user_id):
         return
 
-    args = context.args
-    if len(args) < 2:
-        await update.message.reply_text(ADMIN_HELP_TEXT, parse_mode="HTML")
-        return
+    from group_helper import is_group_chat, delete_admin_command, resolve_target
+    in_group = is_group_chat(update)
+    if in_group:
+        await delete_admin_command(update, context)
 
-    try:
-        target_id = int(args[0])
-        severity = int(args[1])
-    except ValueError:
-        await update.message.reply_text(BAN_USAGE_TEXT, parse_mode="HTML")
+    args = context.args or []
+    target_id = None
+    target_name = None
+    severity = None
+    reason = "Manual admin action"
+
+    cand = getattr(update.message, "reply_to_message", None) if update.message else None
+    if cand and getattr(cand, "from_user", None) and isinstance(getattr(cand.from_user, "id", None), int):
+        target_id = cand.from_user.id
+        u_name = cand.from_user.username
+        target_name = f"@{u_name}" if u_name else cand.from_user.first_name
+        if len(args) >= 1:
+            try:
+                severity = int(args[0])
+                if len(args) > 1:
+                    reason = " ".join(args[1:])
+            except ValueError:
+                pass
+    elif len(args) >= 2:
+        target_res = await resolve_target(update, context, arg_index=0)
+        if target_res and target_res[0]:
+            target_id, target_name = target_res
+        try:
+            severity = int(args[1])
+            if len(args) > 2:
+                reason = " ".join(args[2:])
+        except ValueError:
+            pass
+
+    if target_id is None or severity is None:
+        target_chat = user_id if in_group else update.message.chat_id
+        await safe_tele_func_call(context.bot.send_message, chat_id=target_chat, text=BAN_USAGE_TEXT, parse_mode="HTML")
         return
 
     if not (0 <= severity <= 10):
-        await update.message.reply_text(SEVERITY_RANGE_TEXT, parse_mode="HTML")
+        target_chat = user_id if in_group else update.message.chat_id
+        await safe_tele_func_call(context.bot.send_message, chat_id=target_chat, text=SEVERITY_RANGE_TEXT, parse_mode="HTML")
         return
 
     if target_id == user_id:
-        await update.message.reply_text(CANT_RESTRICT_SELF_TEXT, parse_mode="HTML")
+        target_chat = user_id if in_group else update.message.chat_id
+        await safe_tele_func_call(context.bot.send_message, chat_id=target_chat, text=CANT_RESTRICT_SELF_TEXT, parse_mode="HTML")
         return
     if is_admin(target_id):
-        await update.message.reply_text(ADMINS_CANT_BE_RESTRICTED_TEXT, parse_mode="HTML")
+        target_chat = user_id if in_group else update.message.chat_id
+        await safe_tele_func_call(context.bot.send_message, chat_id=target_chat, text=ADMINS_CANT_BE_RESTRICTED_TEXT, parse_mode="HTML")
         return
-
-    reason = " ".join(args[2:]) if len(args) > 2 else "Manual admin action"
 
     # Enforce queue eviction & chat severance
     until = await apply_restriction(target_id, severity, reason, context=context)
     if not until:
-        await update.message.reply_text(SEVERITY_ZERO_NOOP_TEXT, parse_mode="HTML")
+        target_chat = user_id if in_group else update.message.chat_id
+        await safe_tele_func_call(context.bot.send_message, chat_id=target_chat, text=SEVERITY_ZERO_NOOP_TEXT, parse_mode="HTML")
         return
 
     remaining = format_duration(until - time.time())
-    await update.message.reply_text(f"⛔ <i>User</i> <code>{target_id}</code> <i>restricted for</i> <b>{esc(remaining)}</b> <i>(severity {severity}).</i>\n<i>Reason:</i> <code>{esc(reason)}</code>", parse_mode="HTML")
+    display_tag = target_name or f"<code>{target_id}</code>"
+    if in_group:
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=update.effective_chat.id,
+            text=f"⛔ <b>User {display_tag} restricted for {esc(remaining)} (severity {severity}).</b>\n<i>Reason:</i> <code>{esc(reason)}</code>",
+            parse_mode="HTML"
+        )
+    else:
+        await update.message.reply_text(f"⛔ <i>User</i> <code>{target_id}</code> <i>restricted for</i> <b>{esc(remaining)}</b> <i>(severity {severity}).</i>\n<i>Reason:</i> <code>{esc(reason)}</code>", parse_mode="HTML")
+
     await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=f"⛔ <b>You've been restricted by an admin.</b>\n\n<i>Reason:</i> <code>{esc(reason)}</code>\n<i>Time:</i> <code>{esc(remaining)}</code>", parse_mode="HTML")
 
 
@@ -367,35 +466,83 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
 
-    args = context.args
-    if not args:
-        await update.message.reply_text(UNBAN_USAGE_TEXT, parse_mode="HTML")
-        return
+    from group_helper import is_group_chat, delete_admin_command, resolve_target
+    in_group = is_group_chat(update)
+    if in_group:
+        await delete_admin_command(update, context)
 
-    try:
-        target_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text(GIVE_VALID_USER_ID_TEXT, parse_mode="HTML")
+    args = context.args or []
+    target_id = None
+    target_name = None
+
+    cand = getattr(update.message, "reply_to_message", None) if update.message else None
+    if cand and getattr(cand, "from_user", None) and isinstance(getattr(cand.from_user, "id", None), int):
+        target_id = cand.from_user.id
+        u_name = cand.from_user.username
+        target_name = f"@{u_name}" if u_name else cand.from_user.first_name
+    elif args:
+        target_res = await resolve_target(update, context, arg_index=0)
+        if target_res and target_res[0]:
+            target_id, target_name = target_res
+
+    if not target_id:
+        target_chat = update.effective_user.id if in_group else update.message.chat_id
+        await safe_tele_func_call(context.bot.send_message, chat_id=target_chat, text=UNBAN_USAGE_TEXT, parse_mode="HTML")
         return
 
     await clear_restriction(target_id)
-    await update.message.reply_text(f"✅ <i>User</i> <code>{target_id}</code> <i>has been unrestricted.</i>", parse_mode="HTML")
+    display_tag = target_name or f"<code>{target_id}</code>"
+    if in_group:
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=update.effective_chat.id,
+            text=f"✅ <b>User {display_tag} has been unrestricted.</b>",
+            parse_mode="HTML"
+        )
+    else:
+        await update.message.reply_text(f"✅ <i>User</i> <code>{target_id}</code> <i>has been unrestricted.</i>", parse_mode="HTML")
+
     await safe_tele_func_call(context.bot.send_message, chat_id=target_id, text=RESTRICTION_LIFTED_TEXT, parse_mode="HTML")
 
 
 async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.effective_user.id):
+    admin_id = update.effective_user.id
+    if not is_admin(admin_id):
         return
 
-    args = context.args
-    if not args:
-        await update.message.reply_text(CHECKUSER_USAGE_TEXT, parse_mode="HTML")
-        return
+    from group_helper import is_group_chat, delete_admin_command, resolve_target
+    in_group = is_group_chat(update)
+    if in_group:
+        await delete_admin_command(update, context)
 
-    try:
-        target_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text(GIVE_VALID_USER_ID_TEXT, parse_mode="HTML")
+    async def _reply(msg_text):
+        if in_group:
+            await safe_tele_func_call(context.bot.send_message, chat_id=admin_id, text=msg_text, parse_mode="HTML")
+        else:
+            await update.message.reply_text(msg_text, parse_mode="HTML")
+
+    args = context.args or []
+    target_id = None
+
+    cand = getattr(update.message, "reply_to_message", None) if update.message else None
+    if cand and getattr(cand, "from_user", None) and isinstance(getattr(cand.from_user, "id", None), int):
+        target_id = cand.from_user.id
+    elif args:
+        target_res = await resolve_target(update, context, arg_index=0)
+        if target_res and target_res[0]:
+            target_id = target_res[0]
+        elif str(args[0]).startswith("@"):
+            await _reply(NO_RECORD_OF_USER_TEXT)
+            return
+        else:
+            try:
+                target_id = int(args[0])
+            except ValueError:
+                await _reply(GIVE_VALID_USER_ID_TEXT)
+                return
+
+    if not target_id:
+        await _reply(CHECKUSER_USAGE_TEXT)
         return
 
     from saveNload import get_user
@@ -414,7 +561,7 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             details = db_user
 
     if not details:
-        await update.message.reply_text(NO_RECORD_OF_USER_TEXT, parse_mode="HTML")
+        await _reply(NO_RECORD_OF_USER_TEXT)
         return
 
     created_ts = details.get("created_at")
@@ -507,27 +654,44 @@ async def check_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{restriction_line}\n"
         f"Recent reports:\n{reports_text}"
     )
-    await update.message.reply_text(text, parse_mode="HTML")
+    await _reply(text)
 
 
 async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
 
-    args = context.args
-    if len(args) < 2:
-        await update.message.reply_text(GIVEAWAY_USAGE_TEXT, parse_mode="HTML")
+    from group_helper import is_group_chat, delete_admin_command, resolve_target
+    in_group = is_group_chat(update)
+    if in_group:
+        await delete_admin_command(update, context)
+
+    args = context.args or []
+    target_id = None
+    target_name = None
+    tier_key = None
+
+    cand = getattr(update.message, "reply_to_message", None) if update.message else None
+    if cand and getattr(cand, "from_user", None) and isinstance(getattr(cand.from_user, "id", None), int):
+        target_id = cand.from_user.id
+        u_name = cand.from_user.username
+        target_name = f"@{u_name}" if u_name else cand.from_user.first_name
+        if args:
+            tier_key = args[0].lower()
+    elif len(args) >= 2:
+        target_res = await resolve_target(update, context, arg_index=0)
+        if target_res and target_res[0]:
+            target_id, target_name = target_res
+        tier_key = args[1].lower()
+
+    if not target_id or not tier_key:
+        dest_chat = update.effective_user.id if in_group else update.message.chat_id
+        await safe_tele_func_call(context.bot.send_message, chat_id=dest_chat, text=GIVEAWAY_USAGE_TEXT, parse_mode="HTML")
         return
 
-    try:
-        target_id = int(args[0])
-    except ValueError:
-        await update.message.reply_text(GIVE_VALID_USER_ID_TEXT, parse_mode="HTML")
-        return
-
-    tier_key = args[1].lower()
     if tier_key not in subscription.TIERS:
-        await update.message.reply_text(GIVEAWAY_UNKNOWN_TIER_TEXT, parse_mode="HTML")
+        dest_chat = update.effective_user.id if in_group else update.message.chat_id
+        await safe_tele_func_call(context.bot.send_message, chat_id=dest_chat, text=GIVEAWAY_UNKNOWN_TIER_TEXT, parse_mode="HTML")
         return
 
     tier = subscription.TIERS[tier_key]
@@ -536,11 +700,24 @@ async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TY
     await add_subscription_db(target_id, tier_key, tier["duration_days"], source="admin_grant")
     expires_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(new_expiry))
 
-    await update.message.reply_text(
-        f"✅ <i>Granted</i> <b>{tier['label']}</b> <i>to</i> <code>{target_id}</code> "
-        f"<i>(+{tier['bonus_points']} points). Active until</i> <code>{expires_str}</code>.",
-        parse_mode="HTML",
-    )
+    display_tag = target_name or f"<code>{target_id}</code>"
+    if in_group:
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=update.effective_chat.id,
+            text=(
+                f"🎉 <b>VIP Giveaway Winner!</b>\n\n"
+                f"<b>{display_tag}</b> has been awarded <b>{tier['label']}</b> "
+                f"(+{tier['bonus_points']} points)! ✨"
+            ),
+            parse_mode="HTML",
+        )
+    else:
+        await update.message.reply_text(
+            f"✅ <i>Granted</i> <b>{tier['label']}</b> <i>to</i> <code>{target_id}</code> "
+            f"<i>(+{tier['bonus_points']} points). Active until</i> <code>{expires_str}</code>.",
+            parse_mode="HTML",
+        )
     await safe_tele_func_call(
         context.bot.send_message, chat_id=target_id,
         text=(
@@ -554,6 +731,17 @@ async def giveaway_subscription(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def referral_scheme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
+        return
+
+    from group_helper import is_group_chat, delete_admin_command
+    if is_group_chat(update):
+        await delete_admin_command(update, context)
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=update.effective_user.id,
+            text="⚠️ <b>/referral is restricted to private DMs only.</b>",
+            parse_mode="HTML"
+        )
         return
 
     args = context.args
@@ -591,6 +779,11 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
 
+    from group_helper import is_group_chat, delete_admin_command
+    in_group = is_group_chat(update)
+    if in_group:
+        await delete_admin_command(update, context)
+
     total_cached = len(init.user_details)
     active_matches = len(init.active_pairs) // 2
     waiting_count = len(init.waiting_users)
@@ -603,13 +796,26 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• <b>Active Sessions:</b> {len(init.active_sessions) // 2}\n"
         f"• <b>Game Requests In-Flight:</b> {len(init.game_requests)}\n"
     )
-    await update.message.reply_text(text, parse_mode="HTML")
+    if in_group:
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=update.effective_user.id,
+            text=text,
+            parse_mode="HTML"
+        )
+    else:
+        await update.message.reply_text(text, parse_mode="HTML")
 
 
 async def queue_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Shows queue details."""
     if not is_admin(update.effective_user.id):
         return
+
+    from group_helper import is_group_chat, delete_admin_command
+    in_group = is_group_chat(update)
+    if in_group:
+        await delete_admin_command(update, context)
 
     async with init.queue_lock:
         now = time.time()
@@ -623,12 +829,31 @@ async def queue_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• <b>Waiting Users:</b> {count}\n"
         f"• <b>Longest Wait:</b> {int(oldest_wait)}s\n"
     )
-    await update.message.reply_text(text, parse_mode="HTML")
+    if in_group:
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=update.effective_user.id,
+            text=text,
+            parse_mode="HTML"
+        )
+    else:
+        await update.message.reply_text(text, parse_mode="HTML")
 
 
 async def campaign_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to manage sponsor campaigns."""
     if not is_admin(update.effective_user.id):
+        return
+
+    from group_helper import is_group_chat, delete_admin_command
+    if is_group_chat(update):
+        await delete_admin_command(update, context)
+        await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=update.effective_user.id,
+            text="⚠️ <b>/campaign is restricted to private DMs only.</b>",
+            parse_mode="HTML"
+        )
         return
 
     args = context.args

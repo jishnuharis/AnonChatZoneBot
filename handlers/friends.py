@@ -43,10 +43,113 @@ def _format_date(val) -> str:
 
 async def send_friend_request(update: Update, context: ContextTypes.DEFAULT_TYPE, target_id: Optional[int] = None):
     """
-    Sends a mutual friend request to the current or recently ended partner.
-    Can be called via /friendreq in chat or by tapping the end-of-chat inline button.
+    Sends a mutual friend request to the current or recently ended partner in DM,
+    or posts an action card in a group for the target user to accept.
     """
     user_id = update.effective_user.id
+
+    from group_helper import is_group_chat, resolve_target, get_group_redirect_keyboard
+    if is_group_chat(update) and target_id is None:
+        target_res = await resolve_target(update, context)
+        if not target_res:
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text="ℹ️ <i>Reply to a user's message with</i> <code>/friendreq</code> <i>or type</i> <code>/friendreq @username</code> <i>to add them as an anonymous friend!</i>",
+                parse_mode="HTML"
+            )
+            return
+
+        t_id, t_name = target_res
+
+        # 1. Presence check: sender first
+        if user_id not in init.user_details:
+            await init.ensure_user_loaded(user_id)
+        sender_data = init.user_details.get(user_id)
+        if not sender_data or not all([sender_data.get("gender"), sender_data.get("age"), sender_data.get("country")]):
+            bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text="⚠️ <b>You haven't registered with the bot yet!</b>\n\nStart the bot first in private chat to use this feature.",
+                reply_markup=get_group_redirect_keyboard(bot_username, "start"),
+                parse_mode="HTML"
+            )
+            return
+
+        # 2. Presence check: target
+        if not t_id:
+            bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>Target user ({t_name}) has not registered with our bot yet.</b>",
+                reply_markup=get_group_redirect_keyboard(bot_username, "start"),
+                parse_mode="HTML"
+            )
+            return
+
+        if t_id == user_id:
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text="😅 <i>You cannot add yourself as a friend!</i>",
+                parse_mode="HTML"
+            )
+            return
+
+        if t_id not in init.user_details:
+            await init.ensure_user_loaded(t_id)
+        target_data = init.user_details.get(t_id)
+        if not target_data or not all([target_data.get("gender"), target_data.get("age"), target_data.get("country")]):
+            bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>Target user ({t_name}) has not registered with our bot yet.</b>",
+                reply_markup=get_group_redirect_keyboard(bot_username, "start"),
+                parse_mode="HTML"
+            )
+            return
+
+        user_count = await get_friend_count_db(user_id)
+        user_limit = get_friend_limit(user_id)
+        if user_count >= user_limit:
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>Friends list full ({user_count}/{user_limit}).</b>\nUpgrade with /subscribe for more friend slots!",
+                parse_mode="HTML"
+            )
+            return
+
+        if await are_friends_db(user_id, t_id):
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⭐ <b>You are already friends with {t_name}!</b> Check /friends in your DMs.",
+                parse_mode="HTML"
+            )
+            return
+
+        req_id = str(uuid.uuid4())[:8]
+        sender_tag = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.first_name
+        init.pending_friend_requests[req_id] = {
+            "sender_id": user_id,
+            "target_id": t_id,
+            "sender_name": sender_tag,
+            "target_name": t_name,
+            "is_group": True,
+            "created_at": time.time(),
+        }
+
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Accept", callback_data=f"freq_acc|{req_id}"),
+                InlineKeyboardButton("❌ Decline", callback_data=f"freq_dec|{req_id}"),
+            ]
+        ])
+
+        await safe_tele_func_call(
+            update.message.reply_text,
+            text=f"⭐ <b>{sender_tag} sent an Anonymous Friend Request to {t_name}!</b>\n\n<i>Accept to connect and chat anytime inside the bot without revealing identities.</i>",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        return
 
     if target_id is None:
         if not is_in_chat(user_id):
@@ -138,7 +241,7 @@ async def handle_friend_request_response(update: Update, context: ContextTypes.D
     action = parts[0]
     req_id = parts[1] if len(parts) > 1 else ""
 
-    req_data = init.pending_friend_requests.pop(req_id, None)
+    req_data = init.pending_friend_requests.get(req_id)
     if not req_data:
         await safe_tele_func_call(query.edit_message_text, text="⏳ <b>Friend request expired.</b>", parse_mode="HTML")
         return
@@ -147,14 +250,28 @@ async def handle_friend_request_response(update: Update, context: ContextTypes.D
     target_id = req_data["target_id"]
 
     if user_id != target_id:
+        await safe_tele_func_call(
+            query.answer,
+            text="⚠️ Only the invited person can accept or decline this request!",
+            show_alert=True
+        )
         return
 
+    init.pending_friend_requests.pop(req_id, None)
+
     if action == "freq_dec":
-        await safe_tele_func_call(query.edit_message_text, text="❌ <b>Friend request declined.</b>", parse_mode="HTML")
+        if req_data.get("is_group"):
+            await safe_tele_func_call(
+                query.edit_message_text,
+                text=f"❌ <b>Friend request declined by {req_data.get('target_name')}.</b>",
+                parse_mode="HTML"
+            )
+        else:
+            await safe_tele_func_call(query.edit_message_text, text="❌ <b>Friend request declined.</b>", parse_mode="HTML")
         await safe_tele_func_call(
             context.bot.send_message,
             chat_id=sender_id,
-            text="ℹ️ <b>Your partner declined the friend request.</b>",
+            text=f"ℹ️ <b>{req_data.get('target_name', 'Your partner')} declined the friend request.</b>",
             parse_mode="HTML",
         )
         return
@@ -191,17 +308,30 @@ async def handle_friend_request_response(update: Update, context: ContextTypes.D
 
     success = await add_friend_pair_db(sender_id, target_id, name_for_sender, name_for_target)
     if success:
-        await safe_tele_func_call(
-            query.edit_message_text,
-            text=f"🎉 <b>Friend request accepted!</b>\n\nYour partner is saved as <b>{name_for_target}</b>.\n\nGo to /friends to customize their nickname or note anytime!",
-            parse_mode="HTML",
-        )
-        await safe_tele_func_call(
-            context.bot.send_message,
-            chat_id=sender_id,
-            text=f"🎉 <b>Your partner accepted your friend request!</b>\n\nSaved as <b>{name_for_sender}</b>.\n\nGo to /friends to view your friends list!",
-            parse_mode="HTML",
-        )
+        if req_data.get("is_group"):
+            await safe_tele_func_call(
+                query.edit_message_text,
+                text=f"⭐ <b>{req_data.get('target_name')} accepted {req_data.get('sender_name')}'s friend request!</b>\n\n<i>You can now connect and chat anytime via /friends in bot DM.</i>",
+                parse_mode="HTML",
+            )
+            await safe_tele_func_call(
+                context.bot.send_message,
+                chat_id=sender_id,
+                text=f"🎉 <b>{req_data.get('target_name')} accepted your friend request!</b>\nSaved as <b>{name_for_sender}</b> in your /friends list.",
+                parse_mode="HTML",
+            )
+        else:
+            await safe_tele_func_call(
+                query.edit_message_text,
+                text=f"🎉 <b>Friend request accepted!</b>\n\nYour partner is saved as <b>{name_for_target}</b>.\n\nGo to /friends to customize their nickname or note anytime!",
+                parse_mode="HTML",
+            )
+            await safe_tele_func_call(
+                context.bot.send_message,
+                chat_id=sender_id,
+                text=f"🎉 <b>Your partner accepted your friend request!</b>\n\nSaved as <b>{name_for_sender}</b>.\n\nGo to /friends to view your friends list!",
+                parse_mode="HTML",
+            )
     else:
         await safe_tele_func_call(query.edit_message_text, text="⚠️ <b>Failed to add friend. Try again later.</b>", parse_mode="HTML")
 
@@ -247,6 +377,29 @@ async def show_friends_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     # 10th Line: Back to profile
     buttons.append([InlineKeyboardButton("🔙 Back to Profile", callback_data="profile_back")])
     markup = InlineKeyboardMarkup(buttons)
+
+    from group_helper import is_group_chat
+    if is_group_chat(update):
+        bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+        user_tag = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.first_name
+        dm_sent = await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=text, parse_mode="HTML", reply_markup=markup)
+        if dm_sent:
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("👥 Open Friends List", url=f"https://t.me/{bot_username}?start=friends")]])
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"📩 <b>{user_tag}</b>, <i>I have sent your anonymous friends list to your private DM!</i>",
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
+        else:
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("🤖 Start Bot in DM", url=f"https://t.me/{bot_username}?start=friends")]])
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>{user_tag}</b>, <i>please start the bot in private DM first so I can send your friends list!</i>",
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
+        return
 
     if update.callback_query:
         await safe_tele_func_call(update.callback_query.edit_message_text, text=text, parse_mode="HTML", reply_markup=markup)

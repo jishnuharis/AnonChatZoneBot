@@ -138,9 +138,13 @@ async def restriction_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         return
     user_id = user.id
+    if user.username:
+        init.username_to_id[user.username.lower()] = user_id
 
     if user_id in init.user_details:
         init.user_details[user_id]["last_active"] = time.time()
+        if user.username:
+            init.user_details[user_id]["username"] = user.username.lower()
 
     from moderation import is_user_restricted
     restricted, reason, remaining = is_user_restricted(user_id)

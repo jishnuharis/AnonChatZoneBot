@@ -115,13 +115,14 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
             parse_mode="HTML",
         )
 
+        headline = "🎉 <b>WOW! You received a Gift!</b> 🎁" if len(parts) >= 4 else "🎉 <b>WOW! Your chat partner sent you a Gift!</b> 🎁"
         partner_notice = (
-            f"🎉 <b>WOW! Your chat partner sent you a Gift!</b> 🎁\n\n"
+            f"{headline}\n\n"
             f"<blockquote>\n"
             f"{gift['emoji']} <b>{gift['name']}</b>\n"
             f"✨ <i>Reward received:</i> <b>+{gift['points_reward']} Points</b>{vip_reward_text}\n"
             f"</blockquote>\n\n"
-            f"<i>Say thank you to your partner in chat!</i> ❤️"
+            f"<i>Enjoy your gift in Chat Zone!</i> ❤️"
         )
         await safe_tele_func_call(
             context.bot.send_message,
@@ -129,3 +130,25 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
             text=partner_notice,
             parse_mode="HTML",
         )
+
+        if len(parts) >= 4:
+            try:
+                group_id = int(parts[3])
+                sender_tag = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.first_name
+                target_user = init.user_details.get(partner_id, {})
+                target_username = target_user.get("username")
+                target_tag = f"@{target_username}" if target_username else f"User {partner_id}"
+
+                group_announcement = (
+                    f"🎉 <b>A Gift has been sent in Chat Zone!</b> 🎁\n\n"
+                    f"<b>{sender_tag}</b> just gifted a <b>{gift['emoji']} {gift['name']}</b> to <b>{target_tag}</b> "
+                    f"(+{gift['points_reward']} Points{vip_reward_text})! ✨"
+                )
+                await safe_tele_func_call(
+                    context.bot.send_message,
+                    chat_id=group_id,
+                    text=group_announcement,
+                    parse_mode="HTML",
+                )
+            except Exception as e:
+                pass

@@ -14,17 +14,16 @@ from message import (
 )
 
 
+from group_helper import is_group_chat, reply_group_redirect
+import init
+
+
 async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Allows a user in an active chat session to safely share their Telegram profile
-    with their partner as an inline URL button, keeping their raw username hidden
-    from chat logs and preventing link-spam bypasses.
-    
-    Free tier users are subject to a 90-second warm-up lock from the start of the chat.
-    Subscribed (VIP) users can share immediately.
-    """
     if not update.effective_user or not update.message:
         return
+
+    if is_group_chat(update):
+        return await reply_group_redirect(update, context, start_arg="group")
 
     user_id = update.effective_user.id
 

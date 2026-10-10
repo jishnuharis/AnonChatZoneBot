@@ -9,11 +9,15 @@ from message import ALREADY_IN_CHAT_TEXT, LOOKING_FOR_PARTNER_TEXT
 from subscription import has_daily_credit, consume_daily_credit, daily_credit_limit
 from message import DAILY_NEXT_LIMIT_REACHED_TEXT
 
+from group_helper import is_group_chat, reply_group_redirect
 import init
 
 
 @check_user_profile
 async def find(update: Update, context: ContextTypes.DEFAULT_TYPE, charge: bool = True):
+    if is_group_chat(update):
+        return await reply_group_redirect(update, context, start_arg="find")
+
     user_id = update.effective_user.id
 
     # Layer 1: Strict Ban & Restriction check

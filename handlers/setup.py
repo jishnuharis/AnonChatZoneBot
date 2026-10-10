@@ -16,6 +16,10 @@ import referral
 def check_user_profile(handler_func):
     @wraps(handler_func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        # In groups/supergroups, bypass personal DM onboarding and channel gating
+        if update.effective_chat and update.effective_chat.type in ("group", "supergroup"):
+            return await handler_func(update, context, *args, **kwargs)
+
         user_id = update.effective_user.id
 
         if user_id not in init.user_details:

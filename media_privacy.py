@@ -106,6 +106,10 @@ async def maybe_send_private(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 @check_user_profile
 async def handle_private_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from group_helper import is_group_chat, reply_group_redirect
+    if is_group_chat(update):
+        return await reply_group_redirect(update, context, start_arg="group")
+
     user_id = update.effective_user.id
     if not is_subscribed(user_id):
         await safe_reply(update, text=PRIVATE_MODE_SUBSCRIBERS_ONLY_TEXT, parse_mode="HTML", context=context)

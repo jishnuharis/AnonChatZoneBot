@@ -114,12 +114,44 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
 
 @check_user_profile
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from group_helper import is_group_chat
     user_id = update.effective_user.id
     text = await _build_profile_text(
         user_id, context,
         fallback_name=update.effective_user.full_name,
         fallback_username=update.effective_user.username,
     )
+    if not text:
+        return
+
+    if is_group_chat(update):
+        bot_username = context.bot.username if hasattr(context, "bot") and context.bot else ""
+        user_tag = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.first_name
+        dm_sent = await safe_tele_func_call(
+            context.bot.send_message,
+            chat_id=user_id,
+            text=text,
+            reply_markup=_profile_keyboard(),
+            parse_mode="HTML"
+        )
+        if dm_sent:
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("👤 View My Profile", url=f"https://t.me/{bot_username}?start=profile")]])
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"📩 <b>{user_tag}</b>, <i>I have sent your profile to your private DM!</i>",
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
+        else:
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("🤖 Start Bot in DM", url=f"https://t.me/{bot_username}?start=profile")]])
+            await safe_tele_func_call(
+                update.message.reply_text,
+                text=f"⚠️ <b>{user_tag}</b>, <i>please start the bot in private DM first so I can send your profile!</i>",
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
+        return
+
     await safe_tele_func_call(update.message.reply_text, text=text, reply_markup=_profile_keyboard(), parse_mode="HTML")
 
 

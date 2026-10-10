@@ -6,11 +6,15 @@ from handlers.setup import check_user_profile
 from security import safe_tele_func_call
 from message import WELCOME_BACK_TEXT
 
+from group_helper import is_group_chat, reply_group_redirect
 import init
 
 
 @check_user_profile
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if is_group_chat(update):
+        return await reply_group_redirect(update, context, start_arg="group")
+
     user_id = update.effective_user.id
     if not all([init.user_details[user_id].get("gender"), init.user_details[user_id].get("age"), init.user_details[user_id].get("country")]):
         return

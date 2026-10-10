@@ -104,6 +104,8 @@ dirty_users: Set[int] = set()
 game_requests: Dict[int, Dict[str, Any]] = {}
 pending_media: Dict[str, Dict[str, Any]] = {}
 message_map: Dict[int, Dict[int, tuple]] = {}
+username_to_id: Dict[str, int] = {}
+group_games: Dict[str, Dict[str, Any]] = {}
 
 referral_scheme: Dict[str, Any] = {"required_referrals": 0, "expires": None, "reward_days": 1}
 
