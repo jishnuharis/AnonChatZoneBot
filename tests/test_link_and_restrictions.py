@@ -665,7 +665,7 @@ async def test_short_message_handle_blocked_and_long_message_masked():
     await relay_message(mock_update2, mock_context)
     mock_context.bot.send_message.assert_called_once()
     sent_text = mock_context.bot.send_message.call_args[1]["text"]
-    assert "[handle hidden 🔒]" in sent_text
+    assert "[hidden 🔒]" in sent_text
     assert "that_cool_guy_67" not in sent_text
     assert "imagine asking to add your acc with the tag" in sent_text
 
@@ -733,7 +733,7 @@ async def test_bot_username_restrictions_and_safe_words():
     assert "Links and usernames cannot be shared" in mock_update1.message.reply_text.call_args[1]["text"]
 
     # 2. Long message with bot handle (>= 6 words): "someone told me AnonChatZoneBot has free stars in big 2026"
-    # -> MASKED in-place to "[bot hidden 🔒]" and relayed
+    # -> MASKED in-place to "[hidden 🔒]" and relayed
     mock_context.bot.send_message.reset_mock()
     mock_update2 = MagicMock()
     mock_update2.effective_user.id = u1
@@ -756,9 +756,9 @@ async def test_bot_username_restrictions_and_safe_words():
     await relay_message(mock_update2, mock_context)
     mock_context.bot.send_message.assert_called_once()
     sent_text = mock_context.bot.send_message.call_args[1]["text"]
-    assert "[bot hidden 🔒]" in sent_text
+    assert "[hidden 🔒]" in sent_text
     assert "AnonChatZoneBot" not in sent_text
-    assert "someone told me [bot hidden 🔒] has free stars in big 2026" == sent_text
+    assert "someone told me [hidden 🔒] has free stars in big 2026" == sent_text
 
     # 3. Whitelisted English words ending in 'bot' ("robot", "chatbot", "bot") -> Allowed clean & untouched
     mock_context.bot.send_message.reset_mock()

@@ -446,8 +446,7 @@ async def sanitize_free_message(msg, caption=None, bot=None):
     - Under 6 words (< 6 words):
         Any handle, bot username, link, or asking-to-be-added is BLOCKED.
     - 6 or more words (>= 6 words):
-        Embedded handles are masked in-place to '[handle hidden 🔒]',
-        and candidate bot handles are masked in-place to '[bot hidden 🔒]',
+        Embedded handles and candidate bot handles are masked in-place to '[hidden 🔒]',
         allowing jokes/banter to deliver without exposing off-platform contacts or bots.
         Explicit external web links/domains and phone numbers are strictly blocked.
     """
@@ -521,13 +520,13 @@ async def sanitize_free_message(msg, caption=None, bot=None):
             # Short messages (< 6 words) or standalone drops are BLOCKED
             return "BLOCKED", txt
 
-        # For >= 6 words: mask handles and bots in-place
+        # For >= 6 words: mask handles and bots in-place to [hidden 🔒]
         def _mask_handle(m):
             end = m.end()
             after = txt[end:end+10]
             if after.startswith(".") and _FILE_EXT_REGEX.match(after):
                 return m.group(0)
-            return "[handle hidden 🔒]"
+            return "[hidden 🔒]"
 
         masked = _HANDLE_TOKEN_REGEX.sub(_mask_handle, txt)
 
@@ -539,7 +538,7 @@ async def sanitize_free_message(msg, caption=None, bot=None):
                     after = txt[end:end+10]
                     if after.startswith(".") and _FILE_EXT_REGEX.match(after):
                         return token
-                    return "[bot hidden 🔒]"
+                    return "[hidden 🔒]"
                 return token
 
             masked = _BOT_HANDLE_REGEX.sub(_mask_bot, masked)
