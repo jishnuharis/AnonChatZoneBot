@@ -219,13 +219,16 @@ _HOMOGLYPH_MAP = {
     'А': 'A', 'В': 'B', 'С': 'C', 'Е': 'E', 'О': 'O', 'Р': 'P', 'Т': 'T', 'Х': 'X', 'У': 'Y',
 }
 
-_URL_REGEX = re.compile(
+_URL_ONLY_REGEX = re.compile(
     r"(?i)\b(?:https?://|ftp://|www\.)[^\s/$.?#].[^\s]*"
     r"|(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|me|co|xyz|info|biz|ru|in|app|site|online|tech|link|live|top|gg|club|vip|dev|ai|cc|to|ly|pro|store|space|agency|cloud|social|tv|page|click)\b"
     r"|(?:t|telegram)\.me/[a-zA-Z0-9_+]+"
     r"|tg://[^\s]+"
-    r"|@[a-zA-Z0-9_]{3,}"
     r"|\b[a-zA-Z0-9-]+\s*\.\s*(?:com|org|net|io|me|xyz|app|site|top|gg|club|vip|dev|ai|to|ly)\b"
+)
+
+_URL_REGEX = re.compile(
+    _URL_ONLY_REGEX.pattern + r"|@[a-zA-Z0-9_]{3,}"
 )
 
 # Obfuscated dot notation: e.g. "t(dot)me", "google[dot]com", "site ( dot ) com"
@@ -263,6 +266,19 @@ _SCAM_PHRASES_REGEX = re.compile(
 )
 
 
+_FILE_EXT_REGEX = re.compile(r"\.(?:pdf|png|jpe?g|gif|docx?|zip|txt|mp[34]|csv|json|py|html)\b", re.IGNORECASE)
+
+# Handles with letters, underscore, and digits (e.g. super_storm5, that_cool_guy_67, alex_99, 7_killer)
+_HANDLE_TOKEN_REGEX = re.compile(
+    r"(?i)(?<!\w)(?:"
+    r"@[a-zA-Z0-9_]{3,32}"
+    r"|(?:tg|tele|telegram|insta|ig|instagram|snap|sc|snapchat|wa|whatsapp|kik|discord|dc)\s*[:=\-–—]\s*[a-zA-Z0-9_.-]{3,32}"
+    r"|[a-zA-Z0-9]+_[a-zA-Z0-9_]*\d[a-zA-Z0-9_]*"
+    r"|[a-zA-Z0-9_]*\d[a-zA-Z0-9_]*_[a-zA-Z0-9]+"
+    r")(?!\w)"
+)
+
+
 def _deobfuscate_text(text: str) -> str:
     """Removes zero-width characters and maps homoglyphs."""
     if not text:
@@ -292,7 +308,7 @@ def is_scam_or_phishing_message(msg) -> bool:
 def contains_prohibited_contact(text: str) -> bool:
     """
     Returns True if text contains links, handles (with or without @),
-    obfuscated dots, or spaced phone numbers.
+    obfuscated dots, formatted/spaced phone numbers, or handle signatures.
     """
     if not text:
         return False
@@ -308,6 +324,12 @@ def contains_prohibited_contact(text: str) -> bool:
         return True
     if _PHONE_REGEX.search(norm):
         return True
+
+    # If it's a file, don't flag as handle
+    if not _FILE_EXT_REGEX.search(norm):
+        if _HANDLE_TOKEN_REGEX.search(norm):
+            return True
+
     return False
 
 
@@ -333,3 +355,81 @@ def contains_link(msg) -> bool:
 
     text_to_check = f"{getattr(msg, 'text', '') or ''} {getattr(msg, 'caption', '') or ''}"
     return contains_prohibited_contact(text_to_check)
+
+
+def sanitize_free_message(msg, caption=None):
+    """
+    Evaluates message/caption for free-tier link and handle restrictions.
+    Returns:
+        (status, filtered_text, filtered_caption)
+        status in ("CLEAN", "BLOCKED", "MASKED")
+    - Under 6 words (< 6 words):
+        Any handle, link, or asking-to-be-added is BLOCKED.
+    - 6 or more words (>= 6 words):
+        Embedded handles are masked in-place to '[handle hidden 🔒]',
+        allowing jokes/banter to deliver without exposing off-platform contacts.
+        Explicit external web links/domains and phone numbers are strictly blocked.
+    """
+    if not msg:
+        return "CLEAN", None, None
+
+    raw_text = getattr(msg, "text", None)
+    raw_caption = caption if caption is not None else getattr(msg, "caption", None)
+
+    # 1. Check entities: actual URL entities are strictly blocked for free tier
+    entities = []
+    if getattr(msg, "entities", None):
+        entities.extend(msg.entities)
+    if getattr(msg, "caption_entities", None):
+        entities.extend(msg.caption_entities)
+    has_url_entity = any(
+        getattr(ent, "type", "") in ("url", "text_link", MessageEntityType.URL, MessageEntityType.TEXT_LINK)
+        for ent in entities
+    )
+    if has_url_entity:
+        return "BLOCKED", raw_text, raw_caption
+
+    # 2. Strict external URLs, obfuscated dots, or phone numbers are ALWAYS blocked for free tier
+    for t in (raw_text, raw_caption):
+        if not t:
+            continue
+        norm = _deobfuscate_text(t)
+        if _URL_ONLY_REGEX.search(norm) or _OBFUSCATED_DOT_REGEX.search(norm) or _PHONE_REGEX.search(norm):
+            return "BLOCKED", raw_text, raw_caption
+
+    # 3. Check for handle token pattern
+    has_text_handle = bool(_HANDLE_TOKEN_REGEX.search(raw_text)) if raw_text else False
+    has_cap_handle = bool(_HANDLE_TOKEN_REGEX.search(raw_caption)) if raw_caption else False
+
+    if not has_text_handle and not has_cap_handle:
+        return "CLEAN", raw_text, raw_caption
+
+    def _process_text(txt: str):
+        if not txt:
+            return "CLEAN", txt
+        words = txt.strip().split()
+        if len(words) < 6:
+            # Short messages (< 6 words) or standalone drops are BLOCKED
+            return "BLOCKED", txt
+
+        # For >= 6 words: mask handles in-place
+        def _mask_handle(m):
+            end = m.end()
+            after = txt[end:end+10]
+            if after.startswith(".") and _FILE_EXT_REGEX.match(after):
+                return m.group(0)
+            return "[handle hidden 🔒]"
+
+        masked = _HANDLE_TOKEN_REGEX.sub(_mask_handle, txt)
+        return "MASKED", masked
+
+    status_t, filtered_text = _process_text(raw_text) if raw_text else ("CLEAN", None)
+    status_c, filtered_cap = _process_text(raw_caption) if raw_caption else ("CLEAN", None)
+
+    if status_t == "BLOCKED" or status_c == "BLOCKED":
+        return "BLOCKED", raw_text, raw_caption
+
+    if status_t == "MASKED" or status_c == "MASKED":
+        return "MASKED", filtered_text, filtered_cap
+
+    return "BLOCKED", raw_text, raw_caption

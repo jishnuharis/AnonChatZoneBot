@@ -6,7 +6,7 @@ from telegram.error import Forbidden
 from telegram.ext import ContextTypes
 
 from handlers.setup import handle_user_setup
-from security import safe_tele_func_call, check_rate_limit, contains_link, safe_reply, is_scam_or_phishing_message
+from security import safe_tele_func_call, check_rate_limit, contains_link, safe_reply, is_scam_or_phishing_message, sanitize_free_message
 from media_privacy import extract_media, maybe_send_private, split_private_caption, SUPPORTED_KINDS
 from message import (
     FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, MEDIA_DAILY_LIMIT_REACHED_TEXT,
@@ -140,19 +140,26 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         is_free = not is_subscribed(user_id)
+        relayed_text = msg.text
+        relayed_caption = None
 
-        # Enforce zero links and handles for free tier
-        if is_free and contains_link(msg):
-            await safe_reply(
-                update,
-                text=LINK_RESTRICTED_TEXT,
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
-                ]),
-                parse_mode="HTML",
-                context=context,
-            )
-            return
+        # Enforce link and handle restrictions for free tier
+        if is_free:
+            status, filtered_text, filtered_caption = sanitize_free_message(msg)
+            if status == "BLOCKED":
+                await safe_reply(
+                    update,
+                    text=LINK_RESTRICTED_TEXT,
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
+                    ]),
+                    parse_mode="HTML",
+                    context=context,
+                )
+                return
+            elif status == "MASKED":
+                relayed_text = filtered_text
+                relayed_caption = filtered_caption
 
         # Enforce 90-second warmup lock on all non-text messages for free tier
         is_non_text = bool(
@@ -184,6 +191,8 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
         kind, file_id, caption, duration = extract_media(msg)
+        if relayed_caption is not None:
+            caption = relayed_caption
         if kind in SUPPORTED_KINDS:
             handled = await maybe_send_private(update, context, partner_id, kind, file_id, caption, duration)
             if handled:
@@ -232,7 +241,7 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             sent = None
             if msg.text:
-                sent = await safe_tele_func_call(context.bot.send_message, chat_id=partner_id, text=msg.text, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
+                sent = await safe_tele_func_call(context.bot.send_message, chat_id=partner_id, text=relayed_text, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
             elif kind == "photo":
                 sent = await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True, has_spoiler=should_spoil)
                 if sent and not is_subscribed(user_id):
@@ -386,16 +395,24 @@ async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
-    if not is_subscribed(user_id) and contains_link(edit_msg):
-        await safe_tele_func_call(
-            edit_msg.reply_text,
-            text=LINK_RESTRICTED_TEXT,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
-            ]),
-            parse_mode="HTML",
-        )
-        return
+    relayed_edit_text = edit_msg.text
+    relayed_edit_caption = edit_msg.caption
+
+    if not is_subscribed(user_id):
+        status, filtered_text, filtered_caption = sanitize_free_message(edit_msg)
+        if status == "BLOCKED":
+            await safe_tele_func_call(
+                edit_msg.reply_text,
+                text=LINK_RESTRICTED_TEXT,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⭐ Get VIP / Subscribe", callback_data="sub|upgrade_prompt")]
+                ]),
+                parse_mode="HTML",
+            )
+            return
+        elif status == "MASKED":
+            relayed_edit_text = filtered_text
+            relayed_edit_caption = filtered_caption
 
     try:
         if edit_msg.text:
@@ -403,14 +420,14 @@ async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 context.bot.edit_message_text,
                 chat_id=partner_id,
                 message_id=partner_msg_id,
-                text=edit_msg.text,
+                text=relayed_edit_text,
             )
         elif edit_msg.caption is not None:
             await safe_tele_func_call(
                 context.bot.edit_message_caption,
                 chat_id=partner_id,
                 message_id=partner_msg_id,
-                caption=edit_msg.caption,
+                caption=relayed_edit_caption,
             )
     except Exception as e:
         logger.debug(f"Notice on relay_edited_message from {user_id} to {partner_id}: {e}")

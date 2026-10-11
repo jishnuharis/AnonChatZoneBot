@@ -603,3 +603,95 @@ async def test_media_spoiler_toggle_in_edit_handler():
     buttons2 = [btn.text for row in kb2.inline_keyboard for btn in row]
     assert any("Media Shield: OFF ⚪" in b for b in buttons2)
 
+
+@pytest.mark.asyncio
+async def test_short_message_handle_blocked_and_long_message_masked():
+    u1, u2 = 8031, 8032
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=9001))
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    # 1. Short message handle drop (< 6 words): "super_storm5" -> BLOCKED
+    mock_update1 = MagicMock()
+    mock_update1.effective_user.id = u1
+    mock_update1.message.text = "super_storm5"
+    mock_update1.message.caption = None
+    mock_update1.message.entities = None
+    mock_update1.message.caption_entities = None
+    mock_update1.message.photo = None
+    mock_update1.message.video = None
+    mock_update1.message.voice = None
+    mock_update1.message.video_note = None
+    mock_update1.message.sticker = None
+    mock_update1.message.animation = None
+    mock_update1.message.document = None
+    mock_update1.message.audio = None
+    mock_update1.message.dice = None
+    mock_update1.message.reply_to_message = None
+    mock_update1.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update1, mock_context)
+    mock_context.bot.send_message.assert_not_called()
+    mock_update1.message.reply_text.assert_called_once()
+    assert "Links and usernames cannot be shared" in mock_update1.message.reply_text.call_args[1]["text"]
+
+    # 2. Long message with handle (>= 6 words): "imagine asking to add your acc with the tag that_cool_guy_67 in big 2026"
+    # -> MASKED and RELAYED (joke preserved, handle masked)
+    mock_context.bot.send_message.reset_mock()
+    mock_update2 = MagicMock()
+    mock_update2.effective_user.id = u1
+    mock_update2.message.text = "imagine asking to add your acc with the tag that_cool_guy_67 in big 2026"
+    mock_update2.message.caption = None
+    mock_update2.message.entities = None
+    mock_update2.message.caption_entities = None
+    mock_update2.message.photo = None
+    mock_update2.message.video = None
+    mock_update2.message.voice = None
+    mock_update2.message.video_note = None
+    mock_update2.message.sticker = None
+    mock_update2.message.animation = None
+    mock_update2.message.document = None
+    mock_update2.message.audio = None
+    mock_update2.message.dice = None
+    mock_update2.message.reply_to_message = None
+    mock_update2.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update2, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    sent_text = mock_context.bot.send_message.call_args[1]["text"]
+    assert "[handle hidden 🔒]" in sent_text
+    assert "that_cool_guy_67" not in sent_text
+    assert "imagine asking to add your acc with the tag" in sent_text
+
+    # 3. Conversational normal text: "I'm js testing something, don't mind me"
+    # -> Relayed completely clean and untouched
+    mock_context.bot.send_message.reset_mock()
+    mock_update3 = MagicMock()
+    mock_update3.effective_user.id = u1
+    mock_update3.message.text = "I'm js testing something, don't mind me"
+    mock_update3.message.caption = None
+    mock_update3.message.entities = None
+    mock_update3.message.caption_entities = None
+    mock_update3.message.photo = None
+    mock_update3.message.video = None
+    mock_update3.message.voice = None
+    mock_update3.message.video_note = None
+    mock_update3.message.sticker = None
+    mock_update3.message.animation = None
+    mock_update3.message.document = None
+    mock_update3.message.audio = None
+    mock_update3.message.dice = None
+    mock_update3.message.reply_to_message = None
+    mock_update3.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update3, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    assert mock_context.bot.send_message.call_args[1]["text"] == "I'm js testing something, don't mind me"
+
+
