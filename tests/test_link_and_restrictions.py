@@ -440,3 +440,166 @@ async def test_dice_and_non_text_blocked_during_warmup():
     await relay_message(mock_update, mock_context)
     mock_context.bot.send_dice.assert_called_once()
     assert daily_credits_used(u1) == 0
+
+
+def test_handles_without_at_and_anti_scam_detection():
+    from security import contains_prohibited_contact, is_scam_or_phishing_text
+
+    # Positive handle detection without '@'
+    assert contains_prohibited_contact("tg: johndoe")
+    assert contains_prohibited_contact("insta: cute_girl")
+    assert contains_prohibited_contact("snap: cutie99")
+    assert contains_prohibited_contact("tele: user123")
+    assert contains_prohibited_contact("my tg is alex")
+    assert contains_prohibited_contact("my username is coolguy99")
+    assert contains_prohibited_contact("username: coolguy99")
+    assert contains_prohibited_contact("add me on tg johndoe")
+    assert contains_prohibited_contact("dm me on insta saraah")
+
+    # Obfuscated dots & links
+    assert contains_prohibited_contact("visit google(dot)com now")
+    assert contains_prohibited_contact("visit t . me")
+
+    # Phone numbers
+    assert contains_prohibited_contact("+1 555 123 4567")
+    assert contains_prohibited_contact("9876543210")
+    assert contains_prohibited_contact("9 8 7 6 5 4 3 2 1 0")
+
+    # Scam phrases
+    assert is_scam_or_phishing_text("crypto investment earn $500 daily")
+    assert is_scam_or_phishing_text("free stars bot send stars get double")
+    assert is_scam_or_phishing_text("bit.ly/scamlink")
+
+    # Negative cases (ordinary conversational phrases should NOT be flagged)
+    assert not contains_prohibited_contact("Hello partner! How are you doing today?")
+    assert not contains_prohibited_contact("Instagram is a popular app today")
+    assert not contains_prohibited_contact("Telegram is great for privacy")
+    assert not contains_prohibited_contact("Snap of the fingers")
+    assert not contains_prohibited_contact("I am 22 years old and love gaming")
+    assert not contains_prohibited_contact("It costs 100 dollars")
+    assert not contains_prohibited_contact("my_doc")
+
+
+@pytest.mark.asyncio
+async def test_media_spoiler_protection_honors_recipient_preference():
+    u1, u2 = 8019, 8020
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100
+
+    # Ensure u1 has daily credit
+    init.user_details[u1]["daily_credits_used"] = 0
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_update.message.text = None
+    mock_update.message.caption = None
+    mock_update.message.entities = None
+    mock_update.message.caption_entities = None
+    photo_mock = MagicMock()
+    photo_mock.file_id = "photo_123"
+    mock_update.message.photo = [photo_mock]
+    mock_update.message.video = None
+    mock_update.message.voice = None
+    mock_update.message.video_note = None
+    mock_update.message.sticker = None
+    mock_update.message.animation = None
+    mock_update.message.document = None
+    mock_update.message.audio = None
+    mock_update.message.dice = None
+    mock_update.message.reply_to_message = None
+
+    mock_context = MagicMock()
+    mock_context.bot.send_photo = AsyncMock(return_value=MagicMock(message_id=5001))
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    # Case 1: Recipient has media_spoiler: True (default) -> has_spoiler=True
+    init.user_details[u2]["media_spoiler"] = True
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_photo.assert_called_once()
+    assert mock_context.bot.send_photo.call_args[1]["has_spoiler"] is True
+
+    # Case 2: Recipient disabled media_spoiler -> has_spoiler=False
+    init.user_details[u2]["media_spoiler"] = False
+    init.user_details[u1]["daily_credits_used"] = 0
+    mock_context.bot.send_photo.reset_mock()
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_photo.assert_called_once()
+    assert mock_context.bot.send_photo.call_args[1]["has_spoiler"] is False
+
+
+@pytest.mark.asyncio
+async def test_scam_message_blocked_in_relay():
+    u1, u2 = 8021, 8022
+    init.user_details[u1] = init._default_user()
+    # Even if subscriber/VIP, scams are 100% blocked
+    init.user_details[u1]["subscription_expires"] = time.time() + 86400
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_update.message.text = "Join my free stars bot send stars get double!"
+    mock_update.message.caption = None
+    mock_update.message.entities = None
+    mock_update.message.caption_entities = None
+    mock_update.message.photo = None
+    mock_update.message.video = None
+    mock_update.message.voice = None
+    mock_update.message.video_note = None
+    mock_update.message.sticker = None
+    mock_update.message.animation = None
+    mock_update.message.document = None
+    mock_update.message.audio = None
+    mock_update.message.dice = None
+    mock_update.message.reply_to_message = None
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock()
+
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_message.assert_not_called()
+    mock_update.message.reply_text.assert_called_once()
+    assert "Message blocked" in mock_update.message.reply_text.call_args[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_media_spoiler_toggle_in_edit_handler():
+    from handlers.edit import handle_edit_selection
+    from commands.profile import _profile_keyboard
+    u = 8023
+    init.user_details[u] = init._default_user()
+    assert init.user_details[u].get("media_spoiler", True) is True
+
+    # Check keyboard button text
+    kb = _profile_keyboard(u)
+    buttons = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert any("Media Shield: ON 🟢" in b for b in buttons)
+
+    # Trigger toggle callback
+    mock_update = MagicMock()
+    mock_query = MagicMock()
+    mock_query.from_user.id = u
+    mock_query.data = "edit|toggle_spoiler"
+    mock_query.answer = AsyncMock()
+    mock_query.edit_message_text = AsyncMock()
+    mock_update.callback_query = mock_query
+
+    mock_context = MagicMock()
+    mock_context.bot.get_chat = AsyncMock(return_value=MagicMock(full_name="Tester", username="tester"))
+    await handle_edit_selection(mock_update, mock_context)
+
+    # After toggle, setting is False
+    assert init.user_details[u]["media_spoiler"] is False
+    assert u in init.dirty_users
+
+    # Keyboard reflects OFF state
+    kb2 = _profile_keyboard(u)
+    buttons2 = [btn.text for row in kb2.inline_keyboard for btn in row]
+    assert any("Media Shield: OFF ⚪" in b for b in buttons2)
+

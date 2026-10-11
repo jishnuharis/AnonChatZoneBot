@@ -214,6 +214,11 @@ async def global_error_handler(update, context):
         logger.error(f"Error inside the global error handler: {err}")
 
 
+_HOMOGLYPH_MAP = {
+    'а': 'a', 'в': 'b', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'т': 't', 'х': 'x', 'у': 'y',
+    'А': 'A', 'В': 'B', 'С': 'C', 'Е': 'E', 'О': 'O', 'Р': 'P', 'Т': 'T', 'Х': 'X', 'У': 'Y',
+}
+
 _URL_REGEX = re.compile(
     r"(?i)\b(?:https?://|ftp://|www\.)[^\s/$.?#].[^\s]*"
     r"|(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|me|co|xyz|info|biz|ru|in|app|site|online|tech|link|live|top|gg|club|vip|dev|ai|cc|to|ly|pro|store|space|agency|cloud|social|tv|page|click)\b"
@@ -223,11 +228,94 @@ _URL_REGEX = re.compile(
     r"|\b[a-zA-Z0-9-]+\s*\.\s*(?:com|org|net|io|me|xyz|app|site|top|gg|club|vip|dev|ai|to|ly)\b"
 )
 
+# Obfuscated dot notation: e.g. "t(dot)me", "google[dot]com", "site ( dot ) com"
+_OBFUSCATED_DOT_REGEX = re.compile(
+    r"(?i)\b[a-zA-Z0-9-]+\s*(?:\(|\{|\[)\s*dot\s*(?:\)|\}|\])\s*(?:com|org|net|xyz|me|io|app|site|top|to|ly|co)\b"
+    r"|(?:t|tele|telegram|wa|whatsapp)\s*(?:\(|\{|\[|\.)\s*(?:dot|\.)?\s*(?:\)|\}|\])?\s*me\b"
+)
+
+# Social handle triggers without '@':
+# 1. "tg: johndoe", "insta: cute_girl", "wa: +123...", "snap: xxx", "sc: xxx"
+_SOCIAL_HANDLE_PREFIX_REGEX = re.compile(
+    r"(?i)\b(?:tg|tele|telegram|insta|ig|instagram|snap|sc|snapchat|wa|whatsapp|kik|discord|dc|tiktok|tt|twt|twitter)\s*[:=\-–—]\s*([a-zA-Z0-9_.-]{3,32})\b"
+)
+
+# 2. Intent sentences: "my tg is johndoe", "my telegram username is alex99", "add me on snap xxx", "find me on tg xxx"
+_SOCIAL_INTENT_REGEX = re.compile(
+    r"(?i)\bmy\s+(?:(?:tg|tele|telegram|insta|ig|instagram|snap|sc|snapchat|wa|whatsapp|discord|dc|tiktok|tt)\s+)?(?:user|username|handle|id|tag|name)?\s*(?:is|:)\s*([a-zA-Z0-9_.-]{3,32})\b"
+    r"|\b(?:add|find|hit|reach|dm|message|msg|text)\s+(?:me\s+)?(?:on\s+)(?:tg|tele|telegram|insta|ig|instagram|snap|sc|snapchat|wa|whatsapp|discord|dc)\s+([a-zA-Z0-9_.-]{3,32})\b"
+    r"|\b(?:my\s+)?(?:username|user|handle)\s*[:=\-–—]\s*([a-zA-Z0-9_.-]{3,32})\b"
+    r"|\bmy\s+(?:username|user|handle)\s+is\s+([a-zA-Z0-9_.-]{3,32})\b"
+)
+
+
+# Phone numbers (7-15 digits formatted or spaced, e.g. +1 555 123 4567, 9876543210, 9 8 7 6 5 4 3 2 1 0)
+_PHONE_REGEX = re.compile(
+    r"(?:(?:\+|00)\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b"
+    r"|(?:\+?\d[\s.-]?){9,15}\d\b"
+)
+
+# Financial scam / phishing phrases
+_SCAM_PHRASES_REGEX = re.compile(
+    r"(?i)\b(?:crypto\s+investment|doubl(?:e|ing)\s+(?:money|crypto|stars|btc|eth)|earn\s+\$\d+\s+(?:daily|weekly|hourly)|free\s+(?:telegram\s+)?stars\s+bot|send\s+stars\s+get|free\s+crypto|dm\s+for\s+leaks|paid\s+content\s+leak)\b"
+    r"|(?:bit\.ly|tinyurl\.com|is\.gd|cutt\.ly|rb\.gy)/[a-zA-Z0-9]+"
+    r"|(?:t|telegram)\.me/\+[a-zA-Z0-9_-]+"
+)
+
+
+def _deobfuscate_text(text: str) -> str:
+    """Removes zero-width characters and maps homoglyphs."""
+    if not text:
+        return ""
+    cleaned = re.sub(r"[\u200b-\u200f\ufeff]", "", text)
+    for cyr, lat in _HOMOGLYPH_MAP.items():
+        cleaned = cleaned.replace(cyr, lat)
+    return cleaned
+
+
+def is_scam_or_phishing_text(text: str) -> bool:
+    """Returns True if text contains blatant financial scam, doubling, or malicious shortener phrases."""
+    if not text:
+        return False
+    norm = _deobfuscate_text(text)
+    return bool(_SCAM_PHRASES_REGEX.search(norm))
+
+
+def is_scam_or_phishing_message(msg) -> bool:
+    """Returns True if message or caption contains phishing or financial scam phrases."""
+    if not msg:
+        return False
+    text_to_check = f"{getattr(msg, 'text', '') or ''} {getattr(msg, 'caption', '') or ''}"
+    return is_scam_or_phishing_text(text_to_check)
+
+
+def contains_prohibited_contact(text: str) -> bool:
+    """
+    Returns True if text contains links, handles (with or without @),
+    obfuscated dots, or spaced phone numbers.
+    """
+    if not text:
+        return False
+    norm = _deobfuscate_text(text)
+
+    if _URL_REGEX.search(norm):
+        return True
+    if _OBFUSCATED_DOT_REGEX.search(norm):
+        return True
+    if _SOCIAL_HANDLE_PREFIX_REGEX.search(norm):
+        return True
+    if _SOCIAL_INTENT_REGEX.search(norm):
+        return True
+    if _PHONE_REGEX.search(norm):
+        return True
+    return False
+
 
 def contains_link(msg) -> bool:
     """
     Returns True if the message or caption contains any URL, Telegram link,
-    masked link entity, or Telegram @username handle.
+    masked link entity, Telegram @username handle, off-platform contact handle
+    (even without @), or formatted/spaced phone numbers.
     """
     if not msg:
         return False
@@ -244,7 +332,4 @@ def contains_link(msg) -> bool:
             return True
 
     text_to_check = f"{getattr(msg, 'text', '') or ''} {getattr(msg, 'caption', '') or ''}"
-    if _URL_REGEX.search(text_to_check):
-        return True
-
-    return False
+    return contains_prohibited_contact(text_to_check)

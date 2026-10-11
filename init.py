@@ -91,6 +91,7 @@ def _default_user() -> Dict[str, Any]:
         "last_active": time.time(),
         "total_messages": 0,
         "total_chat_duration": 0.0,
+        "media_spoiler": True,
     }
 
 

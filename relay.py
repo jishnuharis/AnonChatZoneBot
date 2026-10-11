@@ -6,7 +6,7 @@ from telegram.error import Forbidden
 from telegram.ext import ContextTypes
 
 from handlers.setup import handle_user_setup
-from security import safe_tele_func_call, check_rate_limit, contains_link, safe_reply
+from security import safe_tele_func_call, check_rate_limit, contains_link, safe_reply, is_scam_or_phishing_message
 from media_privacy import extract_media, maybe_send_private, split_private_caption, SUPPORTED_KINDS
 from message import (
     FAILED_TO_SEND_MESSAGE_TEXT, NOT_IN_CHAT_USE_FIND_INLINE_TEXT, MEDIA_DAILY_LIMIT_REACHED_TEXT,
@@ -127,9 +127,21 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id in init.user_details:
             init.user_details[user_id]["last_active"] = now_ts
 
+        # Enforce zero scams/phishing for all tiers
+        if is_scam_or_phishing_message(msg):
+            from moderation import apply_restriction
+            await apply_restriction(user_id, severity=3, reason="Automated scam/phishing solicitation detected")
+            await safe_reply(
+                update,
+                text="🚫 <b>Message blocked.</b>\n\n<i>Promoting external investment schemes, scam bots, or financial solicitation is strictly prohibited.</i>",
+                parse_mode="HTML",
+                context=context,
+            )
+            return
+
         is_free = not is_subscribed(user_id)
 
-        # Enforce zero links for free tier
+        # Enforce zero links and handles for free tier
         if is_free and contains_link(msg):
             await safe_reply(
                 update,
@@ -215,17 +227,18 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await safe_tele_func_call(context.bot.send_chat_action, chat_id=partner_id, action=ChatAction.TYPING)
 
         reply_to = _resolve_reply(user_id, partner_id, msg)
+        should_spoil = init.user_details.get(partner_id, {}).get("media_spoiler", True)
 
         try:
             sent = None
             if msg.text:
                 sent = await safe_tele_func_call(context.bot.send_message, chat_id=partner_id, text=msg.text, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
             elif kind == "photo":
-                sent = await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
+                sent = await safe_tele_func_call(context.bot.send_photo, chat_id=partner_id, photo=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True, has_spoiler=should_spoil)
                 if sent and not is_subscribed(user_id):
                     consume_daily_credit(user_id)
             elif kind == "video":
-                sent = await safe_tele_func_call(context.bot.send_video, chat_id=partner_id, video=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
+                sent = await safe_tele_func_call(context.bot.send_video, chat_id=partner_id, video=file_id, caption=caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True, has_spoiler=should_spoil)
                 if sent and not is_subscribed(user_id):
                     consume_daily_credit(user_id)
             elif kind == "voice":
@@ -247,7 +260,7 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if sent and not is_subscribed(user_id):
                     consume_daily_credit(user_id)
             elif msg.animation:
-                sent = await safe_tele_func_call(context.bot.send_animation, chat_id=partner_id, animation=msg.animation.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
+                sent = await safe_tele_func_call(context.bot.send_animation, chat_id=partner_id, animation=msg.animation.file_id, caption=msg.caption, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True, has_spoiler=should_spoil)
             elif msg.dice:
                 sent = await safe_tele_func_call(context.bot.send_dice, chat_id=partner_id, emoji=msg.dice.emoji, reply_to_message_id=reply_to, allow_sending_without_reply=True, raise_on_forbidden=True)
 
@@ -362,6 +375,16 @@ async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     partner_msg_id = mapped[1]
+
+    if is_scam_or_phishing_message(edit_msg):
+        from moderation import apply_restriction
+        await apply_restriction(user_id, severity=3, reason="Automated scam/phishing solicitation detected")
+        await safe_tele_func_call(
+            edit_msg.reply_text,
+            text="🚫 <b>Message blocked.</b>\n\n<i>Promoting external investment schemes, scam bots, or financial solicitation is strictly prohibited.</i>",
+            parse_mode="HTML",
+        )
+        return
 
     if not is_subscribed(user_id) and contains_link(edit_msg):
         await safe_tele_func_call(

@@ -13,7 +13,13 @@ import subscription
 import init
 
 
-def _profile_keyboard():
+def _profile_keyboard(user_id=None):
+    spoiler_enabled = True
+    if user_id and user_id in init.user_details:
+        spoiler_enabled = init.user_details[user_id].get("media_spoiler", True)
+
+    spoiler_btn_text = f"🛡️ Media Shield: {'ON 🟢' if spoiler_enabled else 'OFF ⚪'}"
+
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 Anonymous Friends List", callback_data="flist|0")],
         [InlineKeyboardButton("✏️ Edit Gender", callback_data="edit|gender"),
@@ -21,6 +27,7 @@ def _profile_keyboard():
         [InlineKeyboardButton("✏️ Edit Country", callback_data="edit|country"),
          InlineKeyboardButton("🏷️ Edit Interests", callback_data="edit|preferences")],
         [InlineKeyboardButton("⭐ Match Filters (Gender/Country)", callback_data="edit|match_filters")],
+        [InlineKeyboardButton(spoiler_btn_text, callback_data="edit|toggle_spoiler")],
         [InlineKeyboardButton("🔗 My Referral Link", callback_data="refgen")],
         [InlineKeyboardButton("💬 Community Group", url=init.GROUP_URL)],
     ])
@@ -106,6 +113,7 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
         f"<b>Time in Chats:</b> {duration_line}\n"
         f"<b>Rating:</b> {up_votes} 👍 {down_votes} 👎\n"
         f"<b>Points:</b> {user.get('points', 0)}\n"
+        f"<b>Media Shield:</b> {'Tap-to-reveal Blur 🛡️' if user.get('media_spoiler', True) else 'Direct Display 👁️'}\n"
         f"{streak_line}\n"
         f"{filter_line}"
         f"{subscription.status_text(user_id)}"
@@ -131,7 +139,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.bot.send_message,
             chat_id=user_id,
             text=text,
-            reply_markup=_profile_keyboard(),
+            reply_markup=_profile_keyboard(user_id),
             parse_mode="HTML"
         )
         if dm_sent:
@@ -152,7 +160,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    await safe_tele_func_call(update.message.reply_text, text=text, reply_markup=_profile_keyboard(), parse_mode="HTML")
+    await safe_tele_func_call(update.message.reply_text, text=text, reply_markup=_profile_keyboard(user_id), parse_mode="HTML")
 
 
 async def send_profile_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int):
@@ -161,7 +169,7 @@ async def send_profile_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int):
     text = await _build_profile_text(user_id, context)
     if not text:
         return
-    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=text, reply_markup=_profile_keyboard(), parse_mode="HTML")
+    await safe_tele_func_call(context.bot.send_message, chat_id=user_id, text=text, reply_markup=_profile_keyboard(user_id), parse_mode="HTML")
 
 
 async def handle_profile_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -180,6 +188,6 @@ async def handle_profile_back(update: Update, context: ContextTypes.DEFAULT_TYPE
         await safe_tele_func_call(
             query.edit_message_text,
             text=text,
-            reply_markup=_profile_keyboard(),
+            reply_markup=_profile_keyboard(user_id),
             parse_mode="HTML"
         )

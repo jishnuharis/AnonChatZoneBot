@@ -125,6 +125,7 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
             COALESCE(p.longest_streak, 0) as longest_streak,
             p.last_streak_date,
             COALESCE(p.streak_rewards_claimed, '[]'::jsonb) as streak_rewards_claimed,
+            COALESCE(p.media_spoiler, TRUE) as media_spoiler,
             s.tier as subscription_tier, s.expires_at as subscription_expires,
             COALESCE(r_up.votes_up, 0) as votes_up,
             COALESCE(r_down.votes_down, 0) as votes_down,
@@ -234,6 +235,7 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                     "total_messages": int(row.get("total_messages") or 0),
                     "total_chat_duration": float(row.get("total_chat_duration") or 0.0),
                     "last_active": float(row["last_active_ts"]) if row.get("last_active_ts") is not None else time.time(),
+                    "media_spoiler": bool(row.get("media_spoiler", True)),
                     "partner_id": None, # Session state managed via session_manager
                 }
     except Exception as e:
@@ -327,8 +329,8 @@ async def upsert_user(*args, **kwargs):
                         daily_calls_used, daily_calls_reset_day,
                         is_banned, preferred_gender, preferred_country,
                         current_streak, longest_streak, last_streak_date, streak_rewards_claimed,
-                        total_messages, total_chat_duration, last_active
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
+                        total_messages, total_chat_duration, last_active, media_spoiler
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET
                         severity_score = COALESCE(EXCLUDED.severity_score, user_profiles.severity_score),
                         restricted_until = EXCLUDED.restricted_until,
@@ -346,7 +348,8 @@ async def upsert_user(*args, **kwargs):
                         streak_rewards_claimed = COALESCE(EXCLUDED.streak_rewards_claimed, user_profiles.streak_rewards_claimed),
                         total_messages = COALESCE(EXCLUDED.total_messages, user_profiles.total_messages),
                         total_chat_duration = COALESCE(EXCLUDED.total_chat_duration, user_profiles.total_chat_duration),
-                        last_active = COALESCE(EXCLUDED.last_active, user_profiles.last_active);
+                        last_active = COALESCE(EXCLUDED.last_active, user_profiles.last_active),
+                        media_spoiler = COALESCE(EXCLUDED.media_spoiler, user_profiles.media_spoiler);
                 """, (
                     user_id,
                     kwargs.get("severity_score", 0),
@@ -366,6 +369,7 @@ async def upsert_user(*args, **kwargs):
                     int(kwargs.get("total_messages") or 0),
                     float(kwargs.get("total_chat_duration") or 0.0),
                     last_active_dt,
+                    bool(kwargs.get("media_spoiler", True)),
                 ))
 
                 # 3. Upsert referrals if referred_by is set
