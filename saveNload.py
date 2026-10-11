@@ -54,6 +54,7 @@ async def init_pool():
             await p.open()
         logger.info("Database connection pool opened successfully.")
         await ensure_db()
+        await load_all_verified_handles_db()
     except Exception as e:
         logger.error(f"Database connection pool open / ensure_db notice: {e}", exc_info=True)
 
@@ -1673,3 +1674,22 @@ async def save_cached_telegram_handle(handle: str, is_valid: bool, chat_type: st
             """, (norm, is_valid, chat_type))
     except Exception as e:
         logger.debug(f"save_cached_telegram_handle({norm}) notice: {e}")
+
+
+async def load_all_verified_handles_db() -> int:
+    """Pre-warms the in-memory cache from PostgreSQL on bot startup across reboots."""
+    if not is_pool_ready():
+        return 0
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            cur = await conn.execute("SELECT handle, is_valid, chat_type FROM verified_telegram_handles;")
+            rows = await cur.fetchall()
+            for r in rows:
+                _in_memory_verified_handles[r[0]] = (bool(r[1]), str(r[2] or ""))
+            logger.info(f"Loaded {len(rows)} verified telegram handles into memory cache.")
+            return len(rows)
+    except Exception as e:
+        logger.debug(f"load_all_verified_handles_db notice: {e}")
+        return 0
+

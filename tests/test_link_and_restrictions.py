@@ -851,5 +851,31 @@ async def test_telegram_handle_live_verification_and_caching():
     assert is_valid_fake_second is False
     mock_bot.get_chat.assert_not_called()
 
+    # 3. Simulate bot reboot: memory cleared, pre-warmed from DB via load_all_verified_handles_db
+    from saveNload import _in_memory_verified_handles, load_all_verified_handles_db
+    _in_memory_verified_handles.clear()
+    assert handle.lower() not in _in_memory_verified_handles
+
+    mock_cur = MagicMock()
+    mock_cur.fetchall = AsyncMock(return_value=[("rebootbot", True, "bot")])
+    mock_conn = MagicMock()
+    mock_conn.execute = AsyncMock(return_value=mock_cur)
+    mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_conn.__aexit__ = AsyncMock(return_value=None)
+    mock_pool = MagicMock()
+    mock_pool.connection = MagicMock(return_value=mock_conn)
+
+    monkeypatch = pytest.MonkeyPatch()
+    import saveNload
+    monkeypatch.setattr(saveNload, "is_pool_ready", lambda: True)
+    monkeypatch.setattr(saveNload, "get_pool", lambda: mock_pool)
+    try:
+        loaded_count = await load_all_verified_handles_db()
+        assert loaded_count == 1
+        assert _in_memory_verified_handles["rebootbot"] == (True, "bot")
+    finally:
+        monkeypatch.undo()
+
+
 
 
