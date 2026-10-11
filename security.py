@@ -1,4 +1,6 @@
+import os
 import re
+import asyncio
 from telegram import Update
 from telegram.constants import MessageEntityType
 from telegram.error import Forbidden, Conflict, BadRequest, NetworkError, TimedOut, RetryAfter
@@ -12,6 +14,7 @@ import logging
 from collections import defaultdict
 
 import init
+from saveNload import get_cached_telegram_handle, save_cached_telegram_handle
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +281,79 @@ _HANDLE_TOKEN_REGEX = re.compile(
     r")(?!\w)"
 )
 
+# Telegram bot usernames strictly end in "bot" or "_bot" (e.g. AnonChatZoneBot, FreeStarsBot)
+_BOT_HANDLE_REGEX = re.compile(r"(?i)\b[a-zA-Z0-9_]{3,32}(?:bot|_bot)\b")
+
+# Whitelist of legitimate English words and compound words ending in 'bot' / 'bots'
+SAFE_BOT_WORDS = {
+    "bot", "bots", "robot", "robots", "chatbot", "chatbots", "aimbot", "aimbots",
+    "spambot", "spambots", "abbot", "turbot", "talbot", "sabot", "jabot", "cabot",
+    "burbot", "chabot", "jarbot", "tarbot", "autobot", "autobots", "nanobot", "nanobots", "hubot"
+}
+
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+_WORDS_FILE = os.path.join(_DATA_DIR, "english_words_50k.txt")
+
+# English dictionary database loaded into memory for 0ms lookup, persisted on disk across reboots
+ENGLISH_WORDS = set(SAFE_BOT_WORDS)
+if os.path.exists(_WORDS_FILE):
+    try:
+        with open(_WORDS_FILE, "r", encoding="utf-8") as _f:
+            ENGLISH_WORDS.update(line.strip().lower() for line in _f if line.strip())
+    except Exception as _e:
+        logger.warning(f"Could not load english words dictionary: {_e}")
+
+
+def is_bot_candidate(token: str) -> bool:
+    """Returns True if token looks like a Telegram bot handle and is not in safe dictionary."""
+    if not token:
+        return False
+    clean = token.lower().strip("@.,!?:;\"'()[]{}")
+    if clean in SAFE_BOT_WORDS or clean in ENGLISH_WORDS:
+        return False
+    if len(clean) < 4 or len(clean) > 35:
+        return False
+    if not (clean.endswith("bot") or clean.endswith("_bot")):
+        return False
+    return True
+
+
+async def verify_telegram_handle(handle: str, bot=None) -> bool:
+    """
+    Validates a handle against persistent cache and live Telegram API:
+    1. Checks in-memory & PostgreSQL cache (verified_telegram_handles).
+    2. If not cached and `bot` is available, calls bot.get_chat(f"@{clean_handle}") with 0.8s timeout.
+    3. Persists result in DB & memory so future checks take 0ms and survive reboots.
+    4. If no bot is available (offline/mock), falls back to syntax validity.
+    """
+    clean_handle = handle.lstrip("@").strip()
+    if not clean_handle:
+        return False
+
+    cached = await get_cached_telegram_handle(clean_handle)
+    if cached is not None:
+        is_valid, _ = cached
+        return is_valid
+
+    if not bot or not hasattr(bot, "get_chat"):
+        return True
+
+    try:
+        chat = await asyncio.wait_for(bot.get_chat(f"@{clean_handle}"), timeout=0.8)
+        chat_type = str(getattr(chat, "type", "bot") or "bot")
+        await save_cached_telegram_handle(clean_handle, is_valid=True, chat_type=chat_type)
+        return True
+    except BadRequest as e:
+        err = str(e).lower()
+        if "chat not found" in err or "username not found" in err or "invalid username" in err:
+            await save_cached_telegram_handle(clean_handle, is_valid=False, chat_type="")
+            return False
+        await save_cached_telegram_handle(clean_handle, is_valid=True, chat_type="unknown")
+        return True
+    except Exception as e:
+        logger.debug(f"verify_telegram_handle({clean_handle}) notice: {e}")
+        return True
+
 
 def _deobfuscate_text(text: str) -> str:
     """Removes zero-width characters and maps homoglyphs."""
@@ -308,7 +384,8 @@ def is_scam_or_phishing_message(msg) -> bool:
 def contains_prohibited_contact(text: str) -> bool:
     """
     Returns True if text contains links, handles (with or without @),
-    obfuscated dots, formatted/spaced phone numbers, or handle signatures.
+    bot usernames (e.g. AnonChatZoneBot), obfuscated dots, formatted/spaced phone numbers,
+    or handle signatures.
     """
     if not text:
         return False
@@ -329,6 +406,9 @@ def contains_prohibited_contact(text: str) -> bool:
     if not _FILE_EXT_REGEX.search(norm):
         if _HANDLE_TOKEN_REGEX.search(norm):
             return True
+        for m in _BOT_HANDLE_REGEX.finditer(norm):
+            if is_bot_candidate(m.group(0)):
+                return True
 
     return False
 
@@ -357,17 +437,18 @@ def contains_link(msg) -> bool:
     return contains_prohibited_contact(text_to_check)
 
 
-def sanitize_free_message(msg, caption=None):
+async def sanitize_free_message(msg, caption=None, bot=None):
     """
     Evaluates message/caption for free-tier link and handle restrictions.
     Returns:
         (status, filtered_text, filtered_caption)
         status in ("CLEAN", "BLOCKED", "MASKED")
     - Under 6 words (< 6 words):
-        Any handle, link, or asking-to-be-added is BLOCKED.
+        Any handle, bot username, link, or asking-to-be-added is BLOCKED.
     - 6 or more words (>= 6 words):
         Embedded handles are masked in-place to '[handle hidden 🔒]',
-        allowing jokes/banter to deliver without exposing off-platform contacts.
+        and candidate bot handles are masked in-place to '[bot hidden 🔒]',
+        allowing jokes/banter to deliver without exposing off-platform contacts or bots.
         Explicit external web links/domains and phone numbers are strictly blocked.
     """
     if not msg:
@@ -397,14 +478,42 @@ def sanitize_free_message(msg, caption=None):
         if _URL_ONLY_REGEX.search(norm) or _OBFUSCATED_DOT_REGEX.search(norm) or _PHONE_REGEX.search(norm):
             return "BLOCKED", raw_text, raw_caption
 
-    # 3. Check for handle token pattern
+    # 3. Find candidate bot tokens that are valid Telegram handles
+    async def _get_valid_bots(txt: str):
+        if not txt:
+            return set()
+        norm = _deobfuscate_text(txt)
+        candidates = set()
+        for m in _BOT_HANDLE_REGEX.finditer(norm):
+            tok = m.group(0)
+            if is_bot_candidate(tok):
+                end = m.end()
+                after = norm[end:end+10]
+                if not (after.startswith(".") and _FILE_EXT_REGEX.match(after)):
+                    candidates.add(tok)
+
+        valid_bots = set()
+        for cand in candidates:
+            if bot is not None:
+                is_valid = await verify_telegram_handle(cand, bot=bot)
+                if is_valid:
+                    valid_bots.add(cand)
+            else:
+                valid_bots.add(cand)
+        return valid_bots
+
+    text_bots = await _get_valid_bots(raw_text)
+    caption_bots = await _get_valid_bots(raw_caption)
+
+    # 4. Check for regular handle token pattern or verified bot candidates
     has_text_handle = bool(_HANDLE_TOKEN_REGEX.search(raw_text)) if raw_text else False
     has_cap_handle = bool(_HANDLE_TOKEN_REGEX.search(raw_caption)) if raw_caption else False
 
-    if not has_text_handle and not has_cap_handle:
+    has_any_threat = has_text_handle or has_cap_handle or bool(text_bots) or bool(caption_bots)
+    if not has_any_threat:
         return "CLEAN", raw_text, raw_caption
 
-    def _process_text(txt: str):
+    def _process_text(txt: str, valid_bots: set):
         if not txt:
             return "CLEAN", txt
         words = txt.strip().split()
@@ -412,7 +521,7 @@ def sanitize_free_message(msg, caption=None):
             # Short messages (< 6 words) or standalone drops are BLOCKED
             return "BLOCKED", txt
 
-        # For >= 6 words: mask handles in-place
+        # For >= 6 words: mask handles and bots in-place
         def _mask_handle(m):
             end = m.end()
             after = txt[end:end+10]
@@ -421,10 +530,24 @@ def sanitize_free_message(msg, caption=None):
             return "[handle hidden 🔒]"
 
         masked = _HANDLE_TOKEN_REGEX.sub(_mask_handle, txt)
+
+        if valid_bots:
+            def _mask_bot(m):
+                token = m.group(0)
+                if token in valid_bots or token.lower() in {b.lower() for b in valid_bots}:
+                    end = m.end()
+                    after = txt[end:end+10]
+                    if after.startswith(".") and _FILE_EXT_REGEX.match(after):
+                        return token
+                    return "[bot hidden 🔒]"
+                return token
+
+            masked = _BOT_HANDLE_REGEX.sub(_mask_bot, masked)
+
         return "MASKED", masked
 
-    status_t, filtered_text = _process_text(raw_text) if raw_text else ("CLEAN", None)
-    status_c, filtered_cap = _process_text(raw_caption) if raw_caption else ("CLEAN", None)
+    status_t, filtered_text = _process_text(raw_text, text_bots) if raw_text else ("CLEAN", None)
+    status_c, filtered_cap = _process_text(raw_caption, caption_bots) if raw_caption else ("CLEAN", None)
 
     if status_t == "BLOCKED" or status_c == "BLOCKED":
         return "BLOCKED", raw_text, raw_caption

@@ -180,6 +180,14 @@ CREATE TABLE IF NOT EXISTS user_friends (
     CONSTRAINT chk_no_self_friend CHECK (user_id != friend_id)
 );
 
+-- Verified Telegram Handles Cache (Persistent between bot reboots)
+CREATE TABLE IF NOT EXISTS verified_telegram_handles (
+    handle VARCHAR(64) PRIMARY KEY,
+    is_valid BOOLEAN NOT NULL DEFAULT FALSE,
+    chat_type VARCHAR(32),
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for 500k+ Users Performance
 CREATE INDEX IF NOT EXISTS idx_users_prefs ON users (preferences_bitmask);
 CREATE INDEX IF NOT EXISTS idx_profiles_restricted ON user_profiles (restricted_until) WHERE restricted_until IS NOT NULL;

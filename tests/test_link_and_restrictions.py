@@ -695,3 +695,161 @@ async def test_short_message_handle_blocked_and_long_message_masked():
     assert mock_context.bot.send_message.call_args[1]["text"] == "I'm js testing something, don't mind me"
 
 
+@pytest.mark.asyncio
+async def test_bot_username_restrictions_and_safe_words():
+    u1, u2 = 8041, 8042
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=9002))
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    # 1. Standalone / Short message with bot handle (< 6 words): "AnonChatZoneBot" -> BLOCKED
+    mock_update1 = MagicMock()
+    mock_update1.effective_user.id = u1
+    mock_update1.message.text = "AnonChatZoneBot"
+    mock_update1.message.caption = None
+    mock_update1.message.entities = None
+    mock_update1.message.caption_entities = None
+    mock_update1.message.photo = None
+    mock_update1.message.video = None
+    mock_update1.message.voice = None
+    mock_update1.message.video_note = None
+    mock_update1.message.sticker = None
+    mock_update1.message.animation = None
+    mock_update1.message.document = None
+    mock_update1.message.audio = None
+    mock_update1.message.dice = None
+    mock_update1.message.reply_to_message = None
+    mock_update1.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update1, mock_context)
+    mock_context.bot.send_message.assert_not_called()
+    mock_update1.message.reply_text.assert_called_once()
+    assert "Links and usernames cannot be shared" in mock_update1.message.reply_text.call_args[1]["text"]
+
+    # 2. Long message with bot handle (>= 6 words): "someone told me AnonChatZoneBot has free stars in big 2026"
+    # -> MASKED in-place to "[bot hidden 🔒]" and relayed
+    mock_context.bot.send_message.reset_mock()
+    mock_update2 = MagicMock()
+    mock_update2.effective_user.id = u1
+    mock_update2.message.text = "someone told me AnonChatZoneBot has free stars in big 2026"
+    mock_update2.message.caption = None
+    mock_update2.message.entities = None
+    mock_update2.message.caption_entities = None
+    mock_update2.message.photo = None
+    mock_update2.message.video = None
+    mock_update2.message.voice = None
+    mock_update2.message.video_note = None
+    mock_update2.message.sticker = None
+    mock_update2.message.animation = None
+    mock_update2.message.document = None
+    mock_update2.message.audio = None
+    mock_update2.message.dice = None
+    mock_update2.message.reply_to_message = None
+    mock_update2.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update2, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    sent_text = mock_context.bot.send_message.call_args[1]["text"]
+    assert "[bot hidden 🔒]" in sent_text
+    assert "AnonChatZoneBot" not in sent_text
+    assert "someone told me [bot hidden 🔒] has free stars in big 2026" == sent_text
+
+    # 3. Whitelisted English words ending in 'bot' ("robot", "chatbot", "bot") -> Allowed clean & untouched
+    mock_context.bot.send_message.reset_mock()
+    mock_update3 = MagicMock()
+    mock_update3.effective_user.id = u1
+    mock_update3.message.text = "are you a real bot or a chatbot?"
+    mock_update3.message.caption = None
+    mock_update3.message.entities = None
+    mock_update3.message.caption_entities = None
+    mock_update3.message.photo = None
+    mock_update3.message.video = None
+    mock_update3.message.voice = None
+    mock_update3.message.video_note = None
+    mock_update3.message.sticker = None
+    mock_update3.message.animation = None
+    mock_update3.message.document = None
+    mock_update3.message.audio = None
+    mock_update3.message.dice = None
+    mock_update3.message.reply_to_message = None
+    mock_update3.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update3, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    assert mock_context.bot.send_message.call_args[1]["text"] == "are you a real bot or a chatbot?"
+
+    # 4. Another safe word ("robot") -> Allowed
+    mock_context.bot.send_message.reset_mock()
+    mock_update4 = MagicMock()
+    mock_update4.effective_user.id = u1
+    mock_update4.message.text = "I love this robot"
+    mock_update4.message.caption = None
+    mock_update4.message.entities = None
+    mock_update4.message.caption_entities = None
+    mock_update4.message.photo = None
+    mock_update4.message.video = None
+    mock_update4.message.voice = None
+    mock_update4.message.video_note = None
+    mock_update4.message.sticker = None
+    mock_update4.message.animation = None
+    mock_update4.message.document = None
+    mock_update4.message.audio = None
+    mock_update4.message.dice = None
+    mock_update4.message.reply_to_message = None
+    mock_update4.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update4, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    assert mock_context.bot.send_message.call_args[1]["text"] == "I love this robot"
+
+
+@pytest.mark.asyncio
+async def test_telegram_handle_live_verification_and_caching():
+    from security import verify_telegram_handle
+    from saveNload import get_cached_telegram_handle
+    from telegram.error import BadRequest
+
+    mock_bot = MagicMock()
+    mock_chat = MagicMock(type="bot")
+    mock_bot.get_chat = AsyncMock(return_value=mock_chat)
+
+    # 1. Valid Telegram handle verification
+    handle = "TestVerifiedZoneBot"
+    is_valid = await verify_telegram_handle(handle, bot=mock_bot)
+    assert is_valid is True
+    mock_bot.get_chat.assert_called_once_with(f"@{handle}")
+
+    # Cached in memory & DB
+    cached = await get_cached_telegram_handle(handle)
+    assert cached == (True, "bot")
+
+    # Second call uses cache (get_chat not called again)
+    mock_bot.get_chat.reset_mock()
+    is_valid_second = await verify_telegram_handle(handle, bot=mock_bot)
+    assert is_valid_second is True
+    mock_bot.get_chat.assert_not_called()
+
+    # 2. Non-existent Telegram handle (BadRequest "Chat not found")
+    non_existent = "DefinitelyFakeNonExistent1234Bot"
+    mock_bot.get_chat = AsyncMock(side_effect=BadRequest("Chat not found"))
+
+    is_valid_fake = await verify_telegram_handle(non_existent, bot=mock_bot)
+    assert is_valid_fake is False
+
+    cached_fake = await get_cached_telegram_handle(non_existent)
+    assert cached_fake == (False, "")
+
+    # Second call uses cache
+    mock_bot.get_chat.reset_mock()
+    is_valid_fake_second = await verify_telegram_handle(non_existent, bot=mock_bot)
+    assert is_valid_fake_second is False
+    mock_bot.get_chat.assert_not_called()
+
+
+

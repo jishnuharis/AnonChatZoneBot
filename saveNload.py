@@ -1620,3 +1620,56 @@ async def remove_friend_pair_db(user1: int, user2: int) -> bool:
     except Exception as e:
         logger.error(f"remove_friend_pair_db error between {user1} and {user2}: {e}")
         return False
+
+
+_in_memory_verified_handles: Dict[str, Tuple[bool, str]] = {}
+
+
+async def get_cached_telegram_handle(handle: str) -> Optional[Tuple[bool, str]]:
+    """Returns (is_valid, chat_type) if cached in DB or memory, else None."""
+    norm = handle.lower().lstrip("@")
+    if norm in _in_memory_verified_handles:
+        return _in_memory_verified_handles[norm]
+
+    if not is_pool_ready():
+        return None
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            cur = await conn.execute("""
+                SELECT is_valid, chat_type FROM verified_telegram_handles
+                WHERE handle = %s;
+            """, (norm,))
+            row = await cur.fetchone()
+            if row:
+                res = (bool(row[0]), str(row[1] or ""))
+                _in_memory_verified_handles[norm] = res
+                return res
+    except Exception as e:
+        logger.debug(f"get_cached_telegram_handle({norm}) error: {e}")
+    return None
+
+
+async def save_cached_telegram_handle(handle: str, is_valid: bool, chat_type: str = ""):
+    """Persists verified handle state to DB and memory cache across bot reboots."""
+    norm = handle.lower().lstrip("@")
+    res = (bool(is_valid), str(chat_type or ""))
+    _in_memory_verified_handles[norm] = res
+
+    if not is_pool_ready():
+        return
+
+    try:
+        p = get_pool()
+        async with p.connection() as conn:
+            await conn.execute("""
+                INSERT INTO verified_telegram_handles (handle, is_valid, chat_type, checked_at)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (handle) DO UPDATE SET
+                    is_valid = EXCLUDED.is_valid,
+                    chat_type = EXCLUDED.chat_type,
+                    checked_at = NOW();
+            """, (norm, is_valid, chat_type))
+    except Exception as e:
+        logger.debug(f"save_cached_telegram_handle({norm}) notice: {e}")
