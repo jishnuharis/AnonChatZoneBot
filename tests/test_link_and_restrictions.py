@@ -877,5 +877,249 @@ async def test_telegram_handle_live_verification_and_caching():
         monkeypatch.undo()
 
 
+@pytest.mark.asyncio
+async def test_alphanumeric_usernames_blocked_and_masked():
+    """
+    Guarantees that usernames without '@' or underscores (e.g. rshhk9098, ALEEXX157)
+    are strictly detected:
+    - Blocked in short messages (< 6 words)
+    - Masked in long messages (>= 6 words)
+    - contains_link returns True
+    - Safe units, ordinals, time, and doc names are allowed clean
+    """
+    from security import contains_link, contains_prohibited_contact
+
+    # 1. contains_link & contains_prohibited_contact checks
+    msg_rshhk = MagicMock(text="rshhk9098", caption=None, entities=None, caption_entities=None)
+    msg_alex = MagicMock(text="ALEEXX157", caption=None, entities=None, caption_entities=None)
+    assert contains_link(msg_rshhk) is True
+    assert contains_link(msg_alex) is True
+    assert contains_prohibited_contact("rshhk9098") is True
+    assert contains_prohibited_contact("ALEEXX157") is True
+    assert contains_prohibited_contact("add me rshhk9098") is True
+    assert contains_prohibited_contact("my tg is ALEEXX157") is True
+
+    u1, u2 = 8051, 8052
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=9005))
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    # 2. Standalone short drops: "rshhk9098" -> BLOCKED
+    mock_update1 = MagicMock()
+    mock_update1.effective_user.id = u1
+    mock_update1.message.text = "rshhk9098"
+    mock_update1.message.caption = None
+    mock_update1.message.entities = None
+    mock_update1.message.caption_entities = None
+    mock_update1.message.photo = None
+    mock_update1.message.video = None
+    mock_update1.message.voice = None
+    mock_update1.message.video_note = None
+    mock_update1.message.sticker = None
+    mock_update1.message.animation = None
+    mock_update1.message.document = None
+    mock_update1.message.audio = None
+    mock_update1.message.dice = None
+    mock_update1.message.reply_to_message = None
+    mock_update1.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update1, mock_context)
+    mock_context.bot.send_message.assert_not_called()
+    mock_update1.message.reply_text.assert_called_once()
+    assert "Links and usernames cannot be shared" in mock_update1.message.reply_text.call_args[1]["text"]
+
+    # 3. Standalone uppercase username drop: "ALEEXX157" -> BLOCKED
+    mock_context.bot.send_message.reset_mock()
+    mock_update2 = MagicMock()
+    mock_update2.effective_user.id = u1
+    mock_update2.message.text = "ALEEXX157"
+    mock_update2.message.caption = None
+    mock_update2.message.entities = None
+    mock_update2.message.caption_entities = None
+    mock_update2.message.photo = None
+    mock_update2.message.video = None
+    mock_update2.message.voice = None
+    mock_update2.message.video_note = None
+    mock_update2.message.sticker = None
+    mock_update2.message.animation = None
+    mock_update2.message.document = None
+    mock_update2.message.audio = None
+    mock_update2.message.dice = None
+    mock_update2.message.reply_to_message = None
+    mock_update2.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update2, mock_context)
+    mock_context.bot.send_message.assert_not_called()
+    mock_update2.message.reply_text.assert_called_once()
+    assert "Links and usernames cannot be shared" in mock_update2.message.reply_text.call_args[1]["text"]
+
+    # 4. Long message with username (>= 6 words): "someone told me rshhk9098 has free stars in big 2026"
+    # -> MASKED in-place to "[hidden 🔒]" and relayed
+    mock_context.bot.send_message.reset_mock()
+    mock_update3 = MagicMock()
+    mock_update3.effective_user.id = u1
+    mock_update3.message.text = "someone told me rshhk9098 has free stars in big 2026"
+    mock_update3.message.caption = None
+    mock_update3.message.entities = None
+    mock_update3.message.caption_entities = None
+    mock_update3.message.photo = None
+    mock_update3.message.video = None
+    mock_update3.message.voice = None
+    mock_update3.message.video_note = None
+    mock_update3.message.sticker = None
+    mock_update3.message.animation = None
+    mock_update3.message.document = None
+    mock_update3.message.audio = None
+    mock_update3.message.dice = None
+    mock_update3.message.reply_to_message = None
+    mock_update3.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update3, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    sent_text3 = mock_context.bot.send_message.call_args[1]["text"]
+    assert "[hidden 🔒]" in sent_text3
+    assert "rshhk9098" not in sent_text3
+    assert "someone told me [hidden 🔒] has free stars in big 2026" == sent_text3
+
+    # 5. Long message with ALEEXX157 (>= 6 words) -> MASKED
+    mock_context.bot.send_message.reset_mock()
+    mock_update4 = MagicMock()
+    mock_update4.effective_user.id = u1
+    mock_update4.message.text = "someone told me ALEEXX157 has free stars in big 2026"
+    mock_update4.message.caption = None
+    mock_update4.message.entities = None
+    mock_update4.message.caption_entities = None
+    mock_update4.message.photo = None
+    mock_update4.message.video = None
+    mock_update4.message.voice = None
+    mock_update4.message.video_note = None
+    mock_update4.message.sticker = None
+    mock_update4.message.animation = None
+    mock_update4.message.document = None
+    mock_update4.message.audio = None
+    mock_update4.message.dice = None
+    mock_update4.message.reply_to_message = None
+    mock_update4.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update4, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    sent_text4 = mock_context.bot.send_message.call_args[1]["text"]
+    assert "[hidden 🔒]" in sent_text4
+    assert "ALEEXX157" not in sent_text4
+    assert "someone told me [hidden 🔒] has free stars in big 2026" == sent_text4
+
+    # 6. Conversational message with time/measurement: "see you at 10am tomorrow morning bro" -> CLEAN
+    mock_context.bot.send_message.reset_mock()
+    mock_update5 = MagicMock()
+    mock_update5.effective_user.id = u1
+    mock_update5.message.text = "see you at 10am tomorrow morning bro"
+    mock_update5.message.caption = None
+    mock_update5.message.entities = None
+    mock_update5.message.caption_entities = None
+    mock_update5.message.photo = None
+    mock_update5.message.video = None
+    mock_update5.message.voice = None
+    mock_update5.message.video_note = None
+    mock_update5.message.sticker = None
+    mock_update5.message.animation = None
+    mock_update5.message.document = None
+    mock_update5.message.audio = None
+    mock_update5.message.dice = None
+    mock_update5.message.reply_to_message = None
+    mock_update5.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update5, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    assert mock_context.bot.send_message.call_args[1]["text"] == "see you at 10am tomorrow morning bro"
+
+
+@pytest.mark.asyncio
+async def test_sender_username_blocking_and_masking():
+    """
+    Guarantees that a user sharing their own Telegram username (even without numbers/underscores)
+    is caught and blocked in short messages, or masked in long messages.
+    """
+    from security import contains_link, contains_prohibited_contact
+
+    # 1. contains_link check when sender_username is provided
+    msg1 = MagicMock(text="jishnuharis", caption=None, entities=None, caption_entities=None)
+    assert contains_link(msg1, sender_username="jishnuharis") is True
+    assert contains_link(msg1, sender_username="someoneelse") is False  # jishnuharis alone without digits doesn't match generic regex
+    assert contains_prohibited_contact("jishnuharis", sender_username="jishnuharis") is True
+    assert contains_prohibited_contact("add me on @jishnuharis", sender_username="jishnuharis") is True
+
+    # 2. Short message containing sender's own username -> BLOCKED
+    u1, u2 = 8061, 8062
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=9006))
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = u1
+    mock_update.effective_user.username = "jishnuharis"
+    mock_update.message.text = "jishnuharis"
+    mock_update.message.caption = None
+    mock_update.message.entities = None
+    mock_update.message.caption_entities = None
+    mock_update.message.photo = None
+    mock_update.message.video = None
+    mock_update.message.voice = None
+    mock_update.message.video_note = None
+    mock_update.message.sticker = None
+    mock_update.message.animation = None
+    mock_update.message.document = None
+    mock_update.message.audio = None
+    mock_update.message.dice = None
+    mock_update.message.reply_to_message = None
+    mock_update.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update, mock_context)
+    mock_context.bot.send_message.assert_not_called()
+    mock_update.message.reply_text.assert_called_once()
+    assert "Links and usernames cannot be shared" in mock_update.message.reply_text.call_args[1]["text"]
+
+    # 3. Long message containing sender's own username -> MASKED
+    mock_context.bot.send_message.reset_mock()
+    mock_update2 = MagicMock()
+    mock_update2.effective_user.id = u1
+    mock_update2.effective_user.username = "jishnuharis"
+    mock_update2.message.text = "someone told me jishnuharis has free stars in big 2026"
+    mock_update2.message.caption = None
+    mock_update2.message.entities = None
+    mock_update2.message.caption_entities = None
+    mock_update2.message.photo = None
+    mock_update2.message.video = None
+    mock_update2.message.voice = None
+    mock_update2.message.video_note = None
+    mock_update2.message.sticker = None
+    mock_update2.message.animation = None
+    mock_update2.message.document = None
+    mock_update2.message.audio = None
+    mock_update2.message.dice = None
+    mock_update2.message.reply_to_message = None
+    mock_update2.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update2, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    sent_text = mock_context.bot.send_message.call_args[1]["text"]
+    assert "[hidden 🔒]" in sent_text
+    assert "jishnuharis" not in sent_text
+    assert "someone told me [hidden 🔒] has free stars in big 2026" == sent_text
+
+
+
+
 
 

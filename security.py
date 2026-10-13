@@ -271,13 +271,12 @@ _SCAM_PHRASES_REGEX = re.compile(
 
 _FILE_EXT_REGEX = re.compile(r"\.(?:pdf|png|jpe?g|gif|docx?|zip|txt|mp[34]|csv|json|py|html)\b", re.IGNORECASE)
 
-# Handles with letters, underscore, and digits (e.g. super_storm5, that_cool_guy_67, alex_99, 7_killer)
+# Handles with letters, digits, and/or underscores (e.g. rshhk9098, ALEEXX157, super_storm5, that_cool_guy_67, alex_99, 7_killer)
 _HANDLE_TOKEN_REGEX = re.compile(
     r"(?i)(?<!\w)(?:"
     r"@[a-zA-Z0-9_]{3,32}"
-    r"|(?:tg|tele|telegram|insta|ig|instagram|snap|sc|snapchat|wa|whatsapp|kik|discord|dc)\s*[:=\-–—]\s*[a-zA-Z0-9_.-]{3,32}"
-    r"|[a-zA-Z0-9]+_[a-zA-Z0-9_]*\d[a-zA-Z0-9_]*"
-    r"|[a-zA-Z0-9_]*\d[a-zA-Z0-9_]*_[a-zA-Z0-9]+"
+    r"|(?:tg|tele|telegram|insta|ig|instagram|snap|sc|snapchat|wa|whatsapp|kik|discord|dc|tiktok|tt|twt|twitter)\s*[:=\-–—]\s*[a-zA-Z0-9_.-]{3,32}"
+    r"|(?=[a-zA-Z0-9_]{4,32}(?!\w))(?=[a-zA-Z0-9_]*[a-zA-Z])(?=[a-zA-Z0-9_]*\d)[a-zA-Z0-9_]+"
     r")(?!\w)"
 )
 
@@ -302,6 +301,49 @@ if os.path.exists(_WORDS_FILE):
             ENGLISH_WORDS.update(line.strip().lower() for line in _f if line.strip())
     except Exception as _e:
         logger.warning(f"Could not load english words dictionary: {_e}")
+
+# Whitelist of common non-handle alphanumeric terms, tech acronyms, and slang
+SAFE_HANDLE_WORDS = {
+    "2day", "2nite", "xbox360", "ak47", "win10", "win11", "iphone11", "iphone12", "iphone13",
+    "iphone14", "iphone15", "iphone16", "h264", "h265", "g63", "ps4", "ps5", "xbox", "rtx3080",
+    "rtx4090", "mp3", "mp4", "b2b", "p2p", "f2f", "gr8", "l8r", "w8", "b4", "u2", "4u", "4me",
+}
+
+# Regex for ordinals, measurements, time, currencies, and technical units (e.g. 10th, 21st, 10am, 100kg, 60fps, 1080p, 1990s)
+_SAFE_MEASUREMENT_OR_ORDINAL_REGEX = re.compile(
+    r"(?i)^\d+(?:st|nd|rd|th|am|pm|h|hr|hrs|min|mins|s|sec|secs|ms|d|days|w|wk|wks|mo|yr|yrs|k|m|b|g|kg|mg|lb|lbs|oz|km|mi|cm|mm|ft|in|yd|mph|kph|fps|hz|khz|mhz|ghz|kb|mb|gb|tb|p|v|w|a|mah|rs|usd|eur|inr)$"
+)
+
+
+def is_handle_candidate(token: str) -> bool:
+    """Returns True if token looks like an off-platform handle / username and is not a safe word or unit."""
+    if not token:
+        return False
+    if token.startswith("@") or _SOCIAL_HANDLE_PREFIX_REGEX.match(token):
+        return True
+    clean = token.strip("@.,!?:;\"'()[]{}")
+    if not clean:
+        return False
+    if len(clean) < 4 or len(clean) > 32:
+        return False
+    lower = clean.lower()
+    if lower in ENGLISH_WORDS or lower in SAFE_HANDLE_WORDS:
+        return False
+    if _SAFE_MEASUREMENT_OR_ORDINAL_REGEX.match(clean):
+        return False
+    return True
+
+
+def contains_sender_username(text: str, sender_username: str) -> bool:
+    """Returns True if text contains the sender's Telegram username (with or without @)."""
+    if not text or not sender_username or not isinstance(sender_username, str):
+        return False
+    clean_user = sender_username.lstrip("@").strip()
+    if len(clean_user) < 3:
+        return False
+    norm = _deobfuscate_text(text)
+    pattern = re.compile(rf"(?i)(?<!\w)@?{re.escape(clean_user)}(?!\w)")
+    return bool(pattern.search(norm))
 
 
 def is_bot_candidate(token: str) -> bool:
@@ -381,15 +423,18 @@ def is_scam_or_phishing_message(msg) -> bool:
     return is_scam_or_phishing_text(text_to_check)
 
 
-def contains_prohibited_contact(text: str) -> bool:
+def contains_prohibited_contact(text: str, sender_username: str = None) -> bool:
     """
     Returns True if text contains links, handles (with or without @),
-    bot usernames (e.g. AnonChatZoneBot), obfuscated dots, formatted/spaced phone numbers,
-    or handle signatures.
+    the sender's own username, bot usernames (e.g. AnonChatZoneBot),
+    obfuscated dots, formatted/spaced phone numbers, or handle signatures.
     """
     if not text:
         return False
     norm = _deobfuscate_text(text)
+
+    if sender_username and isinstance(sender_username, str) and contains_sender_username(norm, sender_username):
+        return True
 
     if _URL_REGEX.search(norm):
         return True
@@ -404,8 +449,9 @@ def contains_prohibited_contact(text: str) -> bool:
 
     # If it's a file, don't flag as handle
     if not _FILE_EXT_REGEX.search(norm):
-        if _HANDLE_TOKEN_REGEX.search(norm):
-            return True
+        for m in _HANDLE_TOKEN_REGEX.finditer(norm):
+            if is_handle_candidate(m.group(0)):
+                return True
         for m in _BOT_HANDLE_REGEX.finditer(norm):
             if is_bot_candidate(m.group(0)):
                 return True
@@ -413,11 +459,11 @@ def contains_prohibited_contact(text: str) -> bool:
     return False
 
 
-def contains_link(msg) -> bool:
+def contains_link(msg, sender_username: str = None) -> bool:
     """
     Returns True if the message or caption contains any URL, Telegram link,
-    masked link entity, Telegram @username handle, off-platform contact handle
-    (even without @), or formatted/spaced phone numbers.
+    masked link entity, Telegram @username handle, the sender's own username,
+    off-platform contact handle (even without @), or formatted/spaced phone numbers.
     """
     if not msg:
         return False
@@ -433,25 +479,35 @@ def contains_link(msg) -> bool:
         if ent_type in ("url", "text_link", "mention", MessageEntityType.URL, MessageEntityType.TEXT_LINK, MessageEntityType.MENTION):
             return True
 
+    if not sender_username or not isinstance(sender_username, str):
+        from_user = getattr(msg, "from_user", None)
+        u_name = getattr(from_user, "username", None) if from_user else None
+        sender_username = u_name if isinstance(u_name, str) else None
+
     text_to_check = f"{getattr(msg, 'text', '') or ''} {getattr(msg, 'caption', '') or ''}"
-    return contains_prohibited_contact(text_to_check)
+    return contains_prohibited_contact(text_to_check, sender_username=sender_username)
 
 
-async def sanitize_free_message(msg, caption=None, bot=None):
+async def sanitize_free_message(msg, caption=None, bot=None, sender_username: str = None):
     """
     Evaluates message/caption for free-tier link and handle restrictions.
     Returns:
         (status, filtered_text, filtered_caption)
         status in ("CLEAN", "BLOCKED", "MASKED")
     - Under 6 words (< 6 words):
-        Any handle, bot username, link, or asking-to-be-added is BLOCKED.
+        Any handle, bot username, sender's username, link, or asking-to-be-added is BLOCKED.
     - 6 or more words (>= 6 words):
-        Embedded handles and candidate bot handles are masked in-place to '[hidden 🔒]',
+        Embedded handles, sender's own username, and candidate bot handles are masked in-place to '[hidden 🔒]',
         allowing jokes/banter to deliver without exposing off-platform contacts or bots.
         Explicit external web links/domains and phone numbers are strictly blocked.
     """
     if not msg:
         return "CLEAN", None, None
+
+    if not sender_username or not isinstance(sender_username, str):
+        from_user = getattr(msg, "from_user", None)
+        u_name = getattr(from_user, "username", None) if from_user else None
+        sender_username = u_name if isinstance(u_name, str) else None
 
     raw_text = getattr(msg, "text", None)
     raw_caption = caption if caption is not None else getattr(msg, "caption", None)
@@ -505,8 +561,24 @@ async def sanitize_free_message(msg, caption=None, bot=None):
     caption_bots = await _get_valid_bots(raw_caption)
 
     # 4. Check for regular handle token pattern or verified bot candidates
-    has_text_handle = bool(_HANDLE_TOKEN_REGEX.search(raw_text)) if raw_text else False
-    has_cap_handle = bool(_HANDLE_TOKEN_REGEX.search(raw_caption)) if raw_caption else False
+    def _has_handle(txt: str):
+        if not txt:
+            return False
+        norm = _deobfuscate_text(txt)
+        if sender_username and contains_sender_username(norm, sender_username):
+            return True
+        if _SOCIAL_HANDLE_PREFIX_REGEX.search(norm) or _SOCIAL_INTENT_REGEX.search(norm):
+            return True
+        for m in _HANDLE_TOKEN_REGEX.finditer(norm):
+            if is_handle_candidate(m.group(0)):
+                end = m.end()
+                after = norm[end:end+10]
+                if not (after.startswith(".") and _FILE_EXT_REGEX.match(after)):
+                    return True
+        return False
+
+    has_text_handle = _has_handle(raw_text)
+    has_cap_handle = _has_handle(raw_caption)
 
     has_any_threat = has_text_handle or has_cap_handle or bool(text_bots) or bool(caption_bots)
     if not has_any_threat:
@@ -520,15 +592,30 @@ async def sanitize_free_message(msg, caption=None, bot=None):
             # Short messages (< 6 words) or standalone drops are BLOCKED
             return "BLOCKED", txt
 
-        # For >= 6 words: mask handles and bots in-place to [hidden 🔒]
+        # For >= 6 words: mask handles, sender's username, and bots in-place to [hidden 🔒]
+        if sender_username and isinstance(sender_username, str):
+            clean_user = sender_username.lstrip("@").strip()
+            if len(clean_user) >= 3:
+                user_pat = re.compile(rf"(?i)(?<!\w)@?{re.escape(clean_user)}(?!\w)")
+                txt = user_pat.sub("[hidden 🔒]", txt)
+
         def _mask_handle(m):
+            token = m.group(0)
+            if not is_handle_candidate(token):
+                return token
             end = m.end()
             after = txt[end:end+10]
             if after.startswith(".") and _FILE_EXT_REGEX.match(after):
-                return m.group(0)
+                return token
             return "[hidden 🔒]"
 
         masked = _HANDLE_TOKEN_REGEX.sub(_mask_handle, txt)
+
+        def _mask_match(m):
+            return "[hidden 🔒]"
+
+        masked = _SOCIAL_HANDLE_PREFIX_REGEX.sub(_mask_match, masked)
+        masked = _SOCIAL_INTENT_REGEX.sub(_mask_match, masked)
 
         if valid_bots:
             def _mask_bot(m):

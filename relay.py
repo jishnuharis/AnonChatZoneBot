@@ -146,7 +146,10 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Enforce link and handle restrictions for free tier
         if is_free:
             bot = getattr(context, "bot", None)
-            status, filtered_text, filtered_caption = await sanitize_free_message(msg, bot=bot)
+            sender_username = getattr(update.effective_user, "username", None)
+            status, filtered_text, filtered_caption = await sanitize_free_message(
+                msg, bot=bot, sender_username=sender_username
+            )
             if status == "BLOCKED":
                 await safe_reply(
                     update,
@@ -401,7 +404,10 @@ async def relay_edited_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not is_subscribed(user_id):
         bot = getattr(context, "bot", None)
-        status, filtered_text, filtered_caption = await sanitize_free_message(edit_msg, bot=bot)
+        sender_username = getattr(update.effective_user, "username", None)
+        status, filtered_text, filtered_caption = await sanitize_free_message(
+            edit_msg, bot=bot, sender_username=sender_username
+        )
         if status == "BLOCKED":
             await safe_tele_func_call(
                 edit_msg.reply_text,
