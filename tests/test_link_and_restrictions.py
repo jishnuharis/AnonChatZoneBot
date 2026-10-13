@@ -1119,6 +1119,170 @@ async def test_sender_username_blocking_and_masking():
     assert "someone told me [hidden 🔒] has free stars in big 2026" == sent_text
 
 
+@pytest.mark.asyncio
+async def test_unicode_font_normalization_evasion():
+    """
+    Verifies that mathematical bold, italics, full-width, and script font evasions
+    are normalized and blocked / masked.
+    """
+    from security import contains_prohibited_contact
+
+    assert contains_prohibited_contact("𝗿𝘀𝗵𝗵𝗸𝟵𝟬𝟵𝟴") is True
+    assert contains_prohibited_contact("ＡＬＥＥＸＸ１５７") is True
+    assert contains_prohibited_contact("𝓉.𝓂𝑒/𝒸𝒽𝒶𝓉") is True
+
+    u1, u2 = 8071, 8072
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=9007))
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    # 1. Short styled drop -> BLOCKED
+    mock_update1 = MagicMock()
+    mock_update1.effective_user.id = u1
+    mock_update1.message.text = "𝗿𝘀𝗵𝗵𝗸𝟵𝟬𝟵𝟴"
+    mock_update1.message.caption = None
+    mock_update1.message.entities = None
+    mock_update1.message.caption_entities = None
+    mock_update1.message.photo = None
+    mock_update1.message.video = None
+    mock_update1.message.voice = None
+    mock_update1.message.video_note = None
+    mock_update1.message.sticker = None
+    mock_update1.message.animation = None
+    mock_update1.message.document = None
+    mock_update1.message.audio = None
+    mock_update1.message.dice = None
+    mock_update1.message.reply_to_message = None
+    mock_update1.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update1, mock_context)
+    mock_context.bot.send_message.assert_not_called()
+    mock_update1.message.reply_text.assert_called_once()
+    assert "Links and usernames cannot be shared" in mock_update1.message.reply_text.call_args[1]["text"]
+
+    # 2. Long message with styled username -> MASKED
+    mock_context.bot.send_message.reset_mock()
+    mock_update2 = MagicMock()
+    mock_update2.effective_user.id = u1
+    mock_update2.message.text = "someone told me 𝗿𝘀𝗵𝗵𝗸𝟵𝟬𝟵𝟴 has free stars in big 2026"
+    mock_update2.message.caption = None
+    mock_update2.message.entities = None
+    mock_update2.message.caption_entities = None
+    mock_update2.message.photo = None
+    mock_update2.message.video = None
+    mock_update2.message.voice = None
+    mock_update2.message.video_note = None
+    mock_update2.message.sticker = None
+    mock_update2.message.animation = None
+    mock_update2.message.document = None
+    mock_update2.message.audio = None
+    mock_update2.message.dice = None
+    mock_update2.message.reply_to_message = None
+    mock_update2.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update2, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    sent_text = mock_context.bot.send_message.call_args[1]["text"]
+    assert "[hidden 🔒]" in sent_text
+    assert "rshhk9098" not in sent_text
+
+
+@pytest.mark.asyncio
+async def test_ghost_spaced_evasion():
+    """
+    Verifies that ghost-spaced handles (single characters separated by spaces/dots/dashes)
+    are collapsed and blocked / masked.
+    """
+    from security import contains_prohibited_contact
+
+    assert contains_prohibited_contact("r s h h k 9 0 9 8") is True
+    assert contains_prohibited_contact("A - L - E - E - X - X - 1 - 5 - 7") is True
+    assert contains_prohibited_contact("r.s.h.h.k.9.0.9.8") is True
+
+    u1, u2 = 8081, 8082
+    init.user_details[u1] = init._default_user()
+    init.user_details[u2] = init._default_user()
+    init.active_pairs[u1] = u2
+    init.active_pairs[u2] = u1
+    init.session_start_times[u1] = time.time() - 100
+
+    mock_context = MagicMock()
+    mock_context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=9008))
+    mock_context.bot.send_chat_action = AsyncMock()
+
+    # 1. Standalone ghost drop: "r s h h k 9 0 9 8" -> Collapsed word count is 1 (< 6) -> BLOCKED
+    mock_update1 = MagicMock()
+    mock_update1.effective_user.id = u1
+    mock_update1.message.text = "r s h h k 9 0 9 8"
+    mock_update1.message.caption = None
+    mock_update1.message.entities = None
+    mock_update1.message.caption_entities = None
+    mock_update1.message.photo = None
+    mock_update1.message.video = None
+    mock_update1.message.voice = None
+    mock_update1.message.video_note = None
+    mock_update1.message.sticker = None
+    mock_update1.message.animation = None
+    mock_update1.message.document = None
+    mock_update1.message.audio = None
+    mock_update1.message.dice = None
+    mock_update1.message.reply_to_message = None
+    mock_update1.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update1, mock_context)
+    mock_context.bot.send_message.assert_not_called()
+    mock_update1.message.reply_text.assert_called_once()
+    assert "Links and usernames cannot be shared" in mock_update1.message.reply_text.call_args[1]["text"]
+
+    # 2. Long message with ghost handle -> MASKED in-place
+    mock_context.bot.send_message.reset_mock()
+    mock_update2 = MagicMock()
+    mock_update2.effective_user.id = u1
+    mock_update2.message.text = "someone told me to add r s h h k 9 0 9 8 on telegram for free stars"
+    mock_update2.message.caption = None
+    mock_update2.message.entities = None
+    mock_update2.message.caption_entities = None
+    mock_update2.message.photo = None
+    mock_update2.message.video = None
+    mock_update2.message.voice = None
+    mock_update2.message.video_note = None
+    mock_update2.message.sticker = None
+    mock_update2.message.animation = None
+    mock_update2.message.document = None
+    mock_update2.message.audio = None
+    mock_update2.message.dice = None
+    mock_update2.message.reply_to_message = None
+    mock_update2.message.reply_text = AsyncMock()
+
+    await relay_message(mock_update2, mock_context)
+    mock_context.bot.send_message.assert_called_once()
+    sent_text = mock_context.bot.send_message.call_args[1]["text"]
+    assert "[hidden 🔒]" in sent_text
+    assert "r s h h k 9 0 9 8" not in sent_text
+
+
+def test_expanded_shortlink_and_telegram_redirects():
+    """
+    Verifies that alternative Telegram shortlinks and modern URL shorteners are strictly caught.
+    """
+    from security import contains_prohibited_contact
+
+    assert contains_prohibited_contact("join t.me/+abc_123") is True
+    assert contains_prohibited_contact("check telegram.dog/mychan") is True
+    assert contains_prohibited_contact("click tele.click/secret") is True
+    assert contains_prohibited_contact("go to linktr.ee/myprofile") is True
+    assert contains_prohibited_contact("short bit.ly/promo") is True
+    assert contains_prohibited_contact("tg://join?invite=xyz") is True
+    assert contains_prohibited_contact("visit beacons.ai/creator") is True
+
+
+
 
 
 

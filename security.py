@@ -1,5 +1,6 @@
 import os
 import re
+import unicodedata
 import asyncio
 from telegram import Update
 from telegram.constants import MessageEntityType
@@ -224,10 +225,12 @@ _HOMOGLYPH_MAP = {
 
 _URL_ONLY_REGEX = re.compile(
     r"(?i)\b(?:https?://|ftp://|www\.)[^\s/$.?#].[^\s]*"
-    r"|(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|me|co|xyz|info|biz|ru|in|app|site|online|tech|link|live|top|gg|club|vip|dev|ai|cc|to|ly|pro|store|space|agency|cloud|social|tv|page|click)\b"
-    r"|(?:t|telegram)\.me/[a-zA-Z0-9_+]+"
+    r"|(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|me|co|xyz|info|biz|ru|in|app|site|online|tech|link|live|top|gg|club|vip|dev|ai|cc|to|ly|pro|store|space|agency|cloud|social|tv|page|click|fun|icu|pw|ws|bond|fit|quest|bio)\b"
+    r"|(?:t|telegram|tg|tele)\.(?:me|dog|click)/[a-zA-Z0-9_+%-]+"
+    r"|telegram\.dog/[a-zA-Z0-9_+%-]+"
     r"|tg://[^\s]+"
-    r"|\b[a-zA-Z0-9-]+\s*\.\s*(?:com|org|net|io|me|xyz|app|site|top|gg|club|vip|dev|ai|to|ly)\b"
+    r"|(?:bit\.ly|tinyurl\.com|is\.gd|cutt\.ly|rb\.gy|shorturl\.at|linktr\.ee|beacons\.ai|bio\.link|heylink\.me)/[a-zA-Z0-9_+%-]+"
+    r"|\b[a-zA-Z0-9-]+\s*\.\s*(?:com|org|net|io|me|xyz|app|site|top|gg|club|vip|dev|ai|to|ly|co|dog)\b"
 )
 
 _URL_REGEX = re.compile(
@@ -236,9 +239,24 @@ _URL_REGEX = re.compile(
 
 # Obfuscated dot notation: e.g. "t(dot)me", "google[dot]com", "site ( dot ) com"
 _OBFUSCATED_DOT_REGEX = re.compile(
-    r"(?i)\b[a-zA-Z0-9-]+\s*(?:\(|\{|\[)\s*dot\s*(?:\)|\}|\])\s*(?:com|org|net|xyz|me|io|app|site|top|to|ly|co)\b"
-    r"|(?:t|tele|telegram|wa|whatsapp)\s*(?:\(|\{|\[|\.)\s*(?:dot|\.)?\s*(?:\)|\}|\])?\s*me\b"
+    r"(?i)\b[a-zA-Z0-9-]+\s*(?:\(|\{|\[)\s*dot\s*(?:\)|\}|\])\s*(?:com|org|net|xyz|me|io|app|site|top|to|ly|co|dog)\b"
+    r"|(?:t|tele|telegram|wa|whatsapp)\s*(?:\(|\{|\[|\.)\s*(?:dot|\.)?\s*(?:\)|\}|\])?\s*(?:me|dog|click)\b"
 )
+
+# Ghost-spaced tokens e.g. "r s h h k 9 0 9 8", "A - L - E - E - X - X - 1 - 5 - 7", "r.s.h.h.k.9.0.9.8"
+_GHOST_SPACING_REGEX = re.compile(r"(?i)\b[a-zA-Z0-9](?:\s*[\s._\-–—]\s*[a-zA-Z0-9]){3,}\b")
+
+
+def collapse_ghost_spacing(text: str) -> str:
+    """Collapses spaced-out or punctuation-separated single characters into continuous tokens."""
+    if not text:
+        return ""
+
+    def _repl(m):
+        tok = m.group(0)
+        return re.sub(r"[\s._\-–—]+", "", tok)
+
+    return _GHOST_SPACING_REGEX.sub(_repl, text)
 
 # Social handle triggers without '@':
 # 1. "tg: johndoe", "insta: cute_girl", "wa: +123...", "snap: xxx", "sc: xxx"
@@ -398,12 +416,18 @@ async def verify_telegram_handle(handle: str, bot=None) -> bool:
 
 
 def _deobfuscate_text(text: str) -> str:
-    """Removes zero-width characters and maps homoglyphs."""
+    """Removes zero-width characters, normalizes Unicode styles/fonts, maps homoglyphs, and collapses ghost-spacing."""
     if not text:
         return ""
-    cleaned = re.sub(r"[\u200b-\u200f\ufeff]", "", text)
+    # 1. Normalize Unicode mathematical, fullwidth, stylistic fonts into base characters
+    cleaned = unicodedata.normalize("NFKD", text)
+    # 2. Strip zero-width & invisible format characters
+    cleaned = re.sub(r"[\u200b-\u200f\ufeff]", "", cleaned)
+    # 3. Map Cyrillic lookalikes to Latin
     for cyr, lat in _HOMOGLYPH_MAP.items():
         cleaned = cleaned.replace(cyr, lat)
+    # 4. Collapse ghost-spaced character chains (e.g. "r s h h k 9 0 9 8" -> "rshhk9098")
+    cleaned = collapse_ghost_spacing(cleaned)
     return cleaned
 
 
@@ -587,17 +611,37 @@ async def sanitize_free_message(msg, caption=None, bot=None, sender_username: st
     def _process_text(txt: str, valid_bots: set):
         if not txt:
             return "CLEAN", txt
-        words = txt.strip().split()
+        # Calculate words count on collapsed text so ghost-spaced characters don't inflate word count
+        collapsed_txt = collapse_ghost_spacing(txt)
+        words = collapsed_txt.strip().split()
         if len(words) < 6:
             # Short messages (< 6 words) or standalone drops are BLOCKED
             return "BLOCKED", txt
 
-        # For >= 6 words: mask handles, sender's username, and bots in-place to [hidden 🔒]
+        # Normalize stylistic / mathematical unicode fonts for consistent regex masking
+        txt = unicodedata.normalize("NFKD", txt)
+
+        # For >= 6 words: mask handles, sender's username, ghost-spacing, and bots in-place to [hidden 🔒]
         if sender_username and isinstance(sender_username, str):
             clean_user = sender_username.lstrip("@").strip()
             if len(clean_user) >= 3:
                 user_pat = re.compile(rf"(?i)(?<!\w)@?{re.escape(clean_user)}(?!\w)")
                 txt = user_pat.sub("[hidden 🔒]", txt)
+
+        # Mask ghost-spaced handles if present
+        def _mask_ghost(m):
+            tok = m.group(0)
+            condensed = re.sub(r"[\s._\-–—]+", "", tok)
+            condensed_norm = _deobfuscate_text(condensed)
+            if (
+                is_handle_candidate(condensed_norm)
+                or is_bot_candidate(condensed_norm)
+                or (sender_username and isinstance(sender_username, str) and contains_sender_username(condensed_norm, sender_username))
+            ):
+                return "[hidden 🔒]"
+            return tok
+
+        txt = _GHOST_SPACING_REGEX.sub(_mask_ghost, txt)
 
         def _mask_handle(m):
             token = m.group(0)
