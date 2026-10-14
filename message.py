@@ -56,7 +56,7 @@ SUBSCRIBE_COMPARE_TEXT = (
     "• 📞 Unlimited 1-on-1 Voice Calls\n"
     "• 💣 Ghost Media (/private) Self-Destructing Photos\n"
     "• 🚀 Priority Matchmaking Queue\n"
-    "• ⚡ Instant Media (No warmup lock) & HIGHER DAILY CHATS</blockquote>\n\n"
+    "• ⚡ Instant Media (No warmup lock) & Higher Daily Chats</blockquote>\n\n"
     "<blockquote><b>⚡ Daily (25 ⭐ / ₹20)</b>\n"
     "• 48 Daily Chats (vs 32 Free)\n"
     "• 24 Hours VIP Access\n"
