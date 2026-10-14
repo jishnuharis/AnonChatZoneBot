@@ -18,6 +18,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 import init
+import subscription
 from handlers.setup import check_user_profile
 from security import safe_tele_func_call
 
@@ -249,15 +250,16 @@ async def render_leaderboard_text(category: str, viewer_id: int) -> str:
     lines = []
     for rank, entry in enumerate(top_list, start=1):
         icon = RANK_ICONS.get(rank, DEFAULT_RANK_ICON)
+        badge = subscription.get_tier_badge(entry["user_id"])
         anon = anonymize_id(entry["user_id"])
         score = entry["score"]
         if category == "streaks":
             best = entry.get("extra", score)
-            lines.append(f"{icon} <b>{anon}</b>: <b>{score} days</b> <i>(Best: {best}d)</i>")
+            lines.append(f"{icon} {badge} <b>{anon}</b>: <b>{score} days</b> <i>(Best: {best}d)</i>")
         elif category == "karma":
-            lines.append(f"{icon} <b>{anon}</b>: <b>{score} 👍</b>")
+            lines.append(f"{icon} {badge} <b>{anon}</b>: <b>{score} 👍</b>")
         elif category == "games":
-            lines.append(f"{icon} <b>{anon}</b>: <b>{score:,} pts</b>")
+            lines.append(f"{icon} {badge} <b>{anon}</b>: <b>{score:,} pts</b>")
 
     if not lines:
         lines.append("<i>No records yet for this weekly cycle. Be the first!</i>")
@@ -307,7 +309,8 @@ async def render_leaderboard_text(category: str, viewer_id: int) -> str:
             elif v_rank and v_rank <= 10:
                 stats_lines.append("🎉 <i>You are currently in the Top 10!</i>")
 
-    user_blockquote = "<blockquote>\n<b>Your Stats:</b>\n" + "\n".join(stats_lines) + "\n</blockquote>"
+    v_badge = subscription.get_tier_badge(viewer_id)
+    user_blockquote = f"<blockquote>\n<b>Your Stats:</b> ({v_badge})\n" + "\n".join(stats_lines) + "\n</blockquote>"
 
     header = (
         f"🏆 <b>{cat_title}</b>\n"

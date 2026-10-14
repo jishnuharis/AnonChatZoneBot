@@ -24,6 +24,7 @@ from commands.help import help_command
 from commands.profile import show_profile, handle_profile_back
 from commands.call import call_command, handle_call_response
 from commands.link import link_command
+from commands.prune import prune_command
 from handlers.friends import (
     send_friend_request, show_friends_menu, handle_friend_request_response,
     handle_friend_card_actions, handle_connect_response
@@ -102,6 +103,7 @@ async def set_commands(application):
         BotCommand("leaderboard", "Show weekly leaderboard"),
         BotCommand("gift", "Send a gift to your chat partner"),
         BotCommand("link", "Share your Telegram profile"),
+        BotCommand("prune", "Erase replied message for both (VIP)"),
     ]
     # Default fallback: registers all 19 user commands for all chats
     await application.bot.set_my_commands(user_commands)
@@ -243,6 +245,7 @@ def main():
     app.add_handler(CommandHandler("unban", unban_user))
     app.add_handler(CommandHandler("checkuser", check_user))
     app.add_handler(CommandHandler("private", handle_private_command))
+    app.add_handler(CommandHandler("prune", prune_command))
     app.add_handler(CommandHandler("subscribe", show_subscribe_menu))
     app.add_handler(CommandHandler("top", show_top_leaderboard))
     app.add_handler(CommandHandler("leaderboard", show_top_leaderboard))

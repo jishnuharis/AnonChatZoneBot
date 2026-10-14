@@ -8,37 +8,48 @@ logger = logging.getLogger(__name__)
 FREE_DAILY_CREDIT_LIMIT = 32
 FREE_DAILY_CALL_LIMIT = 3
 
+FREE_TIER_BADGE = "💬"
+FREE_TIER_LABEL = "Free Member"
+
 TIERS = {
     "daily": {
         "label": "Daily",
         "duration_days": 1,
         "limit_bonus": 16,
-        "stars": 20,
-        "bonus_points": 40,
+        "stars": 25,
+        "direct_price": "₹20 / $0.24",
+        "badge": "⚡",
+        "bonus_points": 50,
         "priority": 1,
     },
     "weekly": {
         "label": "Weekly",
         "duration_days": 7,
         "limit_bonus": 32,
-        "stars": 70,
-        "bonus_points": 150,
+        "stars": 125,
+        "direct_price": "₹100 / $1.20",
+        "badge": "✨",
+        "bonus_points": 200,
         "priority": 2,
     },
     "monthly": {
         "label": "Monthly",
         "duration_days": 30,
         "limit_bonus": 48,
-        "stars": 150,
-        "bonus_points": 400,
+        "stars": 450,
+        "direct_price": "₹300 / $3.60",
+        "badge": "🌙",
+        "bonus_points": 800,
         "priority": 3,
     },
     "yearly": {
         "label": "Yearly",
         "duration_days": 365,
         "limit_bonus": 64,
-        "stars": 999,
-        "bonus_points": 3000,
+        "stars": 4500,
+        "direct_price": "₹2,400 / $28.80",
+        "badge": "👑",
+        "bonus_points": 3500,
         "priority": 4,
     },
 }
@@ -62,6 +73,34 @@ def active_tier(user_id: int):
         return None
     tier_key = init.user_details.get(user_id, {}).get("subscription_tier")
     return TIERS.get(tier_key)
+
+
+def get_tier_badge(user_id: int) -> str:
+    """Returns the badge emoji for the user's tier (💬 for free, ⚡, ✨, 🌙, 👑 for VIP)."""
+    tier = active_tier(user_id)
+    if not tier:
+        return FREE_TIER_BADGE
+    return tier.get("badge", "⭐")
+
+
+def get_tier_display_name(user_id: int) -> str:
+    """Returns formatted badge and label, e.g. '🌙 Monthly VIP' or '💬 Free Member'."""
+    tier = active_tier(user_id)
+    if not tier:
+        return f"{FREE_TIER_BADGE} {FREE_TIER_LABEL}"
+    return f"{tier.get('badge', '⭐')} {tier['label']} VIP"
+
+
+def has_tier(user_id: int, min_tier_key: str) -> bool:
+    """
+    Returns True if user has an active subscription at or above min_tier_key.
+    Example: has_tier(uid, 'weekly') returns True for weekly, monthly, and yearly.
+    """
+    tier = active_tier(user_id)
+    if not tier:
+        return False
+    min_priority = TIERS.get(min_tier_key, {}).get("priority", 99)
+    return tier.get("priority", 0) >= min_priority
 
 
 def daily_credit_limit(user_id: int) -> int:
@@ -226,9 +265,9 @@ def status_text(user_id: int) -> str:
         used_calls = daily_calls_used(user_id)
         rem_calls = max(0, FREE_DAILY_CALL_LIMIT - used_calls)
         return (
-            "❌ <i>No active subscription. Use</i> /subscribe <i>to unlock perks.</i>\n"
+            f"<i>Account Status:</i> <b>{FREE_TIER_BADGE} {FREE_TIER_LABEL}</b>\n"
             f"<i>Daily voice calls:</i> <b>{rem_calls}/{FREE_DAILY_CALL_LIMIT} remaining today</b>\n"
-            f"<i>Daily credit limit:</i> {FREE_DAILY_CREDIT_LIMIT} (limits how many users you can chat with per day via /find & /next + media sends)"
+            f"<i>Daily matches:</i> <b>{FREE_DAILY_CREDIT_LIMIT} chats/day</b>"
         )
     expires = init.user_details[user_id]["subscription_expires"]
     rem_secs = max(0, (expires - time.time()))
@@ -240,9 +279,8 @@ def status_text(user_id: int) -> str:
         time_left_str = f"{remaining_days:.1f} days left"
 
     return (
-        f"✅ <b>{tier['label']}</b> <i>plan active</i> — "
-        f"<i>{time_left_str}</i>\n"
-        f"<i>Daily credit limit:</i> {daily_credit_limit(user_id)} "
-        f"(daily chat limit for /find & /next; voice calls & media sends are free & unlimited on your plan)"
+        f"✅ <b>{tier.get('badge', '⭐')} {tier['label']}</b> <i>plan active</i> — <i>{time_left_str}</i>\n"
+        f"<i>Daily credit limit:</i> {daily_credit_limit(user_id)} chats/day "
+        f"(voice calls & media sends are free & unlimited on your plan)"
     )
 

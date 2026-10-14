@@ -104,6 +104,7 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
         "<b>👤 Your Profile</b>\n\n"
         f"<b>Name:</b> {full_name}{username_line}\n"
         f"<b>ID:</b> <code>{user_id}</code>\n"
+        f"<b>Membership:</b> {subscription.get_tier_display_name(user_id)}\n"
         f"<b>Member Since:</b> {created_line}\n"
         f"<b>Gender:</b> {'Male' if user.get('gender') == 'M' else 'Female'}\n"
         f"<b>Age:</b> {user.get('age')}\n"
