@@ -29,7 +29,7 @@ RANK_ICONS = {
     2: "🥈",
     3: "🥉",
 }
-DEFAULT_RANK_ICON = "🎖️⭐"
+DEFAULT_RANK_ICON = "🎖️"
 
 
 def anonymize_id(user_id: int) -> str:

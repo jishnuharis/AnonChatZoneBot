@@ -332,7 +332,7 @@ async def test_leaderboard_rendering_and_tabs(monkeypatch):
     assert "🥇" in text_streaks
     assert "🥈" in text_streaks
     assert "🥉" in text_streaks
-    assert "🎖️⭐" in text_streaks
+    assert "🎖️" in text_streaks
     assert "4014***" in text_streaks  # Top rank anonymized
     assert "Your Stats:" in text_streaks
 
