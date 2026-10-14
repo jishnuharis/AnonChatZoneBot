@@ -39,7 +39,13 @@ from commands.admin_commands import (
     giveaway_subscription, referral_scheme_command, admin_stats, queue_stats, campaign_command
 )
 from commands.subscribe import show_subscribe_menu, handle_tier_selection
-from commands.leaderboard import show_top_leaderboard, handle_top_callback
+from commands.leaderboard import (
+    show_top_leaderboard,
+    handle_top_callback,
+    pre_weekly_leaderboard_update_job,
+    weekly_leaderboard_job,
+    weekly_reward_admin_command,
+)
 from commands.gift import gift_command, handle_gift_callback
 from handlers.payments import handle_pre_checkout, handle_successful_payment
 from referral import handle_referral_link_button
@@ -120,6 +126,7 @@ async def set_commands(application):
         BotCommand("broadcast", "Send message to users"),
         BotCommand("campaign", "Manage sponsor campaigns"),
         BotCommand("rushhour", "Manage or trigger Rush Hour"),
+        BotCommand("weeklyreward", "Trigger weekly leaderboard VIP rewards"),
     ]
     admin_ids = set(init.ADMIN_IDS)
     if init.OWNER and str(init.OWNER).isdigit():
@@ -190,6 +197,22 @@ async def on_startup(application):
         name="rush_hour_end"
     )
 
+    # Schedule Weekly Leaderboard Update every Saturday at 5:59 PM IST (17:59)
+    application.job_queue.run_daily(
+        pre_weekly_leaderboard_update_job,
+        time=datetime.time(hour=17, minute=59, second=0, tzinfo=tz_ist),
+        days=(6,),  # Saturday in PTB JobQueue
+        name="leaderboard_update_sync"
+    )
+
+    # Schedule Weekly Leaderboard Reward every Saturday at 6:00 PM IST (18:00)
+    application.job_queue.run_daily(
+        weekly_leaderboard_job,
+        time=datetime.time(hour=18, minute=0, second=0, tzinfo=tz_ist),
+        days=(6,),  # Saturday in PTB JobQueue
+        name="weekly_leaderboard_reward"
+    )
+
     active_chats_count = len(init.active_pairs) // 2
     users_count = len(init.user_details)
     print(f"🚀 Bot is active. {users_count} active users, {active_chats_count} active chats.", flush=True)
@@ -257,6 +280,7 @@ def main():
     app.add_handler(CommandHandler("campaign", campaign_command))
     app.add_handler(MessageHandler(filters.CaptionRegex(r"^/campaign(?:@\w+)?(?:\s|$)"), campaign_command))
     app.add_handler(CommandHandler("rushhour", rush_hour_command))
+    app.add_handler(CommandHandler("weeklyreward", weekly_reward_admin_command))
 
     app.add_handler(CallbackQueryHandler(handle_check_channel_status, pattern=r"^check_channel_status$"))
     app.add_handler(CallbackQueryHandler(handle_start_find_callback, pattern=r"^start_find_callback$"))

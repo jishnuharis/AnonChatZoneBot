@@ -41,15 +41,18 @@ def anonymize_id(user_id: int) -> str:
 
 
 def get_weekly_reset_countdown() -> Tuple[int, int]:
-    """Returns (days_left, hours_left) until next Sunday 23:59:59 UTC."""
-    now = datetime.now(timezone.utc)
-    days_ahead = 6 - now.weekday()
-    if days_ahead < 0:
-        days_ahead += 7
-    target_sunday = (now + timedelta(days=days_ahead)).replace(
-        hour=23, minute=59, second=59, microsecond=0
+    """Returns (days_left, hours_left) until the next Saturday 6:00 PM IST reset."""
+    tz_ist = timezone(timedelta(hours=5, minutes=30))
+    now_ist = datetime.now(tz_ist)
+    # Python weekday(): Monday is 0, Saturday is 5, Sunday is 6
+    days_ahead = (5 - now_ist.weekday()) % 7
+    target_saturday = (now_ist + timedelta(days=days_ahead)).replace(
+        hour=18, minute=0, second=0, microsecond=0
     )
-    diff = target_sunday - now
+    if target_saturday <= now_ist:
+        target_saturday += timedelta(days=7)
+
+    diff = target_saturday - now_ist
     total_hours = max(0, int(diff.total_seconds() // 3600))
     days = total_hours // 24
     hours = total_hours % 24
@@ -316,7 +319,7 @@ async def render_leaderboard_text(category: str, viewer_id: int) -> str:
 
     header = (
         f"🏆 <b>{cat_title}</b>\n"
-        f"⏳ <i>Weekly reset in {days_left}d {hours_left}h — Top 3 win <b>Free VIP</b>!</i> 🎁\n\n"
+        f"⏳ <i>Weekly reset: Every <b>Saturday at 6:00 PM IST</b> (in {days_left}d {hours_left}h) — Top 3 win <b>1 Day Free VIP</b>!</i> 🎁\n\n"
     )
 
     return f"{header}{top_blockquote}\n{user_blockquote}"
@@ -373,3 +376,150 @@ async def handle_top_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         parse_mode="HTML",
         reply_markup=keyboard,
     )
+
+
+async def award_weekly_leaderboard_prizes(bot=None) -> Dict[str, Any]:
+    """
+    Awards 1 day of Free VIP (Daily tier) to the top 3 users across all 3
+    leaderboard categories ('streaks', 'karma', 'games').
+
+    If a user is in the top 3 across multiple categories, they are deduplicated
+    and receive 1 day of Free VIP. If the top 3 across all categories are
+    distinct, all unique users receive 1 day of Free VIP.
+
+    Notifies each recipient via Telegram DM if a bot instance is provided.
+    Returns a dictionary summarizing the awarded winners.
+    """
+    categories = ("streaks", "karma", "games")
+    category_names = {
+        "streaks": "🔥 Daily Chat Streaks",
+        "karma": "⭐ Karma & Upvotes",
+        "games": "🎮 Mini-Games & Points",
+    }
+    rank_medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+
+    winners_map: Dict[int, List[Tuple[str, int, int]]] = {}
+
+    for cat in categories:
+        try:
+            top_list, _ = await fetch_leaderboard(cat, viewer_id=0)
+        except Exception as e:
+            logger.warning(f"Error fetching leaderboard for {cat} during weekly reward: {e}")
+            top_list = []
+
+        for rank, entry in enumerate(top_list[:3], start=1):
+            uid = entry.get("user_id")
+            score = entry.get("score", 0)
+            if not uid or score <= 0:
+                continue
+
+            try:
+                await init.ensure_user_loaded(uid)
+            except Exception as e:
+                logger.debug(f"Notice loading user {uid} during weekly rewards: {e}")
+
+            user_details = init.user_details.get(uid, {})
+            if user_details.get("is_banned"):
+                continue
+
+            if uid not in winners_map:
+                winners_map[uid] = []
+            winners_map[uid].append((cat, rank, score))
+
+    awarded_users: List[int] = []
+
+    for uid, placings in winners_map.items():
+        # Grant 1 day of VIP in memory (prevents accidental tier downgrades)
+        subscription.grant_vip_days(uid, days=1, tier_key="daily", source="leaderboard_reward")
+        awarded_users.append(uid)
+
+        # Persist to database if pool is ready
+        try:
+            from saveNload import add_subscription_db
+            await add_subscription_db(uid, tier="daily", duration_days=1, source="leaderboard_reward")
+        except Exception as e:
+            logger.warning(f"Error saving weekly leaderboard subscription for user {uid}: {e}")
+
+        # Send congratulatory message to winner
+        if bot:
+            bullet_lines = [
+                f"• {rank_medals.get(rk, '🎖️')} <b>#{rk}</b> in {category_names.get(cat, cat)}"
+                for cat, rk, sc in placings
+            ]
+            bullets_text = "\n".join(bullet_lines)
+            congrats_text = (
+                "🏆 <b>Weekly Leaderboard Champion!</b> 🏆\n\n"
+                "Incredible achievement! You finished in the Top 3 on this week's leaderboard (Saturday 6:00 PM IST reset):\n"
+                f"{bullets_text}\n\n"
+                "🎁 <b>You have unlocked 1 Day of Free VIP Premium!</b> ✨\n\n"
+                "Enjoy your exclusive VIP perks today:\n"
+                "• Faster priority matchmaking (<code>/find</code>)\n"
+                "• Unlimited media sharing & voice call requests\n"
+                "• <code>/prune</code> command to erase chat histories\n"
+                "• VIP badge display on your profile & leaderboard\n\n"
+                "<i>Keep chatting and playing to stay on top for next Saturday at 6:00 PM IST!</i> 🚀"
+            )
+            await safe_tele_func_call(
+                bot.send_message,
+                chat_id=uid,
+                text=congrats_text,
+                parse_mode="HTML",
+            )
+
+    logger.info(
+        f"🏆 Awarded weekly leaderboard 1-day VIP rewards to {len(awarded_users)} unique users: {awarded_users}"
+    )
+
+    return {
+        "awarded_count": len(awarded_users),
+        "winners": winners_map,
+        "awarded_users": awarded_users,
+    }
+
+
+async def pre_weekly_leaderboard_update_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Scheduled JobQueue callback executed every Saturday at 5:59 PM IST (17:59).
+    Flushes all pending in-memory user data to the database and evaluates
+    fresh rankings across all categories right before the 6:00 PM prize distribution.
+    """
+    logger.info("📊 Saturday 5:59 PM IST: Running pre-reward leaderboard data sync & standings update...")
+    try:
+        from saveNload import save_user_data
+        await save_user_data(init.user_details, init.dirty_users)
+    except Exception as e:
+        logger.warning(f"Error persisting user data during 5:59 PM leaderboard sync: {e}")
+
+    for cat in ("streaks", "karma", "games"):
+        try:
+            await fetch_leaderboard(cat, viewer_id=0)
+        except Exception as e:
+            logger.warning(f"Error refreshing {cat} leaderboard during 5:59 PM sync: {e}")
+
+    logger.info("✅ Saturday 5:59 PM IST: Leaderboard update and data sync complete.")
+
+
+async def weekly_leaderboard_job(context: ContextTypes.DEFAULT_TYPE):
+    """Scheduled JobQueue callback executed every Saturday at 6:00 PM IST (18:00)."""
+    logger.info("🏆 Saturday 6:00 PM IST: Triggering scheduled weekly leaderboard reward distribution...")
+    try:
+        await award_weekly_leaderboard_prizes(bot=context.bot)
+    except Exception as e:
+        logger.error(f"Error in weekly_leaderboard_job: {e}", exc_info=True)
+
+
+async def weekly_reward_admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to manually trigger weekly leaderboard reward distribution."""
+    user_id = update.effective_user.id
+    from moderation import is_admin
+    if not is_admin(user_id):
+        return
+
+    res = await award_weekly_leaderboard_prizes(bot=context.bot)
+    count = res["awarded_count"]
+    await safe_tele_func_call(
+        update.message.reply_text,
+        text=f"✅ <b>Weekly Leaderboard Reward Triggered!</b> (Saturday 6:00 PM IST cycle)\n\nAwarded 1-day VIP to <b>{count}</b> unique user(s).",
+        parse_mode="HTML",
+    )
+
