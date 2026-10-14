@@ -27,7 +27,7 @@ DAILY_NEXT_LIMIT_REACHED_TEXT = (
 SUBSCRIBE_INTRO_TEXT = (
     "👑 <b>Chat Zone Subscription — VIP Membership</b> 👑\n\n"
     "{status}\n\n"
-    "<blockquote>⚡ <b>All VIP Plans Unlock 100% Full Perks:</b>\n"
+    "<blockquote>⚡ <b>VIP Plans Unlock:</b>\n"
     "🎯 <b>Target Filters:</b> Match only with who you want (Guys/Girls/Country).\n"
     "🗑️ <b>Two-Way Wipe:</b> Reply /prune to erase any message on both sides.\n"
     "👀 <b>Gender Peek:</b> Know who you're talking to before you say hi.\n"
@@ -36,13 +36,13 @@ SUBSCRIBE_INTRO_TEXT = (
     "💣 <b>Ghost Media:</b> Send self-destructing view-once photos (45s).</blockquote>\n\n"
     "📦 <b>Choose Your VIP Tier:</b>\n\n"
     "⚡ <b>1 Day Pass — <code>25 ⭐</code></b> <i>(Direct: ₹20 / $0.24)</i>\n"
-    "└ <i>Full VIP Powers • 48 Chats/Day • 32 Friends • +50 Pts</i>\n\n"
+    "└ <i>Full VIP Powers • Higher Daily Chats • 32 Friends • +50 Pts</i>\n\n"
     "✨ <b>1 Week Pass — <code>125 ⭐</code></b> <i>(Direct: ₹100 / $1.20)</i>\n"
-    "└ <i>Full VIP Powers • 48 Chats/Day • 48 Friends • +200 Pts</i>\n\n"
+    "└ <i>Full VIP Powers • Higher Daily Chats • 48 Friends • +200 Pts</i>\n\n"
     "🌙 <b>1 Month VIP — <code>450 ⭐</code></b> <i>(Direct: ₹300 / $3.60)</i> 🔥\n"
-    "└ <i>Full VIP Powers • 48 Chats/Day • 64 Friends • +800 Pts (Save ~50%)</i>\n\n"
+    "└ <i>Full VIP Powers • Higher Daily Chats • 64 Friends • +800 Pts (Save ~50%)</i>\n\n"
     "👑 <b>1 Year Legend — <code>4,500 ⭐</code></b> <i>(Direct: ₹2,400 / $28.80)</i> 🎁\n"
-    "└ <i>Full VIP Powers • Crown Badge 👑 • 80 Friends • +3,500 Pts (Save ~70%)</i>\n\n"
+    "└ <i>Full VIP Powers • Higher Daily Chats • Crown Badge 👑 • 80 Friends • +3,500 Pts (Save ~70%)</i>\n\n"
     "👉 <a href=\"{admin_url}\">Tap here to buy directly from Admin (UPI/Crypto/Card)</a>\n\n"
     "⭐ <i>Or activate instantly with Telegram Stars below:</i>"
 )
@@ -56,7 +56,7 @@ SUBSCRIBE_COMPARE_TEXT = (
     "• 📞 Unlimited 1-on-1 Voice Calls\n"
     "• 💣 Ghost Media (/private) Self-Destructing Photos\n"
     "• 🚀 Priority Matchmaking Queue\n"
-    "• ⚡ Instant Media (No warmup lock) & 48 Daily Chats</blockquote>\n\n"
+    "• ⚡ Instant Media (No warmup lock) & Higher Daily Chats</blockquote>\n\n"
     "<blockquote><b>⚡ Daily (25 ⭐ / ₹20)</b>\n"
     "• 24 Hours VIP Access\n"
     "• 32 Friends Slots • +50 Points Bonus\n"
@@ -87,6 +87,67 @@ SUBSCRIBE_PAYMENT_SUCCESS_TEXT = (
     "<b>+{points}</b> points added to your account 🎉\n\n"
     "Daily credit limit is now <b>{limit}</b> — and your voice calls & media sends are now unlimited."
 )
+SUBSCRIBE_GROUP_DM_SENT_TEXT = "📩 <b>{user_tag}</b>, <i>I have sent the VIP subscription tiers to your private DM!</i>"
+SUBSCRIBE_GROUP_START_DM_TEXT = "⚠️ <b>{user_tag}</b>, <i>please start the bot in private DM first so I can send the VIP tiers!</i>"
+
+# ---------------------------------------------------------------------------
+# subscription.py status texts
+# ---------------------------------------------------------------------------
+SUBSCRIPTION_STATUS_FREE_TEXT = (
+    "<i>Account Status:</i> <b>{badge} {label}</b>\n"
+    "<i>Daily voice calls:</i> <b>{rem_calls}/{call_limit} remaining today</b>\n"
+    "<i>Daily matches:</i> <b>{credit_limit} chats/day</b>"
+)
+SUBSCRIPTION_STATUS_VIP_TEXT = (
+    "✅ <b>{badge} {label}</b> <i>plan active</i> — <i>{time_left_str}</i>\n"
+    "<i>Daily credit limit:</i> {credit_limit} chats/day "
+    "(voice calls & media sends are free & unlimited on your plan)"
+)
+
+# ---------------------------------------------------------------------------
+# commands/prune.py
+# ---------------------------------------------------------------------------
+PRUNE_NOT_IN_CHAT = "⚠️ <b>You are not currently in an active chat.</b>\n\nUse /find to connect with someone!"
+PRUNE_USAGE = (
+    "💡 <b>Two-Way Wipe (/prune):</b>\n\n"
+    "<i>Reply to any message (yours or your partner's) with</i> <code>/prune</code> "
+    "<i>to permanently erase it for both of you!</i>"
+)
+PRUNE_UPGRADE_PROMPT = (
+    "🔒 <b>Two-Way Wipe (/prune) is a VIP Feature!</b>\n\n"
+    "<i>Permanently erase any message for both you and your partner with zero trace.\n"
+    "Unlocked instantly on all VIP plans (starting at 25 ⭐ / ₹20).</i>"
+)
+
+# ---------------------------------------------------------------------------
+# commands/call.py
+# ---------------------------------------------------------------------------
+CALL_NOT_IN_CHAT_TEXT = "⚠️ <b>You must be in an active chat to start a call.</b>\n\nUse /find to match with someone first!"
+CALL_ALREADY_ACTIVE_TEXT = "📞 <b>A voice call is already active in this session.</b>"
+CALL_LIMIT_REACHED_TEXT = (
+    "⚠️ <b>Daily Voice Call Limit Reached</b> ({used}/{limit})\n\n"
+    "Free accounts can make up to <b>3 voice calls per day</b> (resets at midnight UTC).\n"
+    "Upgrade to VIP with /subscribe to unlock <b>unlimited voice calls</b>, priority matching, and exclusive perks!"
+)
+CALL_INCOMING_TEXT = (
+    "📞 <b>Incoming Anonymous Voice Call!</b>\n\n"
+    "<i>Your partner is inviting you to talk directly via private voice call.</i>\n"
+    "🔒 <b>100% Anonymous:</b> Private audio room with zero account IDs or IP addresses shared."
+)
+CALL_CALLING_PARTNER_TEXT = "📞 <b>Calling partner...</b>\n\n<i>Waiting for them to accept your call request...</i>"
+CALL_INVITATION_EXPIRED_TEXT = "⏳ <b>Call invitation expired.</b>"
+CALL_DECLINED_TEXT = "❌ <b>Call declined.</b>"
+CALL_PARTNER_DECLINED_TEXT = "ℹ️ <b>Your partner declined the voice call.</b>"
+CALL_SESSION_ENDED_TEXT = "⚠️ <b>Chat session ended before call connected.</b>"
+CALL_CONNECTED_RECV_TEXT = "🎉 <b>Call Connected!</b>\n\nTap below to open the secure audio room:"
+CALL_CONNECTED_INIT_TEXT = "🎉 <b>Partner accepted the call!</b>\n\nTap below to join the audio room:"
+CALL_ENDED_TEXT = "🛑 <b>Voice call ended.</b>"
+CALL_PARTNER_ENDED_TEXT = "🛑 <b>Your partner ended the voice call.</b>"
+
+# ---------------------------------------------------------------------------
+# commands/help.py
+# ---------------------------------------------------------------------------
+HELP_GROUP_REDIRECT_TEXT = "💡 <b>Open the bot in private DM to use all features!</b>"
 
 # ---------------------------------------------------------------------------
 # commands/admin_commands.py - /giveaway

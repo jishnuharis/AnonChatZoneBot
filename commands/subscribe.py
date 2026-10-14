@@ -9,6 +9,8 @@ from message import (
     SUBSCRIBE_COMPARE_TEXT,
     SUBSCRIBE_INVOICE_TITLE,
     SUBSCRIBE_INVOICE_DESCRIPTION,
+    SUBSCRIBE_GROUP_DM_SENT_TEXT,
+    SUBSCRIBE_GROUP_START_DM_TEXT,
 )
 import subscription
 
@@ -84,7 +86,7 @@ async def show_subscribe_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
             kb = InlineKeyboardMarkup([[InlineKeyboardButton("⭐ View VIP Perks", url=f"https://t.me/{bot_username}?start=subscribe")]])
             await safe_tele_func_call(
                 update.message.reply_text,
-                text=f"📩 <b>{user_tag}</b>, <i>I have sent the VIP subscription tiers to your private DM!</i>",
+                text=SUBSCRIBE_GROUP_DM_SENT_TEXT.format(user_tag=user_tag),
                 reply_markup=kb,
                 parse_mode="HTML"
             )
@@ -92,7 +94,7 @@ async def show_subscribe_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
             kb = InlineKeyboardMarkup([[InlineKeyboardButton("🤖 Start Bot in DM", url=f"https://t.me/{bot_username}?start=subscribe")]])
             await safe_tele_func_call(
                 update.message.reply_text,
-                text=f"⚠️ <b>{user_tag}</b>, <i>please start the bot in private DM first so I can send the VIP tiers!</i>",
+                text=SUBSCRIBE_GROUP_START_DM_TEXT.format(user_tag=user_tag),
                 reply_markup=kb,
                 parse_mode="HTML"
             )

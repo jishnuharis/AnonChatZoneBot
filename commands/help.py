@@ -4,7 +4,7 @@ from telegram.ext import ContextTypes
 
 from handlers.setup import check_user_profile
 from security import safe_tele_func_call
-from message import HELP_TEXT
+from message import HELP_TEXT, HELP_GROUP_REDIRECT_TEXT
 from commands.subscribe import get_admin_contact_url
 import init
 
@@ -17,10 +17,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     formatted_help = HELP_TEXT.format(admin_url=admin_url)
 
     if is_group_chat(update):
-        text = (
-            f"{formatted_help}\n\n"
-            "💡 <b>Open the bot in private DM to use all features!</b>"
-        )
+        text = f"{formatted_help}\n\n{HELP_GROUP_REDIRECT_TEXT}"
         keyboard = get_group_redirect_keyboard(bot_username, "help")
         await safe_tele_func_call(
             update.message.reply_text,

@@ -2,6 +2,7 @@ import time
 import logging
 
 import init
+from message import SUBSCRIPTION_STATUS_FREE_TEXT, SUBSCRIPTION_STATUS_VIP_TEXT
 
 logger = logging.getLogger(__name__)
 
@@ -264,10 +265,12 @@ def status_text(user_id: int) -> str:
     if not tier:
         used_calls = daily_calls_used(user_id)
         rem_calls = max(0, FREE_DAILY_CALL_LIMIT - used_calls)
-        return (
-            f"<i>Account Status:</i> <b>{FREE_TIER_BADGE} {FREE_TIER_LABEL}</b>\n"
-            f"<i>Daily voice calls:</i> <b>{rem_calls}/{FREE_DAILY_CALL_LIMIT} remaining today</b>\n"
-            f"<i>Daily matches:</i> <b>{FREE_DAILY_CREDIT_LIMIT} chats/day</b>"
+        return SUBSCRIPTION_STATUS_FREE_TEXT.format(
+            badge=FREE_TIER_BADGE,
+            label=FREE_TIER_LABEL,
+            rem_calls=rem_calls,
+            call_limit=FREE_DAILY_CALL_LIMIT,
+            credit_limit=FREE_DAILY_CREDIT_LIMIT,
         )
     expires = init.user_details[user_id]["subscription_expires"]
     rem_secs = max(0, (expires - time.time()))
@@ -278,9 +281,10 @@ def status_text(user_id: int) -> str:
         remaining_days = rem_secs / 86400
         time_left_str = f"{remaining_days:.1f} days left"
 
-    return (
-        f"✅ <b>{tier.get('badge', '⭐')} {tier['label']}</b> <i>plan active</i> — <i>{time_left_str}</i>\n"
-        f"<i>Daily credit limit:</i> {daily_credit_limit(user_id)} chats/day "
-        f"(voice calls & media sends are free & unlimited on your plan)"
+    return SUBSCRIPTION_STATUS_VIP_TEXT.format(
+        badge=tier.get("badge", "⭐"),
+        label=tier["label"],
+        time_left_str=time_left_str,
+        credit_limit=daily_credit_limit(user_id),
     )
 

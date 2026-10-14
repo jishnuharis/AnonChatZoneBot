@@ -7,6 +7,21 @@ import init
 from handlers.setup import check_user_profile
 from security import safe_tele_func_call
 from session_manager import is_in_chat, get_partner
+from message import (
+    CALL_NOT_IN_CHAT_TEXT,
+    CALL_ALREADY_ACTIVE_TEXT,
+    CALL_LIMIT_REACHED_TEXT,
+    CALL_INCOMING_TEXT,
+    CALL_CALLING_PARTNER_TEXT,
+    CALL_INVITATION_EXPIRED_TEXT,
+    CALL_DECLINED_TEXT,
+    CALL_PARTNER_DECLINED_TEXT,
+    CALL_SESSION_ENDED_TEXT,
+    CALL_CONNECTED_RECV_TEXT,
+    CALL_CONNECTED_INIT_TEXT,
+    CALL_ENDED_TEXT,
+    CALL_PARTNER_ENDED_TEXT,
+)
 
 VOICE_CALL_BASE_URL = os.getenv("VOICE_CALL_WEBAPP_URL", "https://call.anonchatzone.org")
 
@@ -140,7 +155,7 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_in_chat(user_id):
         await safe_tele_func_call(
             update.message.reply_text,
-            text="⚠️ <b>You must be in an active chat to start a call.</b>\n\nUse /find to match with someone first!",
+            text=CALL_NOT_IN_CHAT_TEXT,
             parse_mode="HTML",
         )
         return
@@ -154,7 +169,7 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if session_id in active_voice_calls and active_voice_calls[session_id].get("status") == "active":
         await safe_tele_func_call(
             update.message.reply_text,
-            text="📞 <b>A voice call is already active in this session.</b>",
+            text=CALL_ALREADY_ACTIVE_TEXT,
             parse_mode="HTML",
         )
         return
@@ -164,11 +179,7 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed:
         await safe_tele_func_call(
             update.message.reply_text,
-            text=(
-                f"⚠️ <b>Daily Voice Call Limit Reached</b> ({used}/{limit})\n\n"
-                "Free accounts can make up to <b>3 voice calls per day</b> (resets at midnight UTC).\n"
-                "Upgrade to VIP with /subscribe to unlock <b>unlimited voice calls</b>, priority matching, and exclusive perks!"
-            ),
+            text=CALL_LIMIT_REACHED_TEXT.format(used=used, limit=limit),
             parse_mode="HTML",
         )
         return
@@ -196,16 +207,12 @@ async def call_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_tele_func_call(
         context.bot.send_message,
         chat_id=partner_id,
-        text=(
-            "📞 <b>Incoming Anonymous Voice Call!</b>\n\n"
-            "<i>Your partner is inviting you to talk directly via private voice call.</i>\n"
-            "🔒 <b>100% Anonymous:</b> WebRTC audio room with zero account IDs or IP addresses leaked."
-        ),
+        text=CALL_INCOMING_TEXT,
         parse_mode="HTML",
         reply_markup=call_keyboard,
     )
 
-    call_msg = "📞 <b>Calling partner...</b>\n\n<i>Waiting for them to accept your call request...</i>"
+    call_msg = CALL_CALLING_PARTNER_TEXT
     if not is_subscribed(user_id):
         remaining = max(0, limit - used)
         call_msg += f"\n\n<i>Daily free calls remaining today: {remaining}/{limit}</i>"
@@ -231,7 +238,7 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
 
     call_data = active_voice_calls.get(session_id)
     if not call_data:
-        await safe_tele_func_call(query.edit_message_text, text="⏳ <b>Call invitation expired.</b>", parse_mode="HTML")
+        await safe_tele_func_call(query.edit_message_text, text=CALL_INVITATION_EXPIRED_TEXT, parse_mode="HTML")
         return
 
     initiator = call_data["initiator"]
@@ -242,11 +249,11 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if action == "call_dec":
         active_voice_calls.pop(session_id, None)
-        await safe_tele_func_call(query.edit_message_text, text="❌ <b>Call declined.</b>", parse_mode="HTML")
+        await safe_tele_func_call(query.edit_message_text, text=CALL_DECLINED_TEXT, parse_mode="HTML")
         await safe_tele_func_call(
             context.bot.send_message,
             chat_id=initiator,
-            text="ℹ️ <b>Your partner declined the voice call.</b>",
+            text=CALL_PARTNER_DECLINED_TEXT,
             parse_mode="HTML",
         )
         return
@@ -255,7 +262,7 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
         is_grp = session_id.startswith("grpcall_")
         if not is_grp and (not is_in_chat(user_id) or not is_in_chat(initiator)):
             active_voice_calls.pop(session_id, None)
-            await safe_tele_func_call(query.edit_message_text, text="⚠️ <b>Chat session ended before call connected.</b>", parse_mode="HTML")
+            await safe_tele_func_call(query.edit_message_text, text=CALL_SESSION_ENDED_TEXT, parse_mode="HTML")
             return
 
         from subscription import consume_daily_call
@@ -284,7 +291,7 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await safe_tele_func_call(
             query.edit_message_text,
-            text="🎉 <b>Call Connected!</b>\n\nTap below to open the secure audio room:",
+            text=CALL_CONNECTED_RECV_TEXT,
             parse_mode="HTML",
             reply_markup=recv_markup,
         )
@@ -292,7 +299,7 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
         await safe_tele_func_call(
             context.bot.send_message,
             chat_id=initiator,
-            text="🎉 <b>Partner accepted the call!</b>\n\nTap below to join the audio room:",
+            text=CALL_CONNECTED_INIT_TEXT,
             parse_mode="HTML",
             reply_markup=init_markup,
         )
@@ -300,11 +307,11 @@ async def handle_call_response(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if action == "call_end":
         active_voice_calls.pop(session_id, None)
-        await safe_tele_func_call(query.edit_message_text, text="🛑 <b>Voice call ended.</b>", parse_mode="HTML")
+        await safe_tele_func_call(query.edit_message_text, text=CALL_ENDED_TEXT, parse_mode="HTML")
         other_user = initiator if user_id == receiver else receiver
         await safe_tele_func_call(
             context.bot.send_message,
             chat_id=other_user,
-            text="🛑 <b>Your partner ended the voice call.</b>",
+            text=CALL_PARTNER_ENDED_TEXT,
             parse_mode="HTML",
         )

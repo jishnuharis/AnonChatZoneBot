@@ -13,19 +13,9 @@ from security import safe_tele_func_call
 from subscription import is_subscribed
 from group_helper import is_group_chat
 
-logger = logging.getLogger(__name__)
+from message import PRUNE_NOT_IN_CHAT, PRUNE_USAGE, PRUNE_UPGRADE_PROMPT
 
-PRUNE_NOT_IN_CHAT = "⚠️ <b>You are not currently in an active chat.</b>\n\nUse /find to connect with someone!"
-PRUNE_USAGE = (
-    "💡 <b>Two-Way Wipe (/prune):</b>\n\n"
-    "<i>Reply to any message (yours or your partner's) with</i> <code>/prune</code> "
-    "<i>to permanently erase it for both of you!</i>"
-)
-PRUNE_UPGRADE_PROMPT = (
-    "🔒 <b>Two-Way Wipe (/prune) is a VIP Feature!</b>\n\n"
-    "<i>Permanently erase any message for both you and your partner with zero trace.\n"
-    "Unlocked instantly on all VIP plans (starting at 25 ⭐ / ₹20).</i>"
-)
+logger = logging.getLogger(__name__)
 
 
 async def prune_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
