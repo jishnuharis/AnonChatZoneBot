@@ -42,7 +42,7 @@ SUBSCRIBE_INTRO_TEXT = (
     "🌙 <b>1 Month VIP — <code>450 ⭐</code></b> <i>(Direct: ₹300 / $3.60)</i> 🔥\n"
     "└ <i>Full VIP Powers • 80 Chats/Day • 64 Friends • +800 Pts</i>\n\n"
     "👑 <b>1 Year Legend — <code>4,500 ⭐</code></b> <i>(Direct: ₹2,400 / $28.80)</i> 🎁\n"
-    "└ <i>Full VIP Powers • 96 Chats/Day • Crown Badge 👑 • 80 Friends • +3,500 Pts</i>\n\n"
+    "└ <i>Full VIP Powers • 96 Chats/Day • 80 Friends • +3,500 Pts</i>\n\n"
     "👉 <a href=\"{admin_url}\">Tap here to buy directly from Owner (UPI/Crypto/Card)</a>\n\n"
     "⭐ <i>Or activate instantly with Telegram Stars below:</i>"
 )
