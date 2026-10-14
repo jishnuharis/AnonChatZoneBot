@@ -128,6 +128,18 @@ async def handle_edit_selection(update: Update, context: ContextTypes.DEFAULT_TY
         status_str = "ENABLED (Tap-to-reveal blur)" if not current else "DISABLED (Direct display)"
         await query.answer(f"🛡️ Media Shield: {status_str}", show_alert=False)
         return
+    elif action == "toggle_badge":
+        user_info = init.user_details.setdefault(user_id, init._default_user())
+        current = user_info.get("show_badge", True)
+        user_info["show_badge"] = not current
+        init.dirty_users.add(user_id)
+        from commands.profile import _build_profile_text, _profile_keyboard
+        text = await _build_profile_text(user_id, context)
+        new_markup = _profile_keyboard(user_id)
+        await safe_tele_func_call(query.edit_message_text, text=text, reply_markup=new_markup, parse_mode="HTML")
+        status_str = "VISIBLE 🟢" if not current else "HIDDEN ⚪"
+        await query.answer(f"📛 Badge Display: {status_str}", show_alert=False)
+        return
     elif action == "back_to_profile":
         from commands.profile import _build_profile_text, _profile_keyboard
         text = await _build_profile_text(user_id, context)

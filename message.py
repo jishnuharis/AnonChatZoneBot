@@ -40,10 +40,10 @@ SUBSCRIBE_INTRO_TEXT = (
     "✨ <b>1 Week Pass — <code>125 ⭐</code></b> <i>(Direct: ₹100 / $1.20)</i>\n"
     "└ <i>Full VIP Powers • 64 Chats/Day • 48 Friends • +200 Pts</i>\n\n"
     "🌙 <b>1 Month VIP — <code>450 ⭐</code></b> <i>(Direct: ₹300 / $3.60)</i> 🔥\n"
-    "└ <i>Full VIP Powers • 80 Chats/Day • 64 Friends • +800 Pts (Save ~50%)</i>\n\n"
+    "└ <i>Full VIP Powers • 80 Chats/Day • 64 Friends • +800 Pts</i>\n\n"
     "👑 <b>1 Year Legend — <code>4,500 ⭐</code></b> <i>(Direct: ₹2,400 / $28.80)</i> 🎁\n"
-    "└ <i>Full VIP Powers • 96 Chats/Day • Crown Badge 👑 • 80 Friends • +3,500 Pts (Save ~70%)</i>\n\n"
-    "👉 <a href=\"{admin_url}\">Tap here to buy directly from Admin (UPI/Crypto/Card)</a>\n\n"
+    "└ <i>Full VIP Powers • 96 Chats/Day • Crown Badge 👑 • 80 Friends • +3,500 Pts</i>\n\n"
+    "👉 <a href=\"{admin_url}\">Tap here to buy directly from Owner (UPI/Crypto/Card)</a>\n\n"
     "⭐ <i>Or activate instantly with Telegram Stars below:</i>"
 )
 
@@ -69,15 +69,15 @@ SUBSCRIBE_COMPARE_TEXT = (
     "• Badge: ✨ Weekly VIP</blockquote>\n\n"
     "<blockquote><b>🌙 Monthly (450 ⭐ / ₹300) 🔥</b>\n"
     "• 80 Daily Chats\n"
-    "• 30 Days VIP Access (Save ~50%)\n"
+    "• 30 Days VIP Access\n"
     "• 64 Friends Slots • +800 Points Bonus\n"
     "• Badge: 🌙 Monthly VIP</blockquote>\n\n"
     "<blockquote><b>👑 Yearly Legend (4,500 ⭐ / ₹2,400) 🎁</b>\n"
-    "• 96 Daily Chats (Maximum allowed)\n"
-    "• 365 Days VIP Access (Save ~70%)\n"
+    "• 96 Daily Chats\n"
+    "• 365 Days VIP Access\n"
     "• 80 Friends Slots • +3,500 Points Bonus\n"
-    "• Badge: 👑 Crown VIP (Profile & Leaderboard)</blockquote>\n\n"
-    "👉 <a href=\"{admin_url}\">Contact Admin for Direct UPI/Card/Crypto Activation</a>"
+    "• Badge: 👑 Crown VIP</blockquote>\n\n"
+    "👉 <a href=\"{admin_url}\">Contact Owner for Direct UPI/Card/Crypto Activation</a>"
 )
 
 SUBSCRIBE_INVOICE_TITLE = "Chat Zone — {label} Plan"
@@ -209,7 +209,7 @@ HELP_TEXT = (
     "/private — <i>Send media with view protection</i>\n"
     "/help — <i>Show this help menu</i></blockquote>\n\n"
     "───\n"
-    "🧰 <b>Support:</b> <a href=\"{admin_url}\">@AdminSupport</a>\n"
+    "🧰 <b>Support:</b> <a href=\"{admin_url}\">Owner DM</a>\n"
     "💬 <b>Community:</b> <a href=\"https://t.me/groupchatzone\">@groupchatzone</a>\n"
     "📢 <b>Updates:</b> <a href=\"https://t.me/channelofchatzone\">@channelofchatzone</a>"
 )

@@ -127,6 +127,7 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
             p.last_streak_date,
             COALESCE(p.streak_rewards_claimed, '[]'::jsonb) as streak_rewards_claimed,
             COALESCE(p.media_spoiler, TRUE) as media_spoiler,
+            COALESCE(p.show_badge, TRUE) as show_badge,
             s.tier as subscription_tier, s.expires_at as subscription_expires,
             COALESCE(r_up.votes_up, 0) as votes_up,
             COALESCE(r_down.votes_down, 0) as votes_down,
@@ -237,6 +238,7 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
                     "total_chat_duration": float(row.get("total_chat_duration") or 0.0),
                     "last_active": float(row["last_active_ts"]) if row.get("last_active_ts") is not None else time.time(),
                     "media_spoiler": bool(row.get("media_spoiler", True)),
+                    "show_badge": bool(row.get("show_badge", True)),
                     "partner_id": None, # Session state managed via session_manager
                 }
     except Exception as e:
@@ -350,7 +352,8 @@ async def upsert_user(*args, **kwargs):
                         total_messages = COALESCE(EXCLUDED.total_messages, user_profiles.total_messages),
                         total_chat_duration = COALESCE(EXCLUDED.total_chat_duration, user_profiles.total_chat_duration),
                         last_active = COALESCE(EXCLUDED.last_active, user_profiles.last_active),
-                        media_spoiler = COALESCE(EXCLUDED.media_spoiler, user_profiles.media_spoiler);
+                        media_spoiler = COALESCE(EXCLUDED.media_spoiler, user_profiles.media_spoiler),
+                        show_badge = COALESCE(EXCLUDED.show_badge, user_profiles.show_badge);
                 """, (
                     user_id,
                     kwargs.get("severity_score", 0),
@@ -371,6 +374,7 @@ async def upsert_user(*args, **kwargs):
                     float(kwargs.get("total_chat_duration") or 0.0),
                     last_active_dt,
                     bool(kwargs.get("media_spoiler", True)),
+                    bool(kwargs.get("show_badge", True)),
                 ))
 
                 # 3. Upsert referrals if referred_by is set
@@ -1222,6 +1226,8 @@ async def load_user_data() -> dict:
                            COALESCE(p.longest_streak, 0) as longest_streak,
                            p.last_streak_date,
                            COALESCE(p.streak_rewards_claimed, '[]'::jsonb) as streak_rewards_claimed,
+                           COALESCE(p.media_spoiler, TRUE) as media_spoiler,
+                           COALESCE(p.show_badge, TRUE) as show_badge,
                            s.tier as subscription_tier, s.expires_at as subscription_expires,
                            ref.referrer_id as referred_by,
                            ref.credited as referral_credited,
@@ -1328,6 +1334,8 @@ async def load_user_data() -> dict:
                             "total_messages": int(r.get("total_messages") or 0),
                             "total_chat_duration": float(r.get("total_chat_duration") or 0.0),
                             "last_active": float(r["last_active_ts"]) if r.get("last_active_ts") is not None else time.time(),
+                            "media_spoiler": bool(r.get("media_spoiler", True)),
+                            "show_badge": bool(r.get("show_badge", True)),
                         }
             else:
                 data = await _load_legacy_user_data(conn)

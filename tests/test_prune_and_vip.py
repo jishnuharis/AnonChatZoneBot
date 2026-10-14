@@ -230,3 +230,55 @@ async def test_badges_in_profile_and_leaderboard():
     # Leaderboard shows badge
     board_text = await render_leaderboard_text("games", u_vip)
     assert "👑" in board_text
+
+
+@pytest.mark.asyncio
+async def test_badge_visibility_toggle():
+    """Verify users can toggle their badge off in profile."""
+    from handlers.edit import handle_edit_selection
+
+    u = 7001
+    init.user_details[u] = {**init._default_user(), "gender": "M", "age": 20, "country": "US"}
+    subscription.grant_subscription(u, "monthly")
+
+    assert init.user_details[u].get("show_badge", True) is True
+    assert subscription.get_tier_badge(u) == "🌙"
+
+    # Simulate toggle_badge callback
+    cb_update = MagicMock()
+    cb_update.callback_query.from_user.id = u
+    cb_update.callback_query.data = "edit|toggle_badge"
+    cb_update.callback_query.answer = AsyncMock()
+    cb_update.callback_query.edit_message_text = AsyncMock()
+    context = MagicMock()
+    context.bot.get_chat = AsyncMock(return_value=MagicMock(full_name="User", username="user"))
+
+    await handle_edit_selection(cb_update, context)
+
+    # Now badge is hidden
+    assert init.user_details[u]["show_badge"] is False
+    assert subscription.get_tier_badge(u) == ""
+
+    # Toggle back on
+    await handle_edit_selection(cb_update, context)
+    assert init.user_details[u]["show_badge"] is True
+    assert subscription.get_tier_badge(u) == "🌙"
+
+
+def test_admin_contact_url_points_to_owner(monkeypatch):
+    """Verify get_admin_contact_url returns owner's DM and not channel."""
+    from commands.subscribe import get_admin_contact_url
+
+    # Case 1: Numeric owner ID -> tg://user?id=...
+    monkeypatch.setenv("OWNER", "123456789")
+    monkeypatch.delenv("ADMIN_CONTACT_URL", raising=False)
+    monkeypatch.delenv("OWNER_USERNAME", raising=False)
+    monkeypatch.delenv("ADMIN_USERNAME", raising=False)
+    import init
+    init.OWNER = "123456789"
+    assert get_admin_contact_url() == "tg://user?id=123456789"
+
+    # Case 2: Owner username
+    monkeypatch.setenv("OWNER_USERNAME", "@the_real_owner")
+    assert get_admin_contact_url() == "https://t.me/the_real_owner"
+

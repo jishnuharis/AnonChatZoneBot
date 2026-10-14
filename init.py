@@ -92,6 +92,7 @@ def _default_user() -> Dict[str, Any]:
         "total_messages": 0,
         "total_chat_duration": 0.0,
         "media_spoiler": True,
+        "show_badge": True,
     }
 
 

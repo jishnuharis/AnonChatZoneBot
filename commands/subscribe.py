@@ -18,14 +18,21 @@ import init
 
 
 def get_admin_contact_url() -> str:
-    """Returns the admin contact URL for direct purchases."""
+    """Returns the direct contact URL to the owner's DMs."""
     if os.getenv("ADMIN_CONTACT_URL"):
         return os.getenv("ADMIN_CONTACT_URL")
-    admin_user = os.getenv("ADMIN_USERNAME")
-    if admin_user:
-        clean = admin_user.lstrip("@").strip()
+    if os.getenv("OWNER_USERNAME"):
+        clean = os.getenv("OWNER_USERNAME").lstrip("@").strip()
         return f"https://t.me/{clean}"
-    return "https://t.me/channelofchatzone"
+    if os.getenv("ADMIN_USERNAME"):
+        clean = os.getenv("ADMIN_USERNAME").lstrip("@").strip()
+        return f"https://t.me/{clean}"
+    owner = str(init.OWNER or os.getenv("OWNER") or "").strip()
+    if owner:
+        if owner.startswith("@") or not owner.isdigit():
+            return f"https://t.me/{owner.lstrip('@').strip()}"
+        return f"tg://user?id={owner}"
+    return "tg://openmessage"
 
 
 def _tier_keyboard():
@@ -43,7 +50,7 @@ def _tier_keyboard():
             InlineKeyboardButton("📋 Compare All Tier Perks", callback_data="sub|compare"),
         ],
         [
-            InlineKeyboardButton("💎 Buy VIP via Admin (Direct)", url=admin_url),
+            InlineKeyboardButton("💎 Buy VIP from Owner (Direct)", url=admin_url),
         ],
     ])
 
@@ -61,7 +68,7 @@ def _compare_keyboard():
         ],
         [
             InlineKeyboardButton("⬅️ Back to VIP Plans", callback_data="sub|back"),
-            InlineKeyboardButton("💎 Buy (Admin)", url=admin_url),
+            InlineKeyboardButton("💎 Buy from Owner", url=admin_url),
         ],
     ])
 

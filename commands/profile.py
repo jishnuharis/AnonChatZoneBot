@@ -15,10 +15,13 @@ import init
 
 def _profile_keyboard(user_id=None):
     spoiler_enabled = True
+    badge_enabled = True
     if user_id and user_id in init.user_details:
         spoiler_enabled = init.user_details[user_id].get("media_spoiler", True)
+        badge_enabled = init.user_details[user_id].get("show_badge", True)
 
     spoiler_btn_text = f"🛡️ Media Shield: {'ON 🟢' if spoiler_enabled else 'OFF ⚪'}"
+    badge_btn_text = f"📛 Badge: {'Visible 🟢' if badge_enabled else 'Hidden ⚪'}"
 
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 Anonymous Friends List", callback_data="flist|0")],
@@ -27,7 +30,10 @@ def _profile_keyboard(user_id=None):
         [InlineKeyboardButton("✏️ Edit Country", callback_data="edit|country"),
          InlineKeyboardButton("🏷️ Edit Interests", callback_data="edit|preferences")],
         [InlineKeyboardButton("⭐ Match Filters (Gender/Country)", callback_data="edit|match_filters")],
-        [InlineKeyboardButton(spoiler_btn_text, callback_data="edit|toggle_spoiler")],
+        [
+            InlineKeyboardButton(spoiler_btn_text, callback_data="edit|toggle_spoiler"),
+            InlineKeyboardButton(badge_btn_text, callback_data="edit|toggle_badge"),
+        ],
         [InlineKeyboardButton("🔗 My Referral Link", callback_data="refgen")],
         [InlineKeyboardButton("💬 Community Group", url=init.GROUP_URL)],
     ])
@@ -114,6 +120,7 @@ async def _build_profile_text(user_id, context: ContextTypes.DEFAULT_TYPE, fallb
         f"<b>Time in Chats:</b> {duration_line}\n"
         f"<b>Rating:</b> {up_votes} 👍 {down_votes} 👎\n"
         f"<b>Points:</b> {user.get('points', 0)}\n"
+        f"<b>Badge Display:</b> {'Visible in Leaderboards 🟢' if user.get('show_badge', True) else 'Hidden in Leaderboards ⚪'}\n"
         f"<b>Media Shield:</b> {'Tap-to-reveal Blur 🛡️' if user.get('media_spoiler', True) else 'Direct Display 👁️'}\n"
         f"{streak_line}\n"
         f"{filter_line}"

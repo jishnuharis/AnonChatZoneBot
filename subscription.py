@@ -76,8 +76,10 @@ def active_tier(user_id: int):
     return TIERS.get(tier_key)
 
 
-def get_tier_badge(user_id: int) -> str:
+def get_tier_badge(user_id: int, check_visibility: bool = True) -> str:
     """Returns the badge emoji for the user's tier (💬 for free, ⚡, ✨, 🌙, 👑 for VIP)."""
+    if check_visibility and not init.user_details.get(user_id, {}).get("show_badge", True):
+        return ""
     tier = active_tier(user_id)
     if not tier:
         return FREE_TIER_BADGE
@@ -87,9 +89,12 @@ def get_tier_badge(user_id: int) -> str:
 def get_tier_display_name(user_id: int) -> str:
     """Returns formatted badge and label, e.g. '🌙 Monthly VIP' or '💬 Free Member'."""
     tier = active_tier(user_id)
-    if not tier:
-        return f"{FREE_TIER_BADGE} {FREE_TIER_LABEL}"
-    return f"{tier.get('badge', '⭐')} {tier['label']} VIP"
+    badge = tier.get("badge", "⭐") if tier else FREE_TIER_BADGE
+    label = f"{tier['label']} VIP" if tier else FREE_TIER_LABEL
+    show_badge = init.user_details.get(user_id, {}).get("show_badge", True)
+    if show_badge:
+        return f"{badge} {label}"
+    return f"{label} (Badge Hidden)"
 
 
 def has_tier(user_id: int, min_tier_key: str) -> bool:
