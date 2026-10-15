@@ -10,6 +10,19 @@ ALREADY_IN_CHAT_TEXT = "⚠️ <b>You're already in a chat.</b>\n\nUse /stop or 
 LOOKING_FOR_PARTNER_TEXT = "🔍 <b>Looking for a partner...</b>\n\nMatching you with someone who shares your interests if possible."
 
 # ---------------------------------------------------------------------------
+# session_manager.py / Matchmaking
+# ---------------------------------------------------------------------------
+PARTNER_FOUND_TEMPLATE = (
+    "🎯 <b>Partner found! Say hi!</b> 👋\n"
+    "⭐ <b>Rating:</b> {rating_up} 👍 • {rating_down} 👎{vip_perk}\n"
+    "✨ <b>Shared Interests:</b> {shared_interests}\n\n"
+    "{starter_quote}\n\n"
+    "───────────────\n"
+    "⏭️ /next <i>— Next Chat</i>\n"
+    "🛑 /stop <i>— Leave Chat</i>"
+)
+
+# ---------------------------------------------------------------------------
 # commands/next.py
 # ---------------------------------------------------------------------------
 PARTNER_LEFT_CHAT_TEXT = "⛔ <b>Your partner left the chat.</b>"

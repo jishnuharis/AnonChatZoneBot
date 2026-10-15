@@ -13,7 +13,10 @@ Guarantees:
 import asyncio
 import logging
 import time
-from typing import Optional, Tuple
+import os
+import json
+import random
+from typing import Optional, Tuple, List
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
 
@@ -23,7 +26,7 @@ from saveNload import create_chat_session_db, end_chat_session_db, is_blocked_pa
 from games.registry import end_any_active_game
 from games.game_requests import clear_pending_requests
 from handlers.rating import ask_for_rating
-from message import PARTNER_LEFT_CHAT_TEXT, CHAT_ENDED_TEXT
+from message import PARTNER_LEFT_CHAT_TEXT, CHAT_ENDED_TEXT, PARTNER_FOUND_TEMPLATE
 from subscription import is_subscribed
 
 logger = logging.getLogger(__name__)
@@ -75,21 +78,61 @@ def _record_recent_partner(user1: int, user2: int):
             history.pop(0)
 
 
-ICEBREAKERS = [
-    "If you could have dinner with anyone dead or alive, who would it be?",
-    "What's the best movie or series you watched recently?",
-    "If you won $10,000 today, what's the very first thing you'd do?",
-    "What's an unpopular opinion you hold with pure passion?",
-    "Pineapple on pizza: crime against humanity or culinary genius?",
-    "What song is currently stuck on repeat in your head?",
-    "If you could travel anywhere right now, where are you boarding a flight to?",
-    "What is your absolute favorite comfort food after a long day?",
-    "What superpower would you choose: flight, invisibility, or teleportation?",
-    "Morning person or nocturnal night owl?",
-]
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+ICEBREAKERS_FILE = os.path.join(DATA_DIR, "icebreakers.json")
+TIPS_FILE = os.path.join(DATA_DIR, "tips.json")
+
+_icebreakers_cache: List[str] = []
+_tips_cache: List[str] = []
 
 
-def _build_shared_interest_or_icebreaker(user1: int, user2: int) -> str:
+def _load_starters_content():
+    global _icebreakers_cache, _tips_cache
+    if os.path.exists(ICEBREAKERS_FILE):
+        try:
+            with open(ICEBREAKERS_FILE, "r", encoding="utf-8") as f:
+                _icebreakers_cache = json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading {ICEBREAKERS_FILE}: {e}")
+    if os.path.exists(TIPS_FILE):
+        try:
+            with open(TIPS_FILE, "r", encoding="utf-8") as f:
+                _tips_cache = json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading {TIPS_FILE}: {e}")
+
+
+# Initialize in-memory cache on import
+_load_starters_content()
+
+ICEBREAKERS = _icebreakers_cache
+TIPS = _tips_cache
+
+
+def get_random_starter_blockquote() -> str:
+    """
+    Returns a blockquote formatted string containing either an Icebreaker or a Tip (50% chance each).
+    Format:
+    <blockquote>💡 <b>Icebreaker:</b>
+    {text}</blockquote>
+    or
+    <blockquote>💡 <b>Tip:</b>
+    {text}</blockquote>
+    """
+    if random.random() < 0.5 and _icebreakers_cache:
+        item = random.choice(_icebreakers_cache)
+        return f"<blockquote>💡 <b>Icebreaker:</b>\n{item}</blockquote>"
+    elif _tips_cache:
+        item = random.choice(_tips_cache)
+        return f"<blockquote>💡 <b>Tip:</b>\n{item}</blockquote>"
+    elif _icebreakers_cache:
+        item = random.choice(_icebreakers_cache)
+        return f"<blockquote>💡 <b>Icebreaker:</b>\n{item}</blockquote>"
+    else:
+        return "<blockquote>💡 <b>Tip:</b>\nType /game while in a chat to play Tic-Tac-Toe, Trivia, or Rock-Paper-Scissors with your partner!</blockquote>"
+
+
+def _build_shared_interests_line(user1: int, user2: int) -> str:
     p1 = init.user_details.get(user1, {}).get("preferences", 0) or 0
     p2 = init.user_details.get(user2, {}).get("preferences", 0) or 0
     overlap = p1 & p2
@@ -99,10 +142,15 @@ def _build_shared_interest_or_icebreaker(user1: int, user2: int) -> str:
             shared_tags.append(f"{emoji} {name}")
 
     if shared_tags:
-        return f"\n✨ <b>You both like:</b> {', '.join(shared_tags)}"
+        return f"{', '.join(shared_tags)}"
     else:
-        import random
-        return f"\n💡 <i>Icebreaker:</i> <b>\"{random.choice(ICEBREAKERS)}\"</b>"
+        return "<b>None</b> <i>(Maybe ask them yourself)</i>"
+
+
+def _build_shared_interest_or_icebreaker(user1: int, user2: int) -> str:
+    """Legacy helper maintained for test and backward compatibility."""
+    interests = _build_shared_interests_line(user1, user2)
+    return f"\n✨ <b>Shared Interests:</b> {interests}"
 
 
 def _overlap_score(a: int, b: int) -> int:
@@ -117,7 +165,8 @@ def _partner_details_line(viewer_id: int, partner_id: int) -> str:
     partner = init.user_details.get(partner_id, {})
     g = partner.get("gender")
     gender = "Male 👨" if g == "M" else "Female 👩" if g == "F" else "Not specified"
-    return f"\n✨ <i>VIP Perk: Partner is {gender}</i>"
+    return f"\n👑 <i>VIP Peek: Partner is {gender}</i>"
+
 
 
 async def start_chat_session(
@@ -164,7 +213,8 @@ async def start_chat_session(
     if not isinstance(uv2, dict):
         uv2 = {"up": 0, "down": 0}
 
-    starter_section = _build_shared_interest_or_icebreaker(user1, user2)
+    shared_interests = _build_shared_interests_line(user1, user2)
+    starter_blockquote = get_random_starter_blockquote()
 
     details1 = _partner_details_line(user1, user2)
     details2 = _partner_details_line(user2, user1)
@@ -179,11 +229,39 @@ async def start_chat_session(
         text1 = f"🎯 <b>Connected to target user! Say hi!</b> 👋\n\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
         text2 = f"🎯 <b>Someone found you.... Say hi!!</b>\n\n/next <i>- Next</i>\n/stop <i>- Stop</i>"
     elif is_friend_connection:
-        text1 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b>\n\nSay hi!👋\n{starter_section}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
-        text2 = f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b>\n\nSay hi!👋\n{starter_section}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text1 = (
+            f"🎉 <b>You are now connected with your anonymous friend {friend_name_1 or 'Friend'}!</b>\n\n"
+            f"Say hi! 👋\n"
+            f"✨ <b>Shared Interests:</b> {shared_interests}\n\n"
+            f"{starter_blockquote}\n\n"
+            f"───────────────\n"
+            f"⏭️ /next <i>— Next Chat</i>\n"
+            f"🛑 /stop <i>— Leave Chat</i>"
+        )
+        text2 = (
+            f"🎉 <b>You are now connected with your anonymous friend {friend_name_2 or 'Friend'}!</b>\n\n"
+            f"Say hi! 👋\n"
+            f"✨ <b>Shared Interests:</b> {shared_interests}\n\n"
+            f"{starter_blockquote}\n\n"
+            f"───────────────\n"
+            f"⏭️ /next <i>— Next Chat</i>\n"
+            f"🛑 /stop <i>— Leave Chat</i>"
+        )
     else:
-        text1 = f"🎯 <b>Found someone.... Say hi!!</b>\n\n<i>Rating:</i> {uv2.get('up', 0)} 👍 {uv2.get('down', 0)}👎\n{starter_section}{details1}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
-        text2 = f"🎯 <b>Found someone.... Say hi!!</b>\n\n<i>Rating:</i> {uv1.get('up', 0)} 👍 {uv1.get('down', 0)}👎\n{starter_section}{details2}\n\n/next <i>- Next Chat</i>\n/stop <i>- Stop Chat</i>"
+        text1 = PARTNER_FOUND_TEMPLATE.format(
+            rating_up=uv2.get("up", 0),
+            rating_down=uv2.get("down", 0),
+            vip_perk=details1,
+            shared_interests=shared_interests,
+            starter_quote=starter_blockquote,
+        )
+        text2 = PARTNER_FOUND_TEMPLATE.format(
+            rating_up=uv1.get("up", 0),
+            rating_down=uv1.get("down", 0),
+            vip_perk=details2,
+            shared_interests=shared_interests,
+            starter_quote=starter_blockquote,
+        )
 
     msg1 = await safe_tele_func_call(
         context.bot.send_message, chat_id=user1,

@@ -167,3 +167,52 @@ async def test_active_sessions_restored_on_startup(monkeypatch):
     assert is_in_chat(u1) is True
     assert is_in_chat(u2) is True
 
+
+@pytest.mark.asyncio
+async def test_partner_found_content_and_layout(monkeypatch):
+    from session_manager import _icebreakers_cache, _tips_cache, get_random_starter_blockquote, _build_shared_interests_line
+    assert len(_icebreakers_cache) == 128
+    assert len(_tips_cache) == 128
+
+    # Test random starter formatting: no surrounding quotes, starts on newline
+    for _ in range(50):
+        starter = get_random_starter_blockquote()
+        assert starter.startswith("<blockquote>💡 <b>")
+        assert starter.endswith("</blockquote>")
+        # Ensure no quotation marks wrapping the line
+        inner = starter.replace("<blockquote>", "").replace("</blockquote>", "")
+        lines = inner.split("\n", 1)
+        assert len(lines) == 2
+        content_line = lines[1]
+        assert not content_line.startswith('"')
+        assert not content_line.endswith('"')
+
+    # Test shared interests formatting
+    u1, u2 = 9201, 9202
+    init.user_details[u1] = {**init._default_user(), "preferences": 0}
+    init.user_details[u2] = {**init._default_user(), "preferences": 0}
+    none_line = _build_shared_interests_line(u1, u2)
+    assert none_line == "<b>None</b> <i>(Maybe ask them yourself)</i>"
+
+    # With preferences (e.g. Gaming bit 0 = 1)
+    init.user_details[u1]["preferences"] = 1
+    init.user_details[u2]["preferences"] = 1
+    matched_line = _build_shared_interests_line(u1, u2)
+    assert "Gaming" in matched_line
+
+    # Test full session message
+    monkeypatch.setattr("saveNload.is_blocked_pairwise", AsyncMock(return_value=False))
+    monkeypatch.setattr("saveNload.create_chat_session_db", AsyncMock(return_value="test-uuid-found"))
+    context = MagicMock()
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=101))
+
+    ok = await start_chat_session(context, u1, u2)
+    assert ok is True
+    msg_text = context.bot.send_message.call_args_list[0][1]["text"]
+    assert "🎯 <b>Partner found! Say hi!</b> 👋" in msg_text
+    assert "⭐ <b>Rating:</b>" in msg_text
+    assert "✨ <b>Shared Interests:</b>" in msg_text
+    assert "───────────────" in msg_text
+    assert "⏭️ /next <i>— Next Chat</i>" in msg_text
+    assert "🛑 /stop <i>— Leave Chat</i>" in msg_text
+

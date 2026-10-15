@@ -48,7 +48,7 @@ def test_shared_interest_reveal_matching_tags():
     init.user_details[u2] = {**init._default_user(), "preferences": 3}
 
     text = _build_shared_interest_or_icebreaker(u1, u2)
-    assert "✨ <b>You both like:</b>" in text
+    assert "✨ <b>Shared Interests:</b>" in text
     assert "Gaming" in text
     assert "Anime" in text
 
@@ -60,8 +60,8 @@ def test_shared_interest_reveal_icebreaker_fallback_when_no_match():
     init.user_details[u2] = {**init._default_user(), "preferences": 2}
 
     text = _build_shared_interest_or_icebreaker(u1, u2)
-    assert "💡 <i>Icebreaker:</i>" in text
-    assert "You both like" not in text
+    assert "None" in text
+    assert "Maybe ask them yourself" in text
 
 
 @pytest.mark.asyncio

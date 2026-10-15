@@ -174,7 +174,7 @@ async def test_vip_gender_peek_only_for_subscribers():
     # VIP user: gets gender peek only (no age, no country, no bio)
     init.user_details[u_vip]["subscription_expires"] = time.time() + 86400
     line_vip = _partner_details_line(u_vip, partner)
-    assert "VIP Perk" in line_vip
+    assert "VIP Peek" in line_vip
     assert "Female" in line_vip
     assert "Japan" not in line_vip
     assert "22" not in line_vip
