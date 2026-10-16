@@ -220,6 +220,78 @@ async def test_save_user_data_flushes_user_with_user_id_in_dict(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_upsert_user_placeholders_match_parameters(monkeypatch):
+    """Ensure all SQL statements inside upsert_user have matching placeholder and parameter counts."""
+    import re
+    from saveNload import upsert_user
+    from unittest.mock import AsyncMock, MagicMock
+
+    executed_queries = []
+
+    async def mock_execute(query, params=None):
+        if params is not None:
+            # Count %s placeholders (excluding %% and % escaped sequences)
+            placeholders = re.findall(r"(?<!%)%s", query)
+            assert len(placeholders) == len(params), (
+                f"Placeholder count mismatch: {len(placeholders)} placeholders vs {len(params)} parameters in query:\n{query}"
+            )
+        executed_queries.append((query, params))
+        mock_cur = MagicMock()
+        mock_cur.fetchone = AsyncMock(return_value=None)
+        return mock_cur
+
+    mock_conn = MagicMock()
+    mock_conn.execute = AsyncMock(side_effect=mock_execute)
+
+    class MockAsyncContextManager:
+        async def __aenter__(self):
+            return mock_conn
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    mock_conn.transaction.return_value = MockAsyncContextManager()
+
+    mock_pool = MagicMock()
+    mock_pool.connection.return_value = MockAsyncContextManager()
+
+    monkeypatch.setattr("saveNload.is_pool_ready", lambda: True)
+    monkeypatch.setattr("saveNload.get_pool", lambda: mock_pool)
+
+    # Call upsert_user with a variety of kwargs including show_badge, media_spoiler, etc.
+    uid = 8470217402
+    await upsert_user(
+        uid,
+        gender="M",
+        age=25,
+        country="India",
+        preferences=3,
+        points=100,
+        severity_score=1,
+        restricted_until=None,
+        restriction_reason=None,
+        daily_credits_used=2,
+        daily_credits_reset_day="2026-10-15",
+        daily_calls_used=1,
+        daily_calls_reset_day="2026-10-15",
+        is_banned=False,
+        pref_gender="F",
+        pref_country="ANY",
+        current_streak=5,
+        longest_streak=10,
+        last_streak_date="2026-10-15",
+        streak_rewards_claimed=[],
+        total_messages=45,
+        total_chat_duration=120.5,
+        last_active=1700000000,
+        media_spoiler=True,
+        show_badge=True,
+    )
+
+    assert len(executed_queries) >= 2, "Expected at least users and user_profiles upsert queries to be executed."
+
+
+@pytest.mark.asyncio
 async def test_get_user_votes_queries_db_and_fallback(monkeypatch):
     from saveNload import get_user_votes
     from unittest.mock import AsyncMock, MagicMock

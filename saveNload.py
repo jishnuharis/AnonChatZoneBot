@@ -332,8 +332,8 @@ async def upsert_user(*args, **kwargs):
                         daily_calls_used, daily_calls_reset_day,
                         is_banned, preferred_gender, preferred_country,
                         current_streak, longest_streak, last_streak_date, streak_rewards_claimed,
-                        total_messages, total_chat_duration, last_active, media_spoiler
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s)
+                        total_messages, total_chat_duration, last_active, media_spoiler, show_badge
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET
                         severity_score = COALESCE(EXCLUDED.severity_score, user_profiles.severity_score),
                         restricted_until = EXCLUDED.restricted_until,
